@@ -1,0 +1,213 @@
+@extends('admin.layoutEdit')
+@section('css')
+    <link href="/libs/iCheck/skins/square/blue.css" rel="stylesheet">
+    <link href="/libs/layui-v2.1.7/css/layui.css" rel="stylesheet">
+    <style>
+        .title {
+            width: 100%;
+            background-color: #eee;
+            line-height: 55px;
+            margin-bottom: 20px;
+        }
+        .title span {
+            margin-left: 15px;
+            font-size: 16px;
+        }
+        .pic-list ul {
+            padding-left: 0;
+        }
+        .pic-list ul li {
+            float: left;
+            margin: 0 15px 15px 0;
+            display: block;
+            width: 100px;
+            height: 100px;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            background-color: #fff;
+            position: relative;
+        }
+        .pic-list ul li img {
+            width: 98px;
+            height: 98px;
+        }
+        .pic-list ul li a {
+            display: inline-block;
+            width: 100%;
+            height: 100%;
+            line-height: 100px;
+            text-align: center;
+            cursor: pointer;
+        }
+        .pic-list .glyphicon-remove {
+            right: -12px;
+            top: -12px;
+        }
+    </style>
+@endsection
+@section('title')
+    <ul>
+        <li class="cur">
+            <span>创建商品</span>
+        </li>
+    </ul>
+@endsection
+
+@section('go-back-btn')
+    <button class="btn btn-default layer-go-back" type="button" onclick="back()">返回</button>
+@endsection
+
+@section('content')
+
+    <form action="#" id="goods-add" class="form-horizontal" role="form">
+        <div style="border: 1px solid #eee">
+            <div class="title">
+                <span>基本信息</span>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-2 control-label" for="" style="text-align: right;line-height: 20px;;">
+                    <span style="color:red">* </span>分类名称：</label>
+                <div class="col-sm-10">
+                    <input type="text" class="form-control" style="width:320px;" placeholder="格式:伊利安慕希酸奶蓝莓味 205克*6瓶/组">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-2 control-label" for="" style="text-align: right;line-height: 20px;;">
+                    <span style="color:red">* </span>商品分类：</label>
+                <div class="col-sm-10">
+                    <select class="form-control" style="width:160px;">
+                        <option value="">请选择</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-2 control-label" for="" style="text-align: right;line-height: 20px;;">
+                    <span style="color:red">* </span>商品单位：</label>
+                <div class="col-sm-10">
+                    <input type="text" class="form-control" style="width:160px;" placeholder="件">
+                </div>
+            </div>
+        </div>
+        <div style="height: 15px;"></div>
+        <div style="border: 1px solid #eee">
+            <div class="title">
+                <span>商品规格</span>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-2 control-label" for="" style="text-align: right;line-height: 6px;">
+                    <span style="color:red">* </span>是否多规格：</label>
+                <div class="col-sm-10">
+                    <input type="radio" class="square-radio" name="spec_type" checked> &nbsp;否&nbsp;&nbsp;
+                    <input type="radio" class="square-radio" name="spec_type"> &nbsp;是
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-2 control-label" for="" style="text-align: right;line-height: 20px;;">
+                    商家编码：</label>
+                <div class="col-sm-10">
+                    <input type="text" class="form-control" style="width:160px;" placeholder="请输入商家编码">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-2 control-label" for="" style="text-align: right;line-height: 20px;;">
+                    商品条码：</label>
+                <div class="col-sm-10">
+                    <input type="text" class="form-control" style="width:160px;" placeholder="请输入商品条码">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-2 control-label" for="" style="text-align: right;line-height: 20px;;">
+                    <span style="color:red">* </span>销售价：</label>
+                <div class="col-sm-10">
+                    <input type="text" class="form-control" style="width:160px;" placeholder="请输入销售价">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-2 control-label" for="" style="text-align: right;line-height: 20px;;">
+                    </span>包装费：</label>
+                <div class="col-sm-10">
+                    <input type="text" class="form-control" style="width:160px;" placeholder="0">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-2 control-label" for="" style="text-align: right;line-height: 20px;;">
+                    </span>重量：</label>
+                <div class="col-sm-10 input-group" style="width:176px;">
+                    <input type="text" class="form-control" style="margin-left: 15px;width:122px;" placeholder="0">
+                    <span class="input-group-addon">克</span>
+                </div>
+            </div>
+            <div style="height: 20px;"></div>
+            <div class="form-group">
+                <label class="col-sm-2 control-label" for="" style="text-align: right;line-height: 20px;;">
+                    </span>库存转换系数：</label>
+                <div class="col-sm-10">
+                    <input type="text" class="form-control" style="width:160px;display: inline-block;" placeholder="请输入库存转换系数">
+                    <span> 比如：商品A的线下库存是10kg，在线上售卖1份是500g，商品A的库存系数就是0.5</span>
+                </div>
+            </div>
+        </div>
+        <div style="height: 15px;"></div>
+        <div style="border: 1px solid #eee">
+            <div class="title">
+                <span>商品图片</span>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-2 control-label" for="" style="text-align: right;line-height: 20px;;">
+                    <span style="color:red">* </span>商品图片：</label>
+                <div class="col-sm-10 pic-list" id="js-pic-list">
+                    <ul>
+                        <li class="no-sort">
+                            <a href="#" id="file-view">+添加图片</a>
+                        </li>
+                    </ul>
+                    <span class="help-block" style="clear: both;">建议尺寸：800 x 800 像素；可以拖拽图片调整图片顺序；可点击图片放大。</span>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-2 control-label" for="" style="text-align: right;line-height: 20px;;">
+                    <span style="color:red">* </span>商品描述：</label>
+                <div class="col-sm-10">
+                    <textarea name="" id="" cols="80" rows="8"></textarea>
+                </div>
+            </div>
+        </div>
+    </form>
+@endsection
+
+@section('js')
+    <script src="/libs/iCheck/icheck.js"></script>
+    <script src="/js/admin/photo.js"></script>
+    <script src="/libs/layui-v2.1.7/layui.js"></script>
+
+    <script>
+        $('.square-radio').iCheck({
+            checkboxClass: 'icheckbox_square-blue',
+            radioClass: 'iradio_square-blue',
+            increaseArea: '20%' // optional
+        });
+
+        $(function () {
+
+            var csrf = '{{ csrf_token() }}';
+
+            layui.use('upload', function(){
+                var upload = layui.upload;
+
+                //执行实例
+                var uploadInst = upload.render({
+                    elem: '#file-view' //绑定元素
+                    ,url: '/upload' //上传接口
+                    ,data : { action : 'goods.upload', _token : csrf }
+                    ,done: function(res){
+                        console.log(res);
+                    }
+                    ,error: function(){
+                        //请求异常回调
+                    }
+                });
+            });
+        });
+
+    </script>
+@endsection

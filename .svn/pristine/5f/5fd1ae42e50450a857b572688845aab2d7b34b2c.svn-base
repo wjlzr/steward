@@ -1,0 +1,170 @@
+<?php
+
+/*
+|--------------------------------------------------------------------------
+| Web Routes
+|--------------------------------------------------------------------------
+|
+| Here is where you can register web routes for your application. These
+| routes are loaded by the RouteServiceProvider within a group which
+| contains the "web" middleware group. Now create something great!
+|
+*/
+
+Route::get('/', function () {
+    return view('welcome');
+});
+
+
+/*
+ * -------------------------
+ * 前端样式页面路由 开始
+ * ------------------------
+ */
+
+//登录页
+Route::get('web/login', function () {
+    return view('admin/web/login');
+});
+
+Route::get('web/mall', function () {
+    return view('admin/web/mall');
+});
+
+Route::get('web/goods', function () {
+    return view('admin/goods');
+});
+
+Route::get('web/tbgoods', function () {
+    return view('admin/tbgoods');
+});
+
+
+/*
+ * -------------------------
+ * 前端样式页面路由 结束
+ * ------------------------
+ */
+
+
+Route::get('kit/captcha', 'Common\KitController@captcha');
+
+Route::get('admin/login', 'Admin\LoginController@index');
+Route::get('admin/login/do', 'Admin\LoginController@login');
+Route::get('admin/logout', 'Admin\LoginController@logout');
+
+Route::post('upload', 'Common\UploadController@upload');
+
+Route::middleware(['admin.service'])->group(function () {
+
+    //首页
+    Route::get('admin', 'Admin\IndexController@main');
+    Route::get('admin/index', 'Admin\IndexController@index');
+    Route::get('admin/index/mall', 'Admin\IndexController@mall');
+
+    //订单
+    Route::get('admin/order', 'Admin\OrderController@index');
+    Route::get('admin/order/search', 'Admin\OrderController@search');
+    Route::get('admin/order/detail/{id}', 'Admin\OrderController@detail');
+
+    //商品分类
+    Route::get('admin/category', 'Admin\Goods\CategoryController@index');   //分类列表
+    Route::get('admin/category/search', 'Admin\Goods\CategoryController@search');  //分类查询
+    Route::get('admin/category/edit', 'Admin\Goods\CategoryController@edit');  //修改分类
+    Route::get('admin/category/add', 'Admin\Goods\CategoryController@add');   //添加分类
+    Route::get('admin/category/status', 'Admin\Goods\CategoryController@status');  //启用禁用
+    Route::get('admin/category/sync', 'Admin\Goods\CategoryController@sync');   //同步分类至平台
+
+    //商品管理
+    Route::get('admin/goods', 'Admin\Goods\GoodsController@index');     //商品列表
+    Route::get('admin/goods/search/{type}', 'Admin\Goods\GoodsController@search');  //商品数据查询
+    Route::get('admin/goods/shelf', 'Admin\Goods\GoodsController@shelf');   //上下架
+    Route::get('admin/goods/edit/{id}', 'Admin\Goods\GoodsController@edit');   //添加修改商品页
+    Route::get('admin/goods/submit', 'Admin\Goods\GoodsController@submit');   // 添加修改商品操作
+    Route::get('admin/goods/search_price/{id}', 'Admin\Goods\GoodsController@searchPrice');  //查询商品价格
+    Route::get('admin/goods/edit_price', 'Admin\Goods\GoodsController@editPrice');   //修改商品价格
+    Route::get('admin/goods/batch_upload', 'Admin\Goods\GoodsController@batchUpload');  // 批量导入
+    Route::get('admin/goods/download', 'Admin\Goods\GoodsController@download');  // 下载商品上传模板
+    Route::get('admin/goods/export', 'Admin\Goods\GoodsController@export');  // 导出商品列表
+
+    //商品同步
+    Route::get('admin/goods/synch', 'Admin\Goods\GoodsSynchController@index');
+    Route::get('admin/goods/synch/search', 'Admin\Goods\GoodsSynchController@search');
+    Route::get('admin/goods/synch/edit/{id}', 'Admin\Goods\GoodsSynchController@edit');
+    Route::get('admin/goods/synch/app', 'Admin\Goods\GoodsSynchController@app');
+    Route::get('admin/goods/synch/submit', 'Admin\Goods\GoodsSynchController@submit');
+
+    //商品列表插件
+    Route::get('admin/plugin', 'Admin\Plugin\GoodsPluginController@index');
+    Route::get('admin/plugin/search', 'Admin\Plugin\GoodsPluginController@search');
+    Route::get('admin/plugin/goods', 'Admin\Plugin\GoodsPluginController@goods');
+
+    //门店列表插件
+    Route::get('admin/plugin/mall', 'Admin\Plugin\MallPluginController@index');
+    Route::get('admin/plugin/mall/search', 'Admin\Plugin\MallPluginController@search');
+    Route::get('admin/plugin/mall/query', 'Admin\Plugin\MallPluginController@query');
+
+    //经营分析
+    Route::get('admin/business/analyse/{op?}', 'Admin\Analyse\OperatingIndexController@index');
+    Route::post('admin/business/analyse/1/report', 'Admin\Analyse\BillSaleController@report');
+    Route::post('admin/business/analyse/1/list', 'Admin\Analyse\BillSaleController@saleList');
+
+    //营业分析
+    Route::get('admin/business/analyse/search/list', 'Admin\Analyse\businessController@search');
+
+    //商品分析
+    Route::get('admin/goods/analyse/list', 'Admin\Analyse\goodsController@goodsList');
+    Route::post('admin/goods/analyse/export', 'Admin\Analyse\goodsController@export');
+
+    //商品类别分析
+    Route::get('admin/goods/category/list', 'Admin\Analyse\categoryController@categoryList');
+    Route::post('admin/goods/category/export', 'Admin\Analyse\categoryController@export');
+
+    //门店分析
+    Route::get('admin/mall/analyse/list', 'Admin\Analyse\mallController@mallList');
+    Route::post('admin/mall/analyse/export', 'Admin\Analyse\mallController@export');
+
+    //门店结算
+    Route::get('admin/mall/balance/list', 'Admin\Analyse\mallController@balanceList');
+    Route::post('admin/mall/analyse/balance/export', 'Admin\Analyse\mallController@balanceExport');
+
+    //系统设置
+    Route::get('admin/mall1', 'Admin\Mall\MallController@index1');
+    Route::get('admin/mall', 'Admin\Mall\MallController@index');
+    Route::get('admin/mall/search', 'Admin\Mall\MallController@search');
+    Route::get('admin/mall/status', 'Admin\Mall\MallController@status');
+    Route::get('admin/mall/update', 'Admin\Mall\MallController@updateStock');
+    Route::get('admin/mall/edit', 'Admin\Mall\MallController@edit');
+    Route::get('admin/mall/save', 'Admin\Mall\MallController@submit');
+    Route::get('admin/mall/search_status/{mall_id}', 'Admin\Mall\MallController@searchStatus');
+    Route::get('admin/mall/set_status', 'Admin\Mall\MallController@setStatus');
+    Route::get('admin/mall/set_time', 'Admin\Mall\MallController@setTime');
+
+    //任务管理
+    Route::get('admin/task', 'Admin\Task\TaskManageController@index');
+    Route::get('admin/task/search', 'Admin\Task\TaskManageController@search'); // 查询任务管理
+    Route::get('admin/task/get', 'Admin\Task\TaskManageController@get'); // 获取任务单条信息
+    Route::post('admin/task/edit', 'Admin\Task\TaskManageController@edit'); // 编辑or添加任务
+    Route::get('admin/task/status', 'Admin\Task\TaskManageController@status'); // 暂停或运行任务
+    Route::get('admin/task/del', 'Admin\Task\TaskManageController@del'); // 删除任务
+    Route::get('admin/task/log', 'Admin\Task\TaskManageController@log'); // 查询日志
+
+    //用户管理
+    Route::get('admin/user', 'Admin\User\UserController@index');
+    Route::get('admin/user/search', 'Admin\User\UserController@search');
+    Route::get('admin/user/add', 'Admin\User\UserController@add');
+    Route::get('admin/user/edit', 'Admin\User\UserController@edit');
+    Route::get('admin/user/submit', 'Admin\User\UserController@submit');
+    Route::get('admin/user/status', 'Admin\User\UserController@status');
+    Route::get('admin/user/add_mall', 'Admin\User\UserController@add_mall');
+    Route::get('admin/user/get', 'Admin\User\UserController@get');
+
+});
+
+Route::middleware(['api.service'])->prefix('/open-api/')->group(function () {
+    Route::get('order/index', 'Api\Order\OrderController@index');
+    Route::get('order/search', 'Api\Order\OrderController@search');
+    Route::get('order/detail/{id}', 'Api\Order\OrderController@detail');
+    Route::get('user/search', 'Api\User\UserController@search');
+    Route::get('user/edit', 'Api\User\UserController@edit');
+});

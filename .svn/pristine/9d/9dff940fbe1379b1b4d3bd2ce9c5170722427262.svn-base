@@ -1,0 +1,487 @@
+<?php
+
+namespace App\Http\Controllers\Receive;
+
+use DB;
+use Wm;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
+use App\Models\Order\StOrder;
+use App\Models\StApp;
+use App\Models\ConfigureFunction;
+use App\Models\Order\StOrderTrace;
+use App\Http\Controllers\Controller;
+use Mockery\CountValidator\Exception;
+
+class BdFoodController extends Controller
+{
+
+    public $curl;
+    public $config;
+    public $parameters;
+
+    public function __construct()
+    {
+        $app = StApp::find(100001);
+        $this->curl = Wm::curl_client($app);
+        $this->config = $this->curl->config;
+    }
+
+    /**
+     * 订单入口
+     * @param Request $request
+     */
+    public function index(Request $request)
+    {
+
+        $input_request = $request->input();
+        $app = $input_request['_app'];
+
+        error_log('======//接受数据');
+
+        $input_request['body'] = json_decode($input_request['body'],true);
+
+        error_log(var_export($input_request,true));
+
+        $this->setParamsArray($input_request['body']);
+
+        $cmd = $this->getParameter('cmd');
+
+        if (!$cmd) {
+            $this->returnJson(1, '参数失败');
+        }
+
+        $body = $this->getParameter('body');
+
+        if ($cmd != 'order.create') {
+            $order = StOrder::where('app_order_id', $body['order_id'])
+                ->first();
+            if (!$order) {
+                $this->returnJson(1, '订单信息没有找到');
+            }
+            $body['order_id'] = $order->id;
+        }
+
+        switch ($cmd){
+
+            //订单创建
+            case 'order.create':
+                $res = $this->create($body['order_id'],$app);
+                break;
+
+            case 'order.status.push':
+                $res = $this->statusPush($body, $body['status']);
+                break;
+
+            default:
+                $res = ['code'=>400, 'message'=>'参数错误'];
+
+        }
+
+        if ($res['code'] != 200) {
+            $this->returnJson(1, $res['message']);
+        }
+
+        $this->returnJson(0, 'success');
+
+    }
+
+    /**
+     * 创建订单【下行】
+     * @param string $order_id 平台订单Id
+     * @return array
+     */
+    public function create($order_id,$app) {
+
+        error_log('创建订单');
+        error_log($order_id);
+
+        $StOrder = StOrder::where(['app_order_id' => $order_id])->first();
+
+        if( $StOrder ){
+            return ['code'=>400, 'message'=>'此订单号已创建过订单'];
+        }
+
+        //接口查询订单详情
+        $detail = $this->detail($order_id);
+
+        if (!isset($detail['code']) || $detail['code'] != 200) {
+            return ['code'=>$detail['code'], 'message'=>$detail['message']];
+        }
+
+        $detail_array = $detail['data'];
+
+        $args_data = [
+            'app_id' => $app->id,
+            'order_id' => $detail_array['order']['order_id'],
+            'operator' => 'bd-api',
+            'day_sequence' => $detail_array['order']['order_index'],
+            'user_fee' => $detail_array['order']['user_fee'] > 0 ? $detail_array['order']['user_fee'] / 100 : $detail_array['order']['user_fee'],       //订单应付金额(用户实际需要支付的金额)
+            'order_fee' => $detail_array['order']['total_fee'],
+            'mall_fee' => $detail_array['order']['shop_fee'],
+            'service_fee' => $detail_array['order']['commission'],
+            'mall_act_fee' => $detail_array['discount']['shop_rate'],
+            'app_act_fee' => $detail_array['discount']['baidu_rate'],
+            'mall_code' => $detail_array['shop']['id'],
+            'send_time' => 0,
+            'deliver_lng' => $detail_array['user']['coord']['longitude'],
+            'deliver_lat' => $detail_array['user']['coord']['latitude'],
+            'deliver_name' => $detail_array['user']['name'],
+            'deliver_mobile' => $detail_array['user']['phone'],
+            'deliver_address' => $detail_array['user']['address'],
+            'freight_fee' => $detail_array['order']['send_fee'] > 0 ? $detail_array['order']['send_fee'] / 100 : $detail_array['order']['send_fee'],
+            'package_fee' => $detail_array['order']['package_fee'],
+            'discount_fee' => $detail_array['order']['discount_fee'] > 0 ? $detail_array['order']['discount_fee'] / 100 : $detail_array['order']['discount_fee'],
+            'invoice' => $detail_array['order']['need_invoice'] == 2 ? 0 :$detail_array['order']['need_invoice'], //是否需要发票 1 是 2 否
+            'invoice_title' => $detail_array['order']['invoice_title'],
+            'taxer_id' => $detail_array['order']['taxer_id'],
+            'remark' => $detail_array['order']['remark'],
+            'goods' => [],
+            'wm_bill_json' => json_encode($detail)
+        ];
+
+        if( $detail_array['order']['send_time'] == 1 ){
+            $args_data['send_time'] = date('Y-m-d H:i' , time());
+        }else{
+            $args_data['send_time'] = date('Y-m-d H:i' , $detail_array['order']['send_time']);
+        }
+
+        //检查商品
+        if(!isset($detail_array['products']) || empty($detail_array['products'])) {
+            return array('code'=>404, 'message'=>'没有商品信息');
+        }
+
+        foreach($detail_array['products'] as $products) {
+
+            foreach($products as $goods) {
+
+                /*//商品规格
+                $spec = '';
+                if (isset($goods['product_attr']) && $goods['product_type'] != 2) {
+                    foreach($goods['product_attr'] as $spec) {
+                        $spec .= $spec['option'].',';
+                    }
+                }*/
+                $args_data['goods'][] = [
+                    'goods_name' => $goods['product_name'],  //商品名称
+                    'goods_number' => $goods['product_amount'], //商品份数
+                    'goods_from' => 1,
+                    'price' => ($goods['product_price'] + ($goods['package_price'] * $goods['package_amount'])) / 100, //商品实售价
+                    'sku' => $goods['upc'], //商品编号
+                ];
+            }
+
+        }
+
+        $result = Wm::create_order($args_data);
+
+        error_log('======测试创建订单//');
+        error_log(var_export($result,true));
+
+        return $result;
+
+    }
+
+    /**
+     * 订单状态更新【下行】
+     * @param $args_data
+     * @param $status
+     * @return array|mixed
+     * @throws Exception
+     */
+    public function statusPush($args_data, $status) {
+
+        error_log('1111111//');
+        error_log(var_export($args_data,true));
+
+        if (!isset($args_data['order_id']) || empty($args_data['order_id'])) {
+            return ['code'=>400, 'message'=>'参数错误：order_id'];
+        }
+
+        if (!in_array($status, [1,5, 7, 8, 9, 10])) {
+            return ['code'=>400, 'message'=>'参数错误：status'];
+        }
+
+        $StOrder = StOrder::where('o_order_id',$args_data['order_id'])->first();
+        if (!$StOrder) {
+            return ['code' => 400, 'message' => '没有此订单'];
+        }
+
+        $bill_no = $StOrder->id;
+
+        $open_allot = ConfigureFunction::getConfigureField(21, 'open_allot');//是否开启配货环节
+
+        $bill_status = $open_allot == 1 ? 2 : 7; //订单状态：开启配货流程为2，不开启为7
+
+        $content_map = [
+            7 => [2, '骑士已接单开始取餐'],
+            8 => [4, '骑士已取餐正在配送'],
+        ];
+
+        if ($status == 5) {
+            $res = $this->confirm($args_data['order_id']);
+        }else if ($status == 9) {
+            $res = $this->finish($args_data['order_id']);
+        } else if ($status == 10) {
+            $res = $this->cancel($args_data['order_id']);
+        } else {
+            $distribution_data = [
+                'bill_no' => $bill_no,
+                'bill_status' => $bill_status,
+                'logistics_status' => $content_map[$status][0],
+                'content' => $content_map[$status][1],
+                'operator' => $this->config['operator']
+            ];
+            if ($status == 1) {
+                $distribution_data['name'] = '';
+                $distribution_data['phone'] = '';
+            }
+
+            //如果开启配货流程，平台配送触发发货流程
+            if ($status == 2 && $open_allot == 1) {
+                $deliver = WdhService::deliverGoods(['bill_no'=>$bill_no, $this->config['operator']]);
+                if ($deliver['code'] != 200) {
+                    return $deliver;
+                }
+            }
+
+            //记录订单轨迹并更新物流状态
+            $StOrderTrace = new StOrderTrace();
+            $StOrderTrace->updated_at = Carbon::now();
+            $StOrderTrace->creator = 'mt-push';
+            $StOrderTrace->created_at = Carbon::now();
+            $StOrderTrace->order_id = $StOrder->id;
+            $StOrderTrace->order_status = $bill_status;
+            $StOrderTrace->content = $content_map[$status][1];
+            $StOrderTrace->save();
+
+            $res = ['code'=>200, 'message'=>'ok'];
+
+        }
+
+        return $res;
+
+    }
+
+    /**
+     * 确认接单回调
+     * @param $order_id
+     * @return array
+     */
+    public function confirm ($order_id)
+    {
+
+        error_log('======//小度掌柜接单啦');
+
+        if (!isset($order_id) || empty($order_id)) {
+            return ['code' => 400, 'message' => '参数错误：order_id'];
+        }
+
+        //检查查询wm_bill
+        $StOrder = StOrder::where('o_order_id',$order_id)->first();
+
+        if (!$StOrder) {
+            return ['code' => 400, 'message' => '外卖订单不存在'];
+        }
+
+       /* //查询bill_master
+        $bill_no = $bill_takeout->bill_no;
+
+        $bill_master = Bill::where('bill_no',$bill_no)->first();
+
+        if (!$bill_master) {
+            return ['code' => 400, 'message' => '订单不存在'];
+        }*/
+
+        /*if ($bill_master->order_receive == 1) {
+            return ['code' => 400, 'message' => '外卖订单已接单'];
+        }
+
+        if ($bill_master->pay_type == 2 && $bill_master->pay_status != 1) {
+            return ['code' => 400, 'message' => '外卖订单未全部付款'];
+        }
+
+        if ( $bill_master->bill_refund_status > 0 ) {
+            return ['code' => 400, 'message' => '此订单正在退款'];
+        }*/
+
+        try {
+
+            DB::beginTransaction();
+
+            $StOrderTrace = new StOrderTrace();
+            $StOrderTrace->updated_at = Carbon::now();
+            $StOrderTrace->creator = 'mt-push';
+            $StOrderTrace->created_at = Carbon::now();
+            $StOrderTrace->order_id = $StOrder->id;
+            $StOrderTrace->order_status = $StOrder->status;
+            $StOrderTrace->content = '您的订单已接单';
+            $StOrderTrace->save();
+
+            //Bill::where('bill_no',$bill_no)->update(['order_receive'=>1]);
+
+            DB::commit();
+
+            return ['code' => 200, 'message' => 'ok'];
+
+        } catch (Exception $e) {
+
+            DB::rollBack();
+
+            return ['code' => $e->getCode(), 'message' => $e->getMessage()];
+        }
+
+    }
+
+    /**
+     * 已完成订单
+     * @param $order_id
+     * @return array
+     */
+    public function finish($order_id) {
+
+        if (!isset($order_id) || empty($order_id)) {
+            return ['code'=>400, 'message'=>'缺少必要的参数：order_id'];
+        }
+
+        $StOrder = StOrder::where('o_order_id', $order_id)->first();
+        if (!$StOrder) {
+            return ['code'=>404, 'message'=>'订单信息没有找到'];
+        } else if ($StOrder->status != 1) {
+            return ['code'=>400, 'message'=>'订单未接单'];
+        } else if ($StOrder->status == 4) {
+            return ['code'=>400, 'message'=>'订单已完成'];
+        } else if ($StOrder->status == 5) {
+            return ['code'=>400, 'message'=>'订单已取消'];
+        }
+
+        try {
+
+            DB::beginTransaction();
+
+            StOrderTrace::insert([
+                'updated_at' => Carbon::now(),
+                'creator' => 'mt-push',
+                'created_at' => Carbon::now(),
+                'order_id' => $StOrder->id,
+                'order_status' => 4,
+                'content'=>'您的订单已完成',
+            ]);
+
+            StOrder::where('id', $StOrder->id)->update([
+                'status' => 4
+            ]);
+
+            DB::commit();
+            return ['code'=>200, 'message'=>'ok'];
+
+        } catch (Exception $e) {
+            DB::rollBack();
+            return ['code'=>$e->getCode(), 'message'=>$e->getMessage()];
+        }
+    }
+
+    /**
+     * 美团用户或客服取消
+     */
+    public function cancel($order_id) {
+
+        if (!isset($order_id) || empty($order_id)) {
+            return ['code' => 400, 'message' => '参数错误：order_id'];
+        }
+
+        $StOrder = StOrder::where('o_order_id',$order_id)->first();
+        if (!$StOrder) {
+            return ['code' => 400, 'message' => '订单信息没有找到'];
+        } else if ($StOrder->status == 5) {
+            return ['code' => 400, 'message' => '订单已经被取消'];
+        }
+
+        try {
+
+            DB::beginTransaction();
+
+            StOrder::where('id', $StOrder->id)->update(['status'=>5]);
+
+            $StOrderTrace = new StOrderTrace();
+            $StOrderTrace->updated_at = Carbon::now();
+            $StOrderTrace->creator = 'mt-push';
+            $StOrderTrace->created_at = Carbon::now();
+            $StOrderTrace->order_id = $StOrder->id;
+            $StOrderTrace->order_status = $StOrder->status;
+            $StOrderTrace->content = '订单已取消';
+            $StOrderTrace->save();
+
+            DB::commit();
+            return ['code' => 200, 'message' => 'ok'];
+
+        } catch(Exception $e) {
+            DB::rollback();
+            return ['code' => $e->getCode(), 'message' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * 获取订单详情接口【上行】
+     * @param string $order_id 百度外卖订单Id
+     * @return array
+     */
+    public function detail($order_id) {
+        return  $this->curl->call(['order_id'=>$order_id], 'order.get');
+    }
+
+    /**
+     * 保存参数
+     * @param array $paramsArray
+     */
+    public function setParamsArray( $paramsArray ) {
+        foreach($paramsArray as $k => $v) {
+            $this->parameters[$k] = $v;
+        }
+    }
+
+    /**
+     * 根据key获得参数数值
+     * @param string $key
+     * @return mixed
+     */
+    public function getParameter( $key ) {
+        if (isset($this->parameters[$key])) {
+            return $this->parameters[$key];
+        } else {
+            return null;
+        }
+    }
+
+    /**
+     * 百度接口请求响应
+     * @param $erron
+     * @param $error
+     * @param array $data
+     * @return array
+     */
+    public function returnJson($erron, $error, $data =[]) {
+
+        $return_data = [
+            'body'=>[
+                'erron'=>$erron,
+                'error'=>$error,
+                'data'=>$data
+            ],
+            'cmd'=>'resp.' . $this->parameters['cmd'],
+            'source'=>$this->config['appKey'],
+            'ticket'=>$this->curl->ticket(),
+            'version'=>$this->config['version'],
+            'timestamp'=>time()
+        ];
+
+        $return_data['body'] = json_encode($return_data['body']);
+
+        $return_data['sign'] = $this->curl->sign($return_data);
+        $return_data = json_encode($return_data);
+
+        return $return_data;
+
+    }
+
+}

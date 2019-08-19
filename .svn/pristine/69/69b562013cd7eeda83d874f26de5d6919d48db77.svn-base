@@ -1,0 +1,53 @@
+<?php
+
+namespace App\Services\Analyse;
+
+
+class MallAnalyseService
+{
+
+
+    /**
+     * 门店分析
+     * @param $args = [
+     *      'mall_id' => int 门店ID【选填】
+     *      'app_id' => int 应用ID【选填】
+     *      'start_date' => string 开始日期【必须】
+     *      'end_date' => string 结束日期【必须】
+     *      'page' => int 当前页码【选填】(默认为1)
+     *      'page_size' => int 每页数量【选填】(默认为10)
+     * ]
+     * @return array = [
+     *      'total' => int 总条数
+     *      'list' => [
+     *          'mall_name' => string 门店名称
+     *          'mall_code' => string 门店编号
+     *          'sales_fee' => string 营业额
+     *          'pay' => string 支出额
+     *          'expected_income' => string 预计收入
+     *          'sales_number' => int 订单数
+     *          'unit_price' => string 客单价
+     *      ]
+     * ]
+     */
+    public function mall($args)
+    {
+
+        $return_result = [
+            'total' => 0,
+            'list' => [
+                'mall_name' => '',
+                'mall_code' => '',
+                'sales_fee' => '',
+                'pay' => '',
+                'expected_income' => '',
+                'sales_number' => 0,
+                'unit_price' => '',
+            ]
+        ];
+        return $return_result;
+
+    }
+
+
+}

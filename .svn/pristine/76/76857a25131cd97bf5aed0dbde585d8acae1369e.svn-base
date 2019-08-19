@@ -1,0 +1,170 @@
+<?php
+
+namespace App\Http\Controllers\Admin\Analyse;
+
+use DB;
+
+use Illuminate\Http\Request;
+
+use App\Models\Goods\StStatMallSettleAccounts;
+
+use App\Models\Goods\StStatMallAnalyse;
+
+use App\Models\Mall\MallMaster;
+
+use App\Models\StApp;
+
+use App\Http\Controllers\Controller;
+
+class mallController extends Controller
+{
+
+    public function mallList( Request $request )
+    {
+
+        $startDate = $request->input('startDate');
+        $endDate = $request->input('endDate');
+        $app_id = $request->input('app_id');
+        $mall_name = $request->input('mall_id');
+
+        $where = [];
+
+        if ( !empty( $app_id ) ) {
+            $where[] = ['app_id' , '=' , $app_id] ;
+        }
+
+        if ( !empty( $mall_name ) ) {
+
+            $mall = MallMaster::where([['mallName','LIKE','%'.$mall_name.'%']])->first();
+
+            if ( $mall ) {
+                $where[] = ['mall_id' , '=' , $mall->mallID] ;
+            } else {
+                return response()->json(['total' => 0, 'rows' => []]);
+            }
+        }
+
+        if ( !empty( $startDate ) ) {
+            $where[] = ['cal_date','>=',$startDate];
+        }
+
+        if ( !empty( $endDate ) ) {
+            $where[] = ['cal_date','<=',$endDate];
+        }
+
+        $mall_data = StStatMallAnalyse::where($where)
+            ->orderBy($request->input('sort'), $request->input('order'))
+            ->groupBy('mall_id')
+            ->paginate($request->input('limit'))
+            ->toArray();
+
+        //返回数组
+        $return = [
+            'total' => $mall_data['total'],
+            'rows' => []
+        ];
+
+        if ( $mall_data['data'] ) {
+
+            foreach( $mall_data['data'] as $row ) {
+
+                $mall_name = '';
+                if ( !empty( $row['mall_id'] ) ) {
+                    $mall_master = MallMaster::find( $row['mall_id'] );
+                    if ( $mall_master ) {
+                        $mall_name = $mall_master->mallName;
+                    }
+                }
+
+                $return['rows'][] = [
+                    'mall_name' => $mall_name,
+                    'total_user_fee' => $row['total_user_fee'],
+                    'expense' => $row['activity_expense']+$row['service_expense']+$row['app_expense'],
+                    'total_mall_fee' => $row['total_mall_fee'],
+                    'total_sale_bill_num' => $row['total_sale_bill_num'],
+                    'bill_money' => round( $row['total_user_fee']/$row['total_sale_bill_num'] ,2)
+                ];
+
+            }
+        }
+
+
+        return response()->json($return);
+
+    }
+
+
+    public function balanceList( Request $request )
+    {
+
+        $startDate = $request->input('startDate');
+        $endDate = $request->input('endDate');
+        $app_id = $request->input('app_id');
+
+        $where = [];
+
+        if ( !empty( $app_id ) ) {
+            $where[] = ['app_id' , '=' , $app_id] ;
+        }
+
+        if ( !empty( $startDate ) ) {
+            $where[] = ['cal_date','>=',$startDate];
+        }
+
+        if ( !empty( $endDate ) ) {
+            $where[] = ['cal_date','<=',$endDate];
+        }
+
+        $mall_data = StStatMallSettleAccounts::where($where)
+            ->orderBy($request->input('sort'), $request->input('order'))
+            ->groupBy('mall_id')
+            ->paginate($request->input('limit'))
+            ->toArray();
+
+        //返回数组
+        $return = [
+            'total' => $mall_data['total'],
+            'rows' => []
+        ];
+
+        if ( $mall_data['data'] ) {
+
+            foreach( $mall_data['data'] as $row ) {
+
+                $mall_name = '';
+                if ( !empty( $row['mall_id'] ) ) {
+                    $mall_master = MallMaster::find( $row['mall_id'] );
+                    if ( $mall_master ) {
+                        $mall_name = $mall_master->mallName;
+                    }
+                }
+
+                $app_name = '';
+                if ( !empty( $row['app_id'] ) ) {
+                    $app = StApp::find( $row['app_id'] );
+                    if ( $app ) {
+                        $app_name = $app->name;
+                    }
+                }
+
+                $return['rows'][] = [
+                    'mall_name' => $mall_name,
+                    'app_name' => $app_name,
+                    'toal_goods_money' => $row['toal_goods_money'],
+                    'toal_mall_discount_money' => $row['toal_mall_discount_money'],
+                    'toal_app_discount_money' => $row['toal_app_discount_money'],
+                    'total_income' => $row['total_income'],
+                    'total_return_money' => $row['total_return_money'],
+                    'total_package_money' => $row['total_package_money'],
+                    'bill_money' => $row['total_income']-$row['total_return_money'],
+                ];
+
+            }
+        }
+
+
+        return response()->json($return);
+
+    }
+
+}

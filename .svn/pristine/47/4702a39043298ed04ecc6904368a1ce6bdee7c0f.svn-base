@@ -1,0 +1,150 @@
+<?php
+
+namespace App\Http\Controllers\Admin\Plugin;
+
+use DB;
+use Illuminate\Http\Request;
+use App\Models\Goods\StCategory;
+use App\Models\Goods\StGoods;
+use App\Http\Controllers\Controller;
+
+class GoodsPluginController extends Controller
+{
+    //商品弹层插件
+    public function index(Request $request)
+    {
+
+        $category_data = [];
+
+        $big_category = StCategory::where(['status' => 1,'level' => 1])
+                        ->orderBy('sort','desc')
+                        ->get()->toArray();
+
+        if ($big_category) {
+
+            foreach ($big_category as $big) {
+
+                $bigCategoryID = $big['id'];
+
+                $mid_category = StCategory::where(['status' => 1,'p_id' => $big['id'],'level' => 2])
+                    ->orderBy('sort','desc')
+                    ->get()->toArray();
+
+                if ($mid_category) {
+
+                    foreach ($mid_category as $mid) {
+
+                        $midCategoryID = $mid['id'];
+
+                        $small_category = StCategory::where(['status' => 1,'p_id' => $mid['id'],'level' => 3])
+                            ->orderBy('sort','desc')
+                            ->get()->toArray();
+
+                        if ($small_category) {
+
+                            foreach ($small_category as $small) {
+                                $mid['small'][$small['id']] = [
+                                    'smallCategoryID' => $small['id'],
+                                    'categoryName' => $small['name']
+                                ];
+                            }
+                        }else{
+                            $mid['small'] = null;
+                        }
+
+                        $big['mid'][$midCategoryID] = [
+                            'midCategoryID' => $midCategoryID,
+                            'categoryName' => $mid['name'],
+                            'small' => $mid['small']
+                        ];
+                    }
+                }else{
+                    $big['mid'] = null;
+                }
+
+                $category_data[$bigCategoryID] = array(
+                    'bigCategoryID' => $bigCategoryID,
+                    'categoryName' => $big['name'],
+                    'mid' => $big['mid']
+                );
+            }
+        }
+
+        $category_data = json_encode($category_data);
+        return view('admin/plugin/goods',['category_data'=>$category_data]);
+    }
+
+    /**
+     * 列表页数据
+     * @param Request $request
+     * @return array
+     */
+    public function search(Request $request)
+    {
+
+        //查询数组
+        $where = [];
+
+        if ( $request->input('goods_name') ) {
+            $where[] = ['name','like','%'.$request->input('goods_name').'%'];
+        }
+
+        if ($request->input('bigCategory')) {
+            $where['big_category_id'] = $request->input('bigCategory');
+            if ($request->input('midCategory')) {
+                $where['mid_category_id'] = $request->input('midCategory');
+            }
+            if ($request->input('smallCategory')) {
+                $where['small_category_id'] = $request->input('smallCategory');
+            }
+        }
+
+        $goods_data = StGoods::where($where)
+            ->paginate($request->input('limit'))
+            ->toArray();
+
+        //返回数组
+        $return_result = [
+            'code' => 0,
+            'count' => $goods_data['total'],
+            'data' => []
+        ];
+
+        if ($goods_data['data']) {
+
+            foreach ( $goods_data['data'] as $item ) {
+
+                $return_result['data'][] = [
+                    'id' => $item['id'],
+                    'goods_name' => $item['name'],
+                    'price' => $item['price'],
+                    'big_category' => $item['big_category_name'],
+                    'mid_category' => $item['mid_category_name'],
+                    'small_category' => $item['small_category_name']
+                ];
+
+            }
+
+        }
+
+        return $return_result;
+    }
+
+    /**
+     * 全选数据
+     * @param Request $request
+     */
+    public function goods(Request $request)
+    {
+        $id_data = $request->input('id_arr');
+
+        $result_data = [];
+
+        foreach ($id_data as $id) {
+
+            $result_data[] = StGoods::find($id)->toArray();
+        }
+
+        return response()->json(['code' => 200, 'message' => 'ok', 'data' => $result_data]);
+    }
+}

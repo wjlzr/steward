@@ -1,0 +1,150 @@
+<?php
+namespace App\Services\Wm\EleMe\Request;
+
+use App\Services\Wm\OrderFactoryInterface;
+
+class EleMeOrderRequest implements OrderFactoryInterface
+{
+
+    public function __construct($curl)
+    {
+        $this->curl = $curl;
+    }
+
+    /**
+     * 获取订单接口
+     * @param $args
+     * @return mixed
+     */
+    public function detail($args)
+    {
+        if (!isset($args['order_id']) || empty($args['order_id'])) {
+            return $this->curl->response('缺少必要参数：order_id');
+        }
+        return $this->curl->call('eleme.order.getOrder', $args);
+    }
+
+    /**
+     * 确认订单
+     * @param $args
+     * @return mixed
+     */
+    public function accept_order($args)
+    {
+        if (!isset($args['order_id']) || empty($args['order_id'])) {
+            return $this->curl->response('缺少必要参数：order_id');
+        }
+        return $this->curl->call('eleme.order.confirmOrderLite', ['orderId'=>$args['order_id']]);
+    }
+
+    /**
+     * 取消订单接口
+     * @param $args
+     * @return mixed
+     */
+    public function cancel_order($args)
+    {
+
+        if (!isset($args['order_id']) || empty($args['order_id'])) {
+            return $this->curl->response('缺少必要参数：order_id');
+        }
+
+        if (!isset($args['type']) || empty($args['type'])) {
+            $args['type'] = '';
+        }
+
+        if (!isset($args['remark']) || empty($args['remark'])) {
+            $args['remark'] = '';
+        }
+
+        error_log('eleme取消单');
+
+        $aa = $this->curl->call('eleme.order.cancelOrderLite', [
+            'orderId' => $args['order_id'],
+            'type' => $args['type'],
+            'remark' => $args['remark']
+        ]);
+
+        error_log(var_export($aa,true));
+        return $aa;
+    }
+
+    /**
+     * 审核用户申请取消单/退单
+     * @param $args
+     * @return mixed
+     */
+    public function audit_cancel_order($args)
+    {
+
+        if (!isset($args['order_id']) || empty($args['order_id'])) {
+            return $this->curl->response('缺少必要参数：order_id');
+        }
+
+        if (!isset($args['is_agree']) || !is_bool($args['is_agree'])) {
+            $args['is_agree'] = true;
+        }
+
+        if ($args['is_agree']) {
+            return $this->curl->call('eleme.order.agreeRefundLite', [
+                'orderId' => $args['order_id'],
+            ]);
+        } else {
+            return $this->curl->call('eleme.order.disagreeRefundLite', [
+                'orderId' => $args['order_id'],
+                'reason' => $args['remark']
+            ]);
+        }
+
+    }
+
+    /**
+     * 妥投订单
+     * @param $args
+     * @return mixed
+     */
+    public function delivered_order($args)
+    {
+        if (!isset($args['order_id']) || empty($args['order_id'])) {
+            return $this->curl->response('缺少必要参数：order_id');
+        }
+        return $this->curl->call('eleme.order.receivedOrderLite', ['orderId'=>$args['order_id']]);
+    }
+
+    /**
+     * 回复催单
+     * @param array $args_data
+     * @return mixed
+     */
+    public function reply_remind( $args_data )
+    {
+
+        if (!isset($args_data['remind_id']) || empty($args_data['remind_id'])) {
+            return $this->curl->response('缺少必要参数：remindId');
+        }
+
+        if (!isset($args_data['type']) || empty($args_data['type'])) {
+            $args_data['type'] = 'custom';
+        }
+
+        if (!isset($args_data['reply_content']) || empty($args_data['reply_content'])) {
+            $args_data['reply_content'] = '';
+        }
+
+        return $this->curl->call('eleme.order.replyReminder', [
+            'remindId' => $args_data['remind_id'],
+            'type' => $args_data['type'],
+            'content' => $args_data['reply_content']
+        ]);
+    }
+
+    /**
+     * 订单发货
+     * @param int /string $order_id 订单号
+     * @return mixed
+     */
+    public function send_out_order($order_id)
+    {
+        return ['code'=>200, 'message'=>'发货成功'];
+    }
+}

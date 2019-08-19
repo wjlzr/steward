@@ -1,0 +1,51 @@
+<?php
+
+namespace App\Services\Wm\EleMe;
+
+use App\Models\ConfigureFunction;
+
+class Config
+{
+
+    public $getWay = 'https://open-api.shop.ele.me';
+    public $testGetWay = 'https://open-api-sandbox.shop.ele.me';
+    public $callback = '/open/eleme/callback';
+    public $token;
+    public $version = 'v1';
+    public $alias = 'EleMe';
+    public $userAgent = 'ebsig-ele-api';
+    public $uuid;
+    public $debug = 1;
+
+    //Ä¬ÈÏÊôĞÔÖØÔØ
+    public function _cover_attribute()
+    {
+
+        $attr_arr = [];
+
+        if ($this->debug) {
+            $attr_arr['getWay'] = $this->testGetWay;
+        }
+
+        if (empty($this->uuid)) {
+            $attr_arr['uuid'] = sprintf(
+                '%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
+                mt_rand(0, 0xffff), mt_rand(0, 0xffff),
+                mt_rand(0, 0xffff),
+                mt_rand(0, 0x0fff) | 0x4000,
+                mt_rand(0, 0x3fff) | 0x8000,
+                mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff)
+            );
+        }
+
+        if (!empty($this->callback)) {
+            //$domain_url = ConfigureFunction::getConfigureField(43, 'domain_url');
+//            $attr_arr['callback'] = $domain_url . $this->callback;
+            $attr_arr['callback'] = 'http://hg.ebsig.com' . $this->callback;
+        }
+
+        return $attr_arr;
+
+    }
+
+}

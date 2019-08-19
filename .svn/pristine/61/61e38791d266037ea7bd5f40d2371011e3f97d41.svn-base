@@ -1,0 +1,276 @@
+@extends('admin.layout')
+@section('css')
+    <link rel="stylesheet" href="/css/admin/main.css?v=20180104000">
+@endsection
+
+@section('content')
+    <div class="container" id="main-content">
+        <div class="app-sidebar">
+            <div class="app-first-slider">
+                <ul class="nav_list">
+                    @foreach($left_menus as $l_k=>$l_m)
+                        <li data-index="{{$l_k}}">
+                            <a href="javascript:;">
+                                <span><img src="{{$l_m['icon']}}"></span>
+                                <span class="text">{{$l_m['name']}}</span>
+                            </a>
+                        </li>
+                    @endforeach
+                </ul>
+            </div>
+            <!--子菜单栏-->
+            <div class="app-second-silder" >
+                <ul class="second_list">
+                    @foreach($left_menus as $l_k => $l_m)
+                        @foreach($l_m['sub'] as $m_m)
+                            <li class="sub-nav-{{$l_k}}" style="display: none;">
+                                <a href="{{$m_m['link']}}" target="main-frame">
+                                    <span>{{$m_m['name']}}</span>
+                                </a>
+                            </li>
+                        @endforeach
+                    @endforeach
+                </ul>
+            </div>
+        </div>
+        <div class="main-container">
+            <div class="logo-wrap">
+                <div class="logo"><img src="/images/admin/icon/logo.png"></div>
+            </div>
+            <div class="app-top-box">
+                <div class="left-notice" style="display: none;">
+                    <a href="javascript:;">
+                        <span class="img-notice"><img src="/images/admin/icon/notice.png"> </span>
+                        <span class="order-notice"></span>
+                    </a>
+                </div>
+                <div class="right-nav">
+                    <ul class="right_list">
+                        @if($pc_client == 0)
+                        <li class="phone-text">
+                            <a href="javascript:;"><span><img src="/images/admin/icon/phone.png"></span></a>
+                            <a href="http://www.ebsig.com/steward/download/mobile" target="_blank"><span class="curn-blue">下载手机版商管家</span></a>
+                        </li>
+                        @endif
+                        <li>
+                            <a href="javascript:;" class="num-notice" style="display: none;">
+                                <span><img src="/images/admin/icon/tongzhi.png"></span>
+                                <span class="num">0</span>
+                            </a>
+                            <a href="javascript:;">
+                                <span class="curn-blue"><b>{{$user_name}}</b>&nbsp;&nbsp; 欢迎您！ </span></a> | <a href="/admin/logout">注销
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://iview.github.io/iview-admin/#/home"><span>个人设置</span></a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="right-sidebar">
+            <div class="main-cont">
+                <iframe frameborder="0" id="main-frame" name="main-frame" width="100%" height="100%" ></iframe>
+            </div>
+        </div>
+
+    </div>
+@endsection
+
+@section('js')
+
+    @if($pc_client >= 1)
+        <script src="/js/admin/win.external.js"></script>
+    @endif
+    <script>
+
+        $(function(){
+
+            var main_content_obj = $('#main-content');
+
+            //调整iframe高度
+            var wh = $(window).height();
+            main_content_obj.css('height', (wh-61) + 'px');
+
+            main_content_obj.find('div.app-second-silder').find('li').click(function () {
+                main_content_obj.find('div.app-second-silder').find('li').removeClass('active').eq($(this).index()).addClass('active');
+            });
+
+            main_content_obj.find('ul.nav_list').find('li').click(function() {
+
+                main_content_obj.find('ul.nav_list').find('li').removeClass('active').eq($(this).index()).addClass('active');
+                main_content_obj.find('div.app-second-silder').find('li').hide();
+
+                var sub_nav = $('li.sub-nav-' + $(this).attr('data-index'));
+                sub_nav.show();
+                sub_nav.eq(0).trigger('click');
+                $('#main-frame').attr('src', sub_nav.eq(0).find('a').attr('href'));
+
+                if (sub_nav.length > 1) {
+                    main_content_obj.find('div.app-second-silder').show();
+                    main_content_obj.find('div.right-sidebar').css('margin-left', '240px');
+                } else {
+                    main_content_obj.find('div.app-second-silder').hide();
+                    main_content_obj.find('div.right-sidebar').css('margin-left', '120px');
+                }
+
+            });
+            main_content_obj.find('ul.nav_list').find('li').eq(0).trigger('click');
+
+            @if ( $pc_client >= 1)
+
+                var common_config =  client_common_config_get();
+                var print_config = client_print_config_get();
+                var print_connect = 0;
+
+                $.each( print_config , function ( k ,v ){
+                    if( v.connect == 1){
+                        print_connect = 1;
+                    }
+                });
+                if( common_config.notice_print_open == 1 && print_connect == 0){   //打印机未连接语音提醒
+                    client_notice_audition( 4 );
+                }
+            @endif
+
+            pc_fresh();
+//            setInterval('pc_fresh()',15000);
+
+        });
+
+        /**
+         * 判断是否为大于零的数字
+         * @param num 传值
+         */
+        function isNum(num)
+        {
+            var re = /^[0-9]*[1-9][0-9]*$/ ;
+            return re.test(num)
+        }
+
+        /**
+         * 刷新订单提醒通知(供PC客户端调取)
+         * @param new_count int 新订单数量
+         * @param remind_count int 催单数量
+         * @param return_count int 退单数量
+         */
+        function count_fresh(new_count, remind_count, return_count) {
+            var n_str = '';
+            if (!isNum(new_count) || new_count < 0) {
+                new_count = 0;
+            }
+
+            if (!isNum(remind_count) || remind_count < 0) {
+                remind_count = 0;
+            }
+
+            if (!isNum(return_count) || return_count < 0) {
+                return_count = 0;
+            }
+
+            if (new_count > 0) {
+                n_str += '<a href="javascript:void(0)" onclick="jump_notice(1)" class="order-notice-s">您有'+ new_count +'条新订单</a>';
+            }
+
+            if (remind_count > 0) {
+                n_str += '<a href="javascript:void(0)" onclick="jump_notice(5)" class="order-notice-s">您有'+ remind_count +'条催单</a>';
+            }
+
+            if (return_count > 0) {
+                n_str += '<a href="javascript:void(0)" onclick="jump_notice(6)" class="order-notice-s">您有'+ return_count +'条退单</a>';
+            }
+
+            $('.order-notice').html(n_str);
+
+            if (n_str == '') {
+                $('.left-notice').hide();
+                $('.num-notice').hide().find('.num').html(0);
+            } else {
+                $('.num-notice').show().find('.num').html(parseInt(new_count + remind_count + return_count));
+                $('.left-notice').show();
+            }
+        }
+
+
+        /**
+         * 提醒订单跳转
+         * @param type
+         */
+        function jump_notice(type) {
+            $('#main-frame').attr('src', '/admin/order/list/1?anchor=' + type);
+        }
+
+        /**
+         * pc端刷新信息提醒
+         */
+        function pc_fresh(){
+
+            var auto_order_receive = 0;
+
+            @if ( $pc_client >= 1)
+
+                var print_connect = 0;
+                var common_config = E.getCookie('client_common_config');
+
+                if( !common_config ){
+                    common_config = client_common_config_get();
+                }else{
+                    common_config = $.parseJSON(common_config);
+                }
+
+                var print_config = E.getCookie('client_print_config');
+
+                if( !print_config ){
+                    print_config = client_print_config_get();
+                }else{
+                    print_config = $.parseJSON(print_config);
+                }
+
+                $.each( print_config , function ( k ,v ){
+                    if( v.connect == 1){
+                        print_connect = 1;
+                    }
+                });
+
+                if( common_config.order_auto == 1 && print_connect == 1 ){
+                    auto_order_receive = 1;
+                }
+            @endif
+
+            $.ajax({
+                type:'get',
+                url:'/admin/order/notice',
+                data: {'auto_order_receive':auto_order_receive },
+                dataType:'json',
+                success : function(o){
+                    if(o.code == 200){
+                        @if ($pc_client == 0)
+                            count_fresh(o.data['new_count'],o.data['remind_count'],o.data['return_count']);
+                        @else
+                            client_notice_func(o.data['new_count'],o.data['remind_count'],o.data['return_count']);
+                        if(o.data.new_order_id.length != 0 ){
+                            var new_count = o.data.new_count;
+                            $.ajax({
+                                type:'get',
+                                url:'/admin/order/order_fetch',
+                                data:{'order_id' : o.data['new_order_id']},
+                                dataType:'json',
+                                success : function(o){
+                                    if(o.code == 200){
+                                        layer.msg(new_count+'条订单已自动接单',{ icon: 1 ,time:1500});
+                                        client_print_auto_func(o.data);
+                                    }
+                                }
+                            });
+                        }
+                        @endif
+                    }
+                }
+            });
+        }
+
+    </script>
+
+@endsection

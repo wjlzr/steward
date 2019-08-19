@@ -1,0 +1,34 @@
+<?php
+/*
+|--------------------------------------------------------------------------
+| Task Routes
+|--------------------------------------------------------------------------
+*/
+//namespace routes;
+//use Illuminate\Contracts\Routing\Registrar;
+//
+//class TaskRoutes {
+//
+//    public function map(Registrar $router) {
+//
+//        //任务调度
+//        $router->any('admin/task/exec/{type}', 'Admin\execController@exec');
+//
+//        $router->any('admin/task/mall/stat', 'Admin\Task\StatMallController@stat'); //门店营业分析
+//        $router->any('admin/task/goods/stat', 'Admin\Task\StatSaleController@stat'); //商品分析&商品类别分析
+//        $router->any('admin/task/settle/stat', 'Admin\Task\StatSettleController@stat'); //门店结算统计
+//
+//    }
+//
+//}
+
+//Route::middleware(['admin.service'])->group(function () {
+//
+//    //任务调度
+//    Route::any('admin/task/exec/{type}', 'Admin\execController@exec');
+//
+//    Route::any('admin/task/mall/stat', 'Admin\Task\StatMallController@stat'); //门店营业分析
+//    Route::any('admin/task/goods/stat', 'Admin\Task\StatSaleController@stat'); //商品分析&商品类别分析
+//    Route::any('admin/task/settle/stat', 'Admin\Task\StatSettleController@stat'); //门店结算统计
+//
+//});

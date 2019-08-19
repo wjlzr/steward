@@ -1,0 +1,17 @@
+<?php
+
+namespace App\Models\Mall;
+
+use Illuminate\Database\Eloquent\Model;
+
+class StAppMall extends Model
+{
+
+    protected $table = 'st_app_mall';
+
+    public static function count($app_id = '', $status = '')
+    {
+       return StAppMall::where(['status' => $status, 'app_id' => $app_id])->count();
+    }
+
+}

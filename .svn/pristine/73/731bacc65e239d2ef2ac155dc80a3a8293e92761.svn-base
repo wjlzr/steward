@@ -1,0 +1,54 @@
+<?php
+namespace App\Service\Wm\Bd\Request;
+
+use App\Service\Wm\ShopFactoryInterface;
+
+class BdShopRequest implements ShopFactoryInterface
+{
+
+    /**
+     * BdShopRequest constructor.
+     * @param $curl
+     */
+    public function __construct($curl)
+    {
+        $this->curl = $curl;
+    }
+
+    /**
+     * 获取已授权店铺列表
+     * @remark：传参数组固定传入，
+     * 各平台可以根据实际情况决定是否使用
+     * @param $args = [
+     *      'page' => int 当前页码
+     *      'page_size' => 每页条数 (默认20)
+     * ]
+     * @return mixed
+     */
+    public function get_shop_list($args)
+    {
+        return $this->curl->call([],'shop.list','post');
+    }
+
+    /**
+     * 获取店铺相关信息
+     * @param $args = [
+     *      'mall_code' => string 商户门店编号
+     * ]
+     * @return mixed
+     */
+    public function get_shop($args)
+    {
+
+        if (!isset($args['mall_code']) || empty($args['mall_code'])) {
+            return ['code' => 400, 'message' => '参数错误：mall_code'];
+        }
+
+        $request = [
+            'shop_id' => $args['mall_code']
+        ];
+
+        return $this->curl->call($request, 'shop.get');
+
+    }
+}

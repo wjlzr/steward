@@ -1,0 +1,17 @@
+<?php
+
+namespace App\Http\Controllers\Admin\Goods;
+
+
+use App\Http\Controllers\Controller;
+use Symfony\Component\HttpFoundation\Request;
+
+class GoodsController extends Controller
+{
+
+
+    public function index(Request $request){
+
+        return view('/admin/goods/index');
+    }
+}

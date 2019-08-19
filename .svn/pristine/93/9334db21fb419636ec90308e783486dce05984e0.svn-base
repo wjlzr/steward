@@ -1,0 +1,367 @@
+<?php
+/**
+ * 华冠项目 - 商品接口类
+ * @author   liudaoyang <liudaoyang@ebsig.com>
+ * @version 1.0
+ */
+
+namespace App\Services\Rpc\Goods;
+
+use App\Models\Goods\StGoodsSale;
+use App\Models\Goods\StGoodsStock;
+use App\Models\Mall\StMall;
+use App\Models\StApp;
+use DB;
+use App\Services\HttpService;
+use Carbon\Carbon;
+
+class HgGoods
+{
+
+    private $http_url = '111.207.87.201:801/api/wdh/gateway.do';
+    private $appid = '40fe9ad4949331a12f5f19b477133924';
+    private $key = 'f7a198818328ef8ed10cf403d3c9ce91';
+
+    public function requestApi($request_url, $api_name, $get_data = [], $post_data = [], $request_way = 'get' )
+    {
+
+        //连接接口参数
+        $http_opts = array(
+            CURLOPT_TIMEOUT => 30,
+            CURLOPT_CONNECTTIMEOUT => 10
+        );
+
+        //实例http类
+        $ebsigHttp = new HttpService();
+
+        //接口开始时间
+        $start_time = microtime(true);
+
+        //请求接口
+        $result_array = $ebsigHttp->post($request_url, $post_data, $http_opts);
+
+        //接口请求结束时间
+        $end_time = microtime(true);
+
+        /**
+         * =======商品接口日志==========
+         */
+//        $log_interface = new GoodsLogApi();
+//        $log_interface->updated_at = Carbon::now();
+//        $log_interface->created_at = Carbon::now();
+//        $log_interface->api_name = $api_name;
+//        if( !empty($get_data) && !empty($post_data) ){
+//            $log_interface->request_data = print_r(array_merge($get_data, $post_data), true);
+//        } else if ( !empty($get_data) ){
+//            $log_interface->request_data = print_r($get_data, true);
+//        } else if ( !empty($post_data) ){
+//            $log_interface->request_data = print_r($post_data, true);
+//        }
+//        $log_interface->return_data = print_r($result_array, true);
+//        $log_interface->return_code = $result_array['code'];
+//        $log_interface->return_msg  = $result_array['message'];
+//        $log_interface->exec_time = ($end_time - $start_time) * 1000;
+//        $log_interface->save();
+
+        /**
+         * =======商品接口日志==========
+         */
+
+        return $result_array;
+    }
+
+    //拉取库存
+    public function store()
+    {
+
+        set_time_limit(0);
+
+        $url = $this->http_url; //门店库存接口地址
+
+        //查询门店信息
+        $st_mall = StMall::where(['status' => 1])->get();
+
+        if ($st_mall->isEmpty()) {
+            return ['code' => 100000, 'message' => '门店信息不存在'];
+        }
+
+        $page = 1;
+        $rp = 100;
+
+        while ($page > 0) {
+
+            //分页查询商品信息
+            $goods_data = StGoodsSale::where(['status' => 1])
+                ->offset(($page - 1) * $rp)
+                ->limit($rp)
+                ->get()
+                ->toArray();
+
+            if (!$goods_data) {
+                break;
+            }
+
+            if (!isset($goods_data[$rp - 1])) {
+                $page = 0;
+            } else {
+                $page++;
+            }
+
+            //三级商品编码数组
+            $parameters = [];
+
+            foreach ($goods_data as &$g) {
+
+                $parameters[] = $g['sku'];
+            }
+
+            foreach ($st_mall as $mall) {
+
+                $param = [
+                    'appId' => $this->appid,
+                    'version' => '1.0',
+                    'timestamp' => time(),
+                    'format' => 'json',
+                    'scope' => 'goods.goods.queryStock',
+                    'param' => json_encode([
+                        'product_code_data' => $parameters,
+                        'mall_code' => $mall->code
+                    ])
+                ];
+
+                $param['sign'] = $this->createSign($param, $this->key);
+
+                //接口请求
+
+                $store_data = $this->requestApi($url, 'store', [], $param, 'post');
+
+                if ($store_data['code'] != 200 || empty($store_data['data'])) {
+                    continue;
+                }
+
+                try {
+
+                    DB::beginTransaction();
+
+                    foreach ($store_data['data'] as $item) {
+
+                        $st_goods_stock = StGoodsStock::where([['mall_id', $mall->id], ['sku', $item['product_code']]])->first();
+
+                        if (!$st_goods_stock) {
+
+                            $st_goods_stock = new StGoodsStock();
+                            $st_goods_stock->creator = 'system';
+                            $st_goods_stock->mall_id = $mall->id;
+                            $st_goods_stock->sku = $item['product_code'];
+                            $st_goods_stock->enable_number = $item['qty'];
+                            $st_goods_stock->lock_number = 0 ;
+                            $st_goods_stock->status = $item['qty'] < 0 ? 0 : 1;
+                            $st_goods_stock ->save();
+
+                        }else{
+
+                            $st_goods_stock -> enable_number = $item['qty'] - $st_goods_stock-> lock_number ;
+                            $st_goods_stock -> status = ($item['qty'] - $st_goods_stock-> lock_number) < 0 ? 0 : 1;
+                            $st_goods_stock -> save();
+                        }
+                    }
+
+                    //同步应用平台
+
+                    $st_app = StApp::where('enable', 1) -> get();
+
+                    if( !$st_app -> isEmpty()){
+
+                        foreach ( $st_app as $app){
+
+                            switch ( $app -> id ){
+                                case '100001' :
+
+                                    break;
+                                case '100002' :
+
+                                    $p = 1 ;
+                                    $page_size = 50 ;
+
+                                    while( $p > 0 ){
+
+                                        $st_goods_stock = StGoodsStock::select('st_goods_sale.o_sku_id','st_goods_stock.enable_number')
+                                                                    ->leftJoin('st_goods_sale','st_goods_sale.sku','=','st_goods_stock.sku')
+                                                                    ->where('st_goods_stock.mall_id',$mall->id)
+                                                                    ->offset(($p - 1) * $page_size)
+                                                                    ->limit($page_size)
+                                                                    ->get()
+                                                                    ->toArray();
+
+                                        if (!$st_goods_stock) {
+                                            break;
+                                        }
+
+                                        if (!isset($st_goods_stock[$page_size - 1])) {
+                                            $p = 0;
+                                        } else {
+                                            $p++;
+                                        }
+
+                                        foreach ( $st_goods_stock as $stock ){
+                                            $goods_data[] = [
+                                                $stock -> o_sku_id => $stock -> enable_number
+                                            ];
+                                        }
+
+                                        $args_data = [
+                                            'mall_id' => $mall -> id ,
+                                            'goods_data' => $goods_data
+                                        ];
+
+                                        $res = Wm::send('100002.goods.batch_update_stock',$args_data);
+
+                                        if( $res['code'] != 200 ){
+                                            return ['code' => 10001 ,'message' => $res['message']];
+                                        }
+
+                                    }
+
+                                        break;
+                                case '100003' :
+
+                                    break;
+                                case '100004' :
+
+                                    break;
+
+                            }
+                        }
+                    }
+
+
+                    DB::commit();
+
+                } catch (\Exception $e) {
+                    DB::rollBack();
+                    error_log('华冠门店价格，任务错误信息：' . $e->getMessage());
+                    continue;
+                }
+
+            }
+        }
+
+        return ['code' => 200, 'message' => 'ok'];
+    }
+
+    //拉取价格
+    public function price()
+    {
+
+        set_time_limit(0);
+
+        $url = $this->http_url; //门店价格接口地址
+
+        //查询门店信息
+        $st_mall = StMall::where(['status' => 1])->get();
+
+        if ($st_mall->isEmpty()) {
+            return ['code' => 100000, 'message' => '门店信息不存在'];
+        }
+
+        $page = 1;
+        $rp = 100;
+
+        while ($page > 0) {
+
+            //分页查询商品信息
+            $goods_data = StGoodsSale::where(['status' => 1])
+                ->offset(($page - 1) * $rp)
+                ->limit($rp)
+                ->get()
+                ->toArray();
+
+            if (!$goods_data) {
+                break;
+            }
+
+            if (!isset($goods_data[$rp - 1])) {
+                $page = 0;
+            } else {
+                $page++;
+            }
+
+            //三级商品编码数组
+            $parameters = [];
+
+            foreach ($goods_data as &$g) {
+
+                $parameters[] = $g['sku'];
+
+            }
+
+            foreach ($st_mall as $mall) {
+
+                $param = [
+                    'appId' => $this->appid,
+                    'version' => '1.0',
+                    'timestamp' => time(),
+                    'format' => 'json',
+                    'scope' => 'goods.goods.queryPrice',
+                    'param' => json_encode([
+                        'product_code_data' => $parameters,
+                        'mall_code' => $mall->code
+                    ])
+                ];
+
+                $param['sign'] = $this->createSign($param, $this->key);
+
+                //接口请求
+
+                $price_data = $this->requestApi($url, 'price', [], $param, 'post');
+
+                if ($price_data['code'] != 200 || empty($price_data['data'])) {
+                    continue;
+                }
+
+                try {
+
+                    DB::beginTransaction();
+
+                    foreach ($price_data['data'] as $item) {
+
+                    }
+
+                    DB::commit();
+
+                } catch (\Exception $e) {
+                    DB::rollBack();
+                    error_log('华冠门店价格，任务错误信息：' . $e->getMessage());
+                    continue;
+                }
+            }
+        }
+    }
+
+    private function createSign( $data, $key ) {
+
+        ksort($data);
+
+        $sign_str = '';
+        foreach ($data as $k => $v) {
+            if ($v == '') {
+                continue;
+            }
+            if ($k == 'sign') {
+                continue;
+            }
+
+            if ($sign_str == '') {
+                $sign_str .= $k . '=' . $v;
+            } else {
+                $sign_str .= '&' . $k . '=' . $v;
+            }
+
+        }
+        $sign_str .= 'key=' . $key;
+
+        return strtoupper(md5($sign_str));
+
+    }
+}
+

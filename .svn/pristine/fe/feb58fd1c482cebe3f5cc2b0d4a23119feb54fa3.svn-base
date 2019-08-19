@@ -1,0 +1,665 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use DB;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
+use App\Models\Order\StOrder;
+use App\Models\StApp;
+use App\Models\Goods\StAppGoodsSale;
+use App\Models\Order\StOrderGoods;
+use App\Models\Mall\StAppMall;
+use App\Http\Controllers\Controller;
+
+
+class IndexController extends Controller
+{
+
+
+    /**
+     * 销售概况接口
+     * @param Request $request = [
+     *      'mall_id' => int 门店ID，
+     *      'date_type' => int 日期类型：1、今天 2、昨天 3、近7天 4、近30天
+     * ]
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function salesProfile(Request $request)
+    {
+
+        $mall_id = $request->input('mallId', 0);
+        $date_type = $request->input('date_type', 1);
+
+        /*error_log('======//首页');
+        error_log($mall_id);
+        error_log($date_type);*/
+
+        //查询今日
+        $where = [
+            ['mall_id', $mall_id],
+            ['created_at', '>=', date('Y-m-d 00:00:00')],
+            ['created_at', '<=', date('Y-m-d H:i:s')]
+        ];
+        if ($date_type == 2) {
+            $where = [
+                ['mall_id', $mall_id],
+                ['created_at', '>=', date('Y-m-d 00:00:00',strtotime('-1 day'))],
+                ['created_at', '<=', date('Y-m-d 59:59:59',strtotime('-1 day'))]
+            ];
+        }elseif($date_type == 3) {
+            $where = [
+                ['mall_id', $mall_id],
+                ['created_at', '>=', date('Y-m-d 00:00:00',strtotime('-7 day'))],
+                ['created_at', '<=', Carbon::now()]
+            ];
+        }elseif($date_type == 4) {
+            $where = [
+                ['mall_id', $mall_id],
+                ['created_at', '>=', date('Y-m-d 00:00:00',strtotime('-30 day'))],
+                ['created_at', '<=', Carbon::now()]
+            ];
+        }
+
+        if (empty($mall_id)) {
+            unset($where[0]);
+            $where = array_values($where);
+        }
+
+        //今日总营业额
+        $total_sales = StOrder::where($where)
+                        ->whereNotIn('status',[5,6])
+                        ->sum('order_fee');
+
+        //包装总收入
+        $package_sales = StOrder::where($where)
+                        ->whereNotIn('status',[5,6])
+                        ->sum('package_fee');
+
+        //预计收入
+        $expect_sales = StOrder::where($where)
+                        ->whereNotIn('status',[5,6])
+                        ->sum('user_fee');
+
+        //有效订单数
+        $valid_orders = StOrder::where($where)
+                        ->whereNotIn('status',[5,6])
+                        ->count();
+
+        //总订单数
+        $total_orders = StOrder::where($where)->count();
+
+        //客单价
+        if ($total_sales == 0 || $total_orders == 0) {
+            $avg_price = '0.00';
+        }else{
+            $avg_price = $total_sales/$total_orders;
+        }
+
+        //查询昨日
+        $yes_where = [
+            ['mall_id', $mall_id],
+            ['created_at', '>=', date('Y-m-d 00:00:00',strtotime('-1 day'))],
+            ['created_at', '<=', date('Y-m-d 59:59:59',strtotime('-1 day'))]
+        ];
+
+        if (empty($mall_id)) {
+            unset($yes_where[0]);
+            $yes_where = array_values($yes_where);
+        }
+
+        //总营业额
+        $yes_total_sales = StOrder::where($yes_where)
+            ->whereNotIn('status',[5,6])
+            ->sum('order_fee');
+
+        //包装总收入
+        $yes_package_sales = StOrder::where($yes_where)
+            ->whereNotIn('status',[5,6])
+            ->sum('package_fee');
+
+        //预计收入
+        $yes_expect_sales = StOrder::where($yes_where)
+            ->whereNotIn('status',[5,6])
+            ->sum('user_fee');
+
+        //有效订单数
+        $yes_valid_orders = StOrder::where($yes_where)
+            ->whereNotIn('status',[5,6])
+            ->count();
+
+        //总订单数
+        $yes_total_orders = StOrder::where($yes_where)->count();
+
+        //客单价
+        if ($yes_total_sales == 0 || $yes_total_orders == 0) {
+            $yes_avg_price = '0.00';
+        }else{
+            $yes_avg_price = $yes_total_sales/$yes_total_orders;
+        }
+
+        /*$return_result = [
+            'total_sales' => app_to_decimal($total_sales), //总营业额
+            'package_sales' => app_to_decimal($package_sales), //包装收入
+            'expect_sales' => app_to_decimal($expect_sales), //预计收入
+            'valid_orders' => app_to_int($valid_orders), //有效订单数
+            'total_orders' => app_to_int($total_orders), //总订单数
+            'avg_price' => app_to_decimal($avg_price) //客单价
+        ];*/
+
+        $return_result = [
+            [
+                'name' => '总营业额（元）',
+                'price' => app_to_decimal($total_sales),
+                'yes_price' => '昨日'.app_to_decimal($yes_total_sales).'元'
+            ],
+            [
+                'name' => '包装收入（元）',
+                'price' => app_to_decimal($package_sales),
+                'yes_price' => '昨日'.app_to_decimal($yes_package_sales).'元'
+            ],
+            [
+                'name' => '预计收入（元）',
+                'price' => app_to_decimal($expect_sales),
+                'yes_price' => '昨日'.app_to_decimal($yes_expect_sales).'元'
+            ],
+            [
+                'name' => '有效订单数',
+                'price' => app_to_int($valid_orders),
+                'yes_price' => '昨日'.app_to_int($yes_valid_orders).'单'
+            ],
+            [
+                'name' => '总订单数',
+                'price' => app_to_int($total_orders),
+                'yes_price' => '昨日'.app_to_int($yes_total_orders).'单'
+            ],
+            [
+                'name' => '客单价',
+                'price' => app_to_decimal($avg_price),
+                'yes_price' => '昨日'.app_to_decimal($yes_avg_price).'元'
+            ]
+        ];
+
+        return response()->json(['code'=>200, 'message'=>'ok', 'data'=>$return_result]);
+
+    }
+
+
+    /**
+     * 平台销售占比接口
+     * @param Request $request = [
+     *      'mall_id' => int 门店ID
+     *      'date_type' => int 日期类型：1、今天 2、昨天 3、近7天 4、近30天
+     * ]
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function appOrdersSales(Request $request)
+    {
+
+        $mall_id = $request->input('mallId', 0);
+        $date_type = $request->input('date_type', 1);
+
+        $date_type = 4;
+
+        $return_result = [];
+
+        //查询今日
+        $where = [
+            ['mall_id', $mall_id],
+            ['created_at', '>=', date('Y-m-d 00:00:00')],
+            ['created_at', '<=', date('Y-m-d H:i:s')]
+        ];
+        if ($date_type == 2) {
+            $where = [
+                ['mall_id', $mall_id],
+                ['created_at', '>=', date('Y-m-d 00:00:00',strtotime('-1 day'))],
+                ['created_at', '<=', date('Y-m-d 59:59:59',strtotime('-1 day'))]
+            ];
+        }elseif($date_type == 3) {
+            $where = [
+                ['mall_id', $mall_id],
+                ['created_at', '>=', date('Y-m-d 00:00:00',strtotime('-7 day'))],
+                ['created_at', '<=', Carbon::now()]
+            ];
+        }elseif($date_type == 4) {
+            $where = [
+                ['mall_id', $mall_id],
+                ['created_at', '>=', date('Y-m-d 00:00:00',strtotime('-30 day'))],
+                ['created_at', '<=', Carbon::now()]
+            ];
+        }
+
+        if (empty($mall_id)) {
+            unset($where[0]);
+            $where = array_values($where);
+        }
+
+        //平台
+        $stApp = StApp::all();
+
+        foreach ($stApp as $app) {
+
+            $sale_value = StOrder::where($where)
+                                ->where('app_id',$app->id)
+                                ->sum('order_fee');
+
+            $bill_value = StOrder::where($where)
+                                ->where('app_id',$app->id)
+                                ->count();
+
+            $return_result['sales'][] = [
+                'value' => $sale_value,
+                'name' => $app->name
+            ];
+            $return_result['orders'][] = [
+                'value' => $bill_value,
+                'name' => $app->name
+            ];
+        }
+
+        /*error_log('====//kkkkkkkkk');
+        error_log(var_export($return_result,true));*/
+
+
+        return response()->json(['code'=>200, 'message'=>'ok', 'data'=>$return_result]);
+
+    }
+
+
+    /**
+     * 商品、门店动销接口
+     * @param Request $request = [
+     *      'mall_id' => int 门店ID
+     *      'date_type' => int 日期类型：1、今天 2、昨天 3、近7天 4、近30天
+     * ]
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function goodsMallActSales(Request $request)
+    {
+
+        $mall_id = $request->input('mallId', 0);
+        $date_type = $request->input('date_type', 1);
+
+        /*error_log('======//动销');
+        error_log($mall_id);
+        error_log($date_type);*/
+
+        //查询今日
+        $where = [
+            ['created_at', '>=', date('Y-m-d 00:00:00')],
+            ['created_at', '<=', date('Y-m-d H:i:s')]
+        ];
+        if ($date_type == 2) {
+            $where = [
+                ['created_at', '>=', date('Y-m-d 00:00:00',strtotime('-1 day'))],
+                ['created_at', '<=', date('Y-m-d 59:59:59',strtotime('-1 day'))]
+            ];
+        }elseif($date_type == 3) {
+            $where = [
+                ['created_at', '>=', date('Y-m-d 00:00:00',strtotime('-7 day'))],
+                ['created_at', '<=', Carbon::now()]
+            ];
+        }elseif($date_type == 4) {
+            $where = [
+                ['created_at', '>=', date('Y-m-d 00:00:00',strtotime('-30 day'))],
+                ['created_at', '<=', Carbon::now()]
+            ];
+        }
+
+        //总商品数
+        $total_number = StAppGoodsSale::where($where)
+                                    ->count();
+
+        //上架商品数
+        $shelf_number = StAppGoodsSale::where($where)
+                                    ->where('status',1)
+                                    ->count();
+
+        //动销商品数
+        $act_number = StOrderGoods::where($where)
+                                  ->count();
+
+        //总门店数
+        $mall_total_number = StAppMall::where($where)
+                                ->count();
+
+        //上架门店数
+        $mall_shelf_number = StAppMall::where($where)
+                                ->where('status',1)
+                                ->count();
+
+        //动销门店数
+        $mall_act_number = StAppMall::where($where)
+                                 ->count();
+
+        $return_result = [
+                'total_number' => app_to_int($total_number),    //总商品数
+                'shelf_number' => app_to_int($shelf_number),    //上架商品数
+                'act_number' => app_to_int($act_number),   //动销商品数
+                'mall_total_number' => app_to_int($mall_total_number),    //总门店数
+                'mall_helf_number' => app_to_int($mall_shelf_number),    //上架门店数
+                'mall_act_number' => app_to_int($mall_act_number)   //动销门店数
+        ];
+
+        return response()->json(['code'=>200, 'message'=>'ok', 'data'=>$return_result]);
+
+    }
+
+
+    /**
+     * 热销商品排行接口
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function hotSellGoodsRank(Request $request)
+    {
+
+        $mall_id = $request->input('mallId', 0);
+        $date_type = $request->input('date_type', 1);
+
+        $date_type = 4;
+
+        $return_result = [];
+
+        //查询今日
+        $where = [
+            ['mall_id', $mall_id],
+            ['created_at', '>=', date('Y-m-d 00:00:00')],
+            ['created_at', '<=', date('Y-m-d H:i:s')]
+        ];
+        if ($date_type == 2) {
+            $where = [
+                ['mall_id', $mall_id],
+                ['created_at', '>=', date('Y-m-d 00:00:00',strtotime('-1 day'))],
+                ['created_at', '<=', date('Y-m-d 59:59:59',strtotime('-1 day'))]
+            ];
+        }elseif($date_type == 3) {
+            $where = [
+                ['mall_id', $mall_id],
+                ['created_at', '>=', date('Y-m-d 00:00:00',strtotime('-7 day'))],
+                ['created_at', '<=', Carbon::now()]
+            ];
+        }elseif($date_type == 4) {
+            $where = [
+                ['mall_id', $mall_id],
+                ['created_at', '>=', date('Y-m-d 00:00:00',strtotime('-30 day'))],
+                ['created_at', '<=', Carbon::now()]
+            ];
+        }
+
+        if (empty($mall_id)) {
+            unset($where[0]);
+            $where = array_values($where);
+        }
+        $request = [];
+        $stOrdersGoods = DB::table('st_order_goods')
+                            ->select('goods_name',DB::raw('SUM(price) as total_money,SUM(goods_number) as total_number'))
+                            ->where($where)
+                            ->groupBy('goods_id')
+                            ->orderBy('total_number','desc')
+                            ->take(10)
+                            ->get();
+
+        foreach ($stOrdersGoods as $goods) {
+
+            $avg_price = app_to_decimal($goods->total_money/$goods->total_number);
+
+            $request[] = [
+                'goods_name' => $goods->goods_name,
+                'total_money' => $goods->total_money,
+                'total_number' => $goods->total_number,
+                'avg_price' => $avg_price
+            ];
+        }
+
+        /*error_log('======//热销商品');
+        error_log(var_export($request,true));*/
+
+        return response()->json(['code'=>200, 'message'=>'ok', 'data'=>$request]);
+
+    }
+
+
+    /**
+     * 热销分类排行接口
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function hotSaleCategoryRank(Request $request)
+    {
+
+        $mall_id = $request->input('mallId', 0);
+        $date_type = $request->input('date_type', 1);
+
+        $date_type = 4;
+
+        $return_result = [];
+
+        //查询今日
+        $where = [
+            ['mall_id', $mall_id],
+            ['created_at', '>=', date('Y-m-d 00:00:00')],
+            ['created_at', '<=', date('Y-m-d H:i:s')]
+        ];
+        if ($date_type == 2) {
+            $where = [
+                ['mall_id', $mall_id],
+                ['created_at', '>=', date('Y-m-d 00:00:00',strtotime('-1 day'))],
+                ['created_at', '<=', date('Y-m-d 59:59:59',strtotime('-1 day'))]
+            ];
+        }elseif($date_type == 3) {
+            $where = [
+                ['mall_id', $mall_id],
+                ['created_at', '>=', date('Y-m-d 00:00:00',strtotime('-7 day'))],
+                ['created_at', '<=', Carbon::now()]
+            ];
+        }elseif($date_type == 4) {
+            $where = [
+                ['mall_id', $mall_id],
+                ['created_at', '>=', date('Y-m-d 00:00:00',strtotime('-30 day'))],
+                ['created_at', '<=', Carbon::now()]
+            ];
+        }
+
+        if (empty($mall_id)) {
+            unset($where[0]);
+            $where = array_values($where);
+        }
+        $request = [];
+        $stOrdersGoods = DB::table('st_order_goods')
+            ->select('goods_name',DB::raw('SUM(price) as total_money,SUM(goods_number) as total_number'))
+            ->where($where)
+            ->groupBy('spec_id')
+            ->orderBy('total_number','desc')
+            ->take(10)
+            ->get();
+
+        foreach ($stOrdersGoods as $goods) {
+
+            $avg_price = app_to_decimal($goods->total_money/$goods->total_number);
+
+            $request[] = [
+                'goods_name' => $goods->goods_name,
+                'total_money' => $goods->total_money,
+                'total_number' => $goods->total_number,
+                'avg_price' => $avg_price
+            ];
+        }
+
+        error_log('======//热销商品');
+        error_log(var_export($request,true));
+
+        $return_result = [
+            [
+                'category_name' => '',
+                'total_money' => 0,
+                'total_number' => 0,
+                'avg_price' => ''
+            ]
+        ];
+
+        return response()->json(['code'=>200, 'message'=>'ok', 'data'=>$return_result]);
+
+    }
+
+
+    /**
+     * 所有门店营收入排行
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function mallRevenueRank(Request $request)
+    {
+
+        $mall_id = $request->input('mallId', 0);
+        $date_type = $request->input('date_type', 1);
+
+        $date_type = 4;
+
+        $return_result = [];
+
+        //查询今日
+        $where = [
+            ['mall_id', $mall_id],
+            ['created_at', '>=', date('Y-m-d 00:00:00')],
+            ['created_at', '<=', date('Y-m-d H:i:s')]
+        ];
+        if ($date_type == 2) {
+            $where = [
+                ['mall_id', $mall_id],
+                ['created_at', '>=', date('Y-m-d 00:00:00',strtotime('-1 day'))],
+                ['created_at', '<=', date('Y-m-d 59:59:59',strtotime('-1 day'))]
+            ];
+        }elseif($date_type == 3) {
+            $where = [
+                ['mall_id', $mall_id],
+                ['created_at', '>=', date('Y-m-d 00:00:00',strtotime('-7 day'))],
+                ['created_at', '<=', Carbon::now()]
+            ];
+        }elseif($date_type == 4) {
+            $where = [
+                ['mall_id', $mall_id],
+                ['created_at', '>=', date('Y-m-d 00:00:00',strtotime('-30 day'))],
+                ['created_at', '<=', Carbon::now()]
+            ];
+        }
+
+        if (empty($mall_id)) {
+            unset($where[0]);
+            $where = array_values($where);
+        }
+        error_log('=====//查查查');
+        DB::enableQueryLog();
+        $stOrder = DB::table('st_order')
+        ->select('mall_name',DB::raw('SUM(order_fee) as total_sales,SUM(package_fee) as package_sales,SUM(user_fee) as expect_sales,COUNT(*) as total_orders'))
+        ->where($where)
+        ->groupBy('mall_id')
+        ->orderBy('total_sales','desc')
+        ->take(10)
+        ->get();
+
+        $sql = DB::getQueryLog();
+        error_log(var_export($sql,true));
+        error_log(var_export($stOrder,true));
+
+        $return_result = [
+            [
+                'total_sales' => 0, //总营业额
+                'package_sales' => 0, //包装收入
+                'expect_sales' => 0, //预计收入
+                'valid_orders' => 0, //有效订单数
+                'total_orders' => 0, //总订单数
+                'avg_price' => 0 //客单价
+            ]
+        ];
+
+        return response()->json(['code'=>200, 'message'=>'ok', 'data'=>$return_result]);
+
+    }
+
+
+    /**
+     * 所有门店订单效率排行
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function mallOrderEfficiencyRank(Request $request)
+    {
+
+        $return_result = [
+            [
+                'mall_name' => 0, //门店名称
+                'efficiency' => 0, //效率（秒计：s）
+            ]
+        ];
+
+        return response()->json(['code'=>200, 'message'=>'ok', 'data'=>$return_result]);
+
+    }
+
+
+    /**
+     * 门店统计营收排名
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function salesRank(Request $request)
+    {
+
+        $mall_id = $request->input('mall_id', 0);
+
+        $return_result = [
+            'low' => 0,
+            'avg' => 0,
+            'this' => 0,
+            'high' => 0
+        ];
+
+        return response()->json(['code'=>200, 'message'=>'ok', 'data'=>$return_result]);
+
+    }
+
+
+    /**
+     * 门店统计订单效率排名
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function orderEfficiencyRank(Request $request)
+    {
+
+        $mall_id = $request->input('mall_id', 0);
+
+        $return_result = [
+            'low' => 0,
+            'avg' => 0,
+            'this' => 0,
+            'high' => 0
+        ];
+
+        return response()->json(['code'=>200, 'message'=>'ok', 'data'=>$return_result]);
+
+    }
+
+
+    /**
+     * 门店订单状态数量统计
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function orderStatusCount()
+    {
+
+        $return_result = [
+            'new_orders' => 0,
+            'wait_send_orders' => 0,
+            'abnormal_orders' => 0,
+            'remind_orders' => 0,
+            'refund_orders' => 0
+        ];
+
+        return response()->json(['code'=>200, 'message'=>'ok', 'data'=>$return_result]);
+
+    }
+
+
+}

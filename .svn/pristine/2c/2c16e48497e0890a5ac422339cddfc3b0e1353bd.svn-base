@@ -1,0 +1,46 @@
+<?php
+
+/*
+|--------------------------------------------------------------------------
+| Web Routes
+|--------------------------------------------------------------------------
+|
+| Here is where you can register web routes for your application. These
+| routes are loaded by the RouteServiceProvider within a group which
+| contains the "web" middleware group. Now create something great!
+|
+*/
+
+Route::get('/', function () {
+    return view('welcome');
+});
+
+Route::get('kit/captcha', 'Common\KitController@captcha');
+
+Route::get('admin/login', 'Admin\LoginController@index');
+Route::get('admin/login/do', 'Admin\LoginController@login');
+Route::get('admin/logout', 'Admin\LoginController@logout');
+
+Route::middleware(['admin.service'])->group(function () {
+
+    //首页
+    Route::get('admin', 'Admin\IndexController@main');
+    Route::get('admin/index', 'Admin\IndexController@index');
+    Route::get('admin/index/mall', 'Admin\IndexController@mall');
+
+    //订单
+    Route::get('admin/order', 'Admin\OrderController@index');
+    Route::get('admin/order/search', 'Admin\OrderController@search');
+
+    //商品分类
+    Route::get('admin/category', 'Admin\Goods\CategoryController@index');
+    Route::get('admin/category/search', 'Admin\Goods\CategoryController@search');
+    Route::get('admin/category/edit', 'Admin\Goods\CategoryController@edit');
+    Route::get('admin/category/add', 'Admin\Goods\CategoryController@add');
+    Route::get('admin/category/status', 'Admin\Goods\CategoryController@status');
+
+});
+
+Route::middleware(['api.service'])->prefix('/open-api/')->group(function () {
+    Route::get('order/search', 'Api\Order\OrderController@search');
+});

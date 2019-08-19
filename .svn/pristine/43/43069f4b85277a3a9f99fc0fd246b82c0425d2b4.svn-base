@@ -1,0 +1,171 @@
+<?php
+
+namespace App\Http\Controllers\Admin\User;
+
+use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
+use App\Models\User\StUser;
+use App\Services\User\SearchService;
+
+
+class UserController extends Controller
+{
+
+    //用户列表业
+    public function index(Request $request)
+    {
+
+        return view('admin/user/index');
+
+    }
+
+
+    //用户列表查询
+    public function search(Request $request) {
+
+        $user = new SearchService();
+        $user_result = $user->search($request->input());
+
+        $return_data = [
+            'total' => $user_result['total'],
+            'rows' => []
+        ];
+
+        foreach($user_result['data'] as $user){
+
+            $operation = '<a href="javascript:void(0)" onclick="user.edit('.$user['id'].')">修改</a>';
+            if ($user['type'] == 2) {
+                $role_name = '门店';
+                $operation .= '&nbsp;&nbsp;<a href="javascript:void(0)" onclick="plugin.search_mall()" data_id="'.$user['id'].'">绑定门店</a>';
+            } else {
+                $role_name = '总店';
+            }
+
+            $status_name = $user['status'] == 1 ? '启用' : '禁用';
+            $status_operation = '<a href="javascript:void(0)" class="status_type" data_type="'.$user['status'].'" data_id="'.$user['id'].'">'
+                                . $status_name . '</a>';
+
+            $return_data['rows'][] = [
+                'operation' => $operation,
+                'mobile' => $user['mobile'],
+                'name' => $user['creator'],
+                'type' => $role_name,
+                'mall' => $user['name'],
+                'created_at' => $user['created_at'],
+                'updated_at' => $user['updated_at'],
+                'editor' => $user['editor'],
+                'status' => $status_operation,
+            ];
+        }
+
+        return $return_data;
+
+    }
+
+
+    //查询用户详细信息
+    public function get(Request $request) {
+
+        $user_id = $request->input('id');
+
+        $user_data = StUser::find($user_id);
+        if (!$user_data) {
+            return response()->json(['code'=>404, 'message'=>'用户信息没有找到']);
+        }
+
+        $return_data = [
+            'id' => app_to_int($user_data->id),
+            'mobile' => app_to_string($user_data->mobile),
+            'creator' => app_to_string($user_data->creator),
+            'type' => app_to_int($user_data->type)
+        ];
+
+        return response()->json(['code'=>200, 'message'=>'ok', 'data'=>$return_data]);
+
+    }
+
+
+    //用户新增页
+    public function add(Request $request)
+    {
+        $U =new SearchService();
+        $data=$U->add($request->input());
+
+        return response()->json(['code'=>200, 'message'=>'ok', 'data'=>$data]);
+
+    }
+
+
+    //用户编辑页
+    public function edit(Request $request) {
+        $id='';
+        if($request['id']){
+            $id=$request['id'];
+
+            $U =new SearchService();
+            $data=$U->edit_user($id);
+            $user_data=$data[0];
+        }else{
+            $user_data=[];
+        }
+
+
+        return view('admin/user/edit',['user_data' => $user_data,'id'=>$id]);
+
+    }
+
+
+    //提交用户信息
+    public function submit(Request $request)
+    {
+        if (!isset($request['data']) || empty($request['data'])) {
+            return response()->json(['code' => 10001, 'message' => '缺少参数']);
+        }
+
+        $user_data=$request['data'];
+
+        if(!$user_data['id']){
+            $user_data['created_at']=date('Y-m-d H:i:s',time());
+            $user_data['updated_at']=date('Y-m-d H:i:s',time());
+            $U =new SearchService();
+            $num=$U->add_user($user_data);
+        }else {
+            $user_data['updated_at']=date('Y-m-d H:i:s',time());
+            $U =new SearchService();
+            $num=$U->update_user($user_data);
+        }
+
+        if($num){
+            return response()->json(['code'=>200, 'message'=>'成功']);
+        }
+
+    }
+
+    //启用&禁用
+    public function status(Request $request)
+    {
+        if (!isset($request['data']) || empty($request['data'])) {
+            return response()->json(['code' => 10001, 'message' => '缺少参数']);
+        }
+        $user_data = explode(',', $request['data']);
+        $status = 1;
+        if ($user_data[1] == $status) {
+            $status = 0;
+        }
+        $num = StUser::where('id', $user_data[0])->update(['status' => $status]);
+        if ($num) {
+            return response()->json(['code' => 200, 'message' => '操作成功', 'data' => []]);
+        }
+    }
+
+     public function add_mall(Request $request)
+     {
+         if (!isset($request['id']) || empty($request['id'])) {
+             return response()->json(['code' => 10001, 'message' => '缺少参数']);
+         }
+
+
+
+     }
+
+}

@@ -1,0 +1,117 @@
+<?php
+
+namespace App\Http\Controllers\Admin\Analyse;
+
+use DB;
+
+use Illuminate\Http\Request;
+
+use App\Models\Goods\StStatMallAnalyse;
+
+use App\Http\Controllers\Controller;
+
+class businessController extends Controller
+{
+
+    public function search( Request $request )
+    {
+
+        $startDate = $request->input('startDate');
+        $endDate = $request->input('endDate');
+        $app_id = $request->input('app_id');
+        $mall_id = $request->input('mall_id');
+
+        $where = [];
+
+        if ( !empty( $app_id ) ) {
+            $where[] = ['app_id' , '=' , $app_id] ;
+        }
+
+        if ( !empty( $mall_id ) ) {
+            $where[] = ['mall_id' , '=' , $mall_id] ;
+        }
+
+        if ( !empty( $startDate ) ) {
+            $where[] = ['cal_date','>=',$startDate];
+        }
+
+        if ( !empty( $endDate ) ) {
+            $where[] = ['cal_date','<=',$endDate];
+        }
+
+        $mall_data = StStatMallAnalyse::select(DB::raw('SUM(total_bill_num) as total_bill_num,SUM(total_sale_bill_num) as total_sale_bill_num,SUM(total_cancel_bill_num) as total_cancel_bill_num,SUM(total_user_fee) as total_user_fee,
+        SUM(total_mall_fee) as total_mall_fee,SUM(total_goods_money) as total_goods_money,SUM(package_income) as package_income,SUM(delivery_income) as delivery_income,
+        SUM(activity_expense) as activity_expense,SUM(service_expense) as service_expense,SUM(app_expense) as app_expense,SUM(total_cancel_mall_fee) as total_cancel_mall_fee'))
+            ->where($where)->get()->toArray();
+
+        $days = (strtotime($endDate)-strtotime($startDate))/86400+1;
+        $time = '前'. $days .'日    ';
+        $next_start_date = date('Y-m-d',strtotime('-'. $days .' day',strtotime($startDate)));
+        $next_end_date = date('Y-m-d',strtotime('-'. $days .' day',strtotime($endDate)));
+
+        $return = [];
+
+        if ( $mall_data ) {
+
+            $mall_data =$mall_data[0];
+            $other_where = [];
+
+            if ( !empty( $app_id ) ) {
+                $other_where[] = ['app_id' , '=' , $app_id] ;
+            }
+            if ( !empty( $mall_id ) ) {
+                $where[] = ['mall_id' , '=' , $mall_id] ;
+            }
+            if ( !empty( $startDate ) ) {
+                $other_where[] = ['cal_date','>=',$next_start_date];
+            }
+            if ( !empty( $endDate ) ) {
+                $other_where[] = ['cal_date','<=',$next_end_date];
+            }
+
+            $analyse = StStatMallAnalyse::select(DB::raw('SUM(total_bill_num) as total_bill_num,SUM(total_sale_bill_num) as total_sale_bill_num,SUM(total_cancel_bill_num) as total_cancel_bill_num,SUM(total_user_fee) as total_user_fee,
+        SUM(total_mall_fee) as total_mall_fee,SUM(total_goods_money) as total_goods_money,SUM(package_income) as package_income,SUM(delivery_income) as delivery_income,
+        SUM(activity_expense) as activity_expense,SUM(service_expense) as service_expense,SUM(app_expense) as app_expense,SUM(total_cancel_mall_fee) as total_cancel_mall_fee'))
+                ->where($other_where)->get()->toArray();
+
+            $analyse =$analyse[0];
+
+            if ( !$analyse ) {
+                $analyse['activity_expense'] = 0;
+                $analyse['service_expense'] = 0;
+                $analyse['app_expense'] = 0;
+                $analyse['total_user_fee'] = 0;
+                $analyse['total_mall_fee'] = 0;
+            }
+
+            $expense = $mall_data['activity_expense'] + $mall_data['service_expense'] + $mall_data['app_expense'];
+            $next_expense = $analyse['activity_expense'] + $analyse['service_expense'] + $analyse['app_expense'];
+
+            $return = [
+                'a1'=>isset( $mall_data['total_user_fee'] ) ?$mall_data['total_user_fee'] : 0,
+                'a2'=>isset( $analyse['total_user_fee'] ) ? $time. $analyse['total_user_fee'] : 0,
+                'a3'=>isset( $mall_data['total_goods_money'] ) ? $mall_data['total_goods_money'] : 0,
+                'a4'=>isset( $mall_data['package_income'] ) ? $mall_data['package_income'] : 0,
+                'a5'=>isset( $mall_data['delivery_income'] ) ? $mall_data['delivery_income'] : 0,
+                'b1'=>!empty( $expense ) ? $expense : 0,
+                'b2'=>!empty( $next_expense ) ? $time.$next_expense : 0,
+                'b3'=>isset( $mall_data['activity_expense'] ) ? $mall_data['activity_expense'] : 0,
+                'b4'=>isset( $mall_data['service_expense'] ) ? $mall_data['service_expense'] : 0,
+                'b5'=>isset( $mall_data['app_expense'] ) ? $mall_data['app_expense'] : 0,
+                'c1'=>isset( $mall_data['total_mall_fee'] ) ? $mall_data['total_mall_fee'] : 0,
+                'c2'=>isset( $analyse['total_mall_fee'] ) ? $time.$analyse['total_mall_fee'] : 0,
+                'd1'=>isset( $mall_data['total_sale_bill_num'] ) ? $mall_data['total_sale_bill_num'] : 0,
+                'd2'=>isset( $analyse['total_sale_bill_num'] ) ? $time.$analyse['total_sale_bill_num'] : 0,
+                'd3'=>isset( $mall_data['total_sale_bill_num'] ) ? '平均客单价  '.round( $mall_data['total_user_fee']/$mall_data['total_sale_bill_num'] ,2) : '平均客单价  0',
+                'e1'=>isset( $mall_data['total_cancel_bill_num'] ) ? $mall_data['total_cancel_bill_num'] : 0,
+                'e2'=>isset( $analyse['total_cancel_bill_num'] ) ? $time.$analyse['total_cancel_bill_num'] : 0,
+                'e3'=>isset( $mall_data['total_cancel_mall_fee'] ) ? '预计损失  '.round( $mall_data['total_cancel_mall_fee'],2) : '预计损失  0',
+            ];
+
+        }
+
+        return response()->json(['code'=>200,'message'=>'ok','data'=>$return]);
+
+    }
+
+}

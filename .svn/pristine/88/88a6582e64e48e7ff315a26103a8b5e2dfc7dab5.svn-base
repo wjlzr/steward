@@ -1,0 +1,217 @@
+<?php
+
+namespace App\Services\Core\User;
+
+use App\Models\User\StUser;
+use App\Models\Mall\StMall;
+use App\Services\ControlCenterService;
+
+use Mockery\CountValidator\Exception;
+use DB;
+
+
+class UserEditService
+{
+
+
+    /**
+     * 用户信息新增/编辑
+     * @param $args
+     * @return array
+     */
+    public function edit($args)
+    {
+
+        $id = isset($args['id']) && ebsig_is_int($args['id'])
+            ? $args['id']
+            : 0;
+
+        $user_name = isset($args['user_name']) && !empty($args['user_name'])
+            ? $args['user_name']
+            : 'system';
+
+        if (!isset($args['name']) || empty($args['name'])) {
+            return ['code'=>400, 'message'=>'用户名不能为空'];
+        } else if (!isMobile($args['name'])) {
+            return ['code'=>400, 'message'=>'用户名格式不正确'];
+        }
+
+        if (!isset($args['full_name']) || empty($args['full_name'])) {
+            return ['code'=>400, 'message'=>'用户姓名不能为空'];
+        }
+
+        if (!isset($args['pwd']) && !empty($args['pwd']) && !isPwd($args['pwd'])) {
+            return ['code'=>400, 'message'=>'密码格式不正确'];
+        }
+
+        if (!isset($args['type']) || !in_array($args['type'], [1, 2])) {
+            return ['code'=>400, 'message'=>'运营类型必须选择'];
+        }
+
+        if ($id) {
+
+            $user_data = StUser::find($id);
+            if (!$user_data) {
+                return ['code'=>404, 'message'=>'用户信息没有找到'];
+            }
+            if (!empty($args['pwd'])) {
+                $user_data->pwd = md5($args['pwd']);
+            }
+
+        } else {
+
+            if (empty($args['pwd'])) {
+                return ['code'=>400, 'message'=>'密码不能为空'];
+            }
+            $user = StUser::where('mobile', $args['name'])
+                ->orWhere('name', $args['name'])
+                ->first();
+            if ($user) {
+                return ['code'=>400, 'message'=>'用户信息已经存在'];
+            }
+            $user_data = new StUser();
+            $user_data->status = 1;
+            $user_data->pwd = md5($args['pwd']);
+
+        }
+
+        $user_data->mobile = $args['name'];
+        $user_data->name = $args['name'];
+        $user_data->full_name = $args['full_name'];
+        $user_data->type = $args['type'];
+        $user_data->editor = $user_name;
+
+        $memo = $user_data->type == 1
+            ? '该用户为商管云总部运营类型'
+            : '该用户为商管云门店运营类型';
+
+        $control_service = new ControlCenterService();
+
+        try {
+
+            DB::beginTransaction();
+
+            $user_data->save();
+
+            $control_result = $control_service->post('mall/user/edit', [
+                'user_id' => $user_data->id,
+                'user_name' => $user_data->full_name,
+                'mobile' => $user_data->mobile,
+                'pwd' => $user_data->pwd,
+                'id' => $user_data->e_user_id,
+                'memo' => $memo
+            ]);
+
+            if ($control_result['code'] != 200) {
+                throw new Exception($control_result['message'], $control_result['code']);
+            }
+
+            StUser::where('id', $user_data->id)->update(['e_user_id' => $control_result['data']['id']]);
+
+            DB::commit();
+            return ['code'=>200, 'message'=>'ok'];
+
+        } catch (Exception $e) {
+            DB::rollBack();
+            return ['code'=>$e->getCode(), 'message'=>$e->getMessage()];
+        }
+
+    }
+
+
+    /**
+     * 修改用户密码
+     * @param $args
+     * @return array
+     */
+    public function editPwd($args)
+    {
+
+        $user_id = isset($args['user_id']) && !empty($args['user_id'])
+            ? $args['user_id']
+            : 0;
+
+        $pwd = isset($args['pwd']) && !empty($args['pwd'])
+            ? $args['pwd']
+            : '';
+
+        $old_pwd = isset($args['old_pwd']) && !empty($args['old_pwd'])
+            ? $args['old_pwd']
+            : '';
+
+        if (empty($pwd)) {
+            return ['code'=>400, 'message'=>'密码不能为空'];
+        } else if (!isPwd($pwd)) {
+            return ['code'=>400, 'message'=>'密码格式不正确'];
+        }
+
+        if (empty($old_pwd)) {
+            return ['code'=>400, 'message'=>'原密码不能为空'];
+        }
+
+        $user = StUser::find($user_id);
+        if (!$user) {
+            return ['code'=>404, 'message'=>'用户信息没有找到'];
+        } else if ($user->pwd != md5($old_pwd)) {
+            return ['code'=>404, 'message'=>'用户原密码不正确'];
+        }
+        $user->pwd = md5($pwd);
+        $user->save();
+
+        return ['code'=>200, 'message'=>'ok'];
+
+    }
+
+
+    /**
+     * 用户绑定门店
+     * @param $id
+     * @param $mall_id
+     * @return array
+     */
+    public function binding($id, $mall_id)
+    {
+
+        $user = StUser::find($id);
+        if (!$user) {
+            return ['code'=>404, 'message'=>'用户信息没有找到'];
+        } else if ($user->status == 0) {
+            return ['code'=>400, 'message'=>'用户已禁用'];
+        }
+
+        $mall = StMall::find($mall_id);
+        if (!$mall) {
+            return ['code'=>404, 'message'=>'门店信息没有找到'];
+        } else if ($mall->status == 0) {
+            return ['code'=>400, 'message'=>'门店已禁用'];
+        }
+
+        StUser::where('id', $user->id)->update(['mall_id'=>$mall->id]);
+
+        return ['code'=>200, 'message'=>'ok'];
+
+    }
+
+
+    /**
+     * 改变用户的状态
+     * @param $user_id
+     * @param $status
+     * @return array
+     */
+    public function status($user_id, $status)
+    {
+
+        $user = StUser::find($user_id);
+        if (!$user) {
+            return ['code'=>404, 'message'=>'用户信息没有找到'];
+        }
+
+        StUser::where('id', $user_id)->update(['status'=>$status]);
+
+        return ['code'=>200, 'message'=>'ok'];
+
+    }
+
+
+}

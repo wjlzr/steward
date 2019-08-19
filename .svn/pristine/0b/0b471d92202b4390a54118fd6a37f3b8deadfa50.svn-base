@@ -1,0 +1,167 @@
+<?php
+
+namespace App\Http\Controllers\Admin\Goods;
+
+use App\Models\Goods\StAppGoodsSale;
+use App\Models\Goods\StCategory;
+use App\Models\Mall\StMall;
+use Illuminate\Http\Request;
+use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Redis;
+
+class MallstockController extends Controller
+{
+
+    /**
+     * 库存列表
+     * @return \Illuminate\Contracts\View\Factory|\Illuminate\View\View
+     */
+    public function index()
+    {
+
+        $st_category = StCategory::orderBy('sort','ASC')->get();
+
+        if( !$st_category -> isEmpty()){
+
+            $st_category = $this -> getTree( $st_category->toArray() , 0 );
+        }
+
+        return view('/admin/goods/mallstock/index',['category' => json_encode($st_category)]);
+    }
+
+    /**
+     * 查询库存列表
+     * @param Request $request
+     * @return array
+     */
+    public function search(Request $request)
+    {
+
+        $mall_id = Redis::get('ST_MALL_ID_' . session()->getId()) ? Redis::get('ST_MALL_ID_' . session()->getId()) : 0 ;
+        $request_data = $request -> all();
+
+        $where = [];
+
+        if( !empty($request_data['sku'])){
+
+            $where[] = ['st_app_goods_sale.sku',$request_data['sku']];
+        }
+
+        if( !empty($request_data['upc'])){
+
+            $where[] = ['st_app_goods_sale.sku',$request_data['upc']];
+        }
+
+        if( !empty($request_data['bigCategoryID'])){
+
+            $where[] = ['st_goods.big_category_id',$request_data['bigCategoryID']];
+        }
+
+        if( !empty($request_data['midCategoryID'])){
+
+            $where[] = ['st_goods.mid_category_id',$request_data['midCategoryID']];
+        }
+
+        $st_app_goods_sale = StAppGoodsSale::select('st_app_goods_sale.sku','st_app_goods_sale.upc','st_app_goods_sale.images','st_app_goods_sale.name',
+                                    'st_goods_stock.enable_number','st_goods.big_category_name','st_goods.mid_category_name',
+                                    'st_app_goods_sale.spec_id','st_app_goods_sale.spec')
+                                    ->leftJoin('st_goods','st_app_goods_sale.goods_id','=','st_goods.id')
+                                    ->leftJoin('st_goods_stock','st_app_goods_sale.sku','=','st_goods_stock.sku')
+                                    ->where('st_app_goods_sale.mall_id',$mall_id)
+                                    ->where($where)
+                                    ->groupBy('st_app_goods_sale.spec_id')
+                                    ->orderBy($request->input('sort'), $request->input('order'))
+                                    ->paginate($request->input('limit'), ['*'], '', $request->input('offset') / 10 + 1 )
+                                    ->toArray();
+
+        $result_data = [
+            'total' => 0,
+            'rows' => []
+        ];
+
+        if( !empty($st_app_goods_sale['data'])){
+
+            $result_data['total'] = $st_app_goods_sale['total'];
+
+            foreach ( $st_app_goods_sale['data'] as $item) {
+
+                //处理分类显示
+                if (!empty($item['big_category_name'])) {
+
+                    if (!empty($item['mid_category_name'])) {
+
+                        $category = $item['big_category_name'] . '->' . $item['mid_category_name'];
+                    } else {
+                        $category = $item['big_category_name'];
+                    }
+                }
+
+                $result_data['rows'][] = [
+                    'operation' => '<a href="javascript:void(0)" class="" data-id="' . $item['sku'] . '">拉取ERP价格</a><a href="javascript:void(0)" class="sync-app">同步上线平台</a>',
+                    'product_code' => $item['sku'] . '</br>' . $item['upc'],
+                    'goods_info' => '<img src="' . explode(',', $item['images'])[0] . '" style="width:30px;height:30px;margin-right:10px;" >' . $item['name'],
+                    'category' => $category,
+                    'stock' => '<span>' . $item['enable_number'] . '</span><a href="#" class="inventory" data-id="' . $item['sku'] . '" data-name="' . $item['name'] . '"><img src="/images/admin/updates.png" width="35px;" style="margin-top:-3px;"></a>',
+                ];
+            }
+        }
+
+        return $result_data;
+    }
+
+    /**
+     * 修改商品库存
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function edit(Request $request)
+    {
+
+        $mall_id = Redis::get('ST_MALL_ID_' . session()->getId()) ? Redis::get('ST_MALL_ID_' . session()->getId()) : 0 ;
+
+        $sku_ids = $request -> input('sku_ids' ,'');
+        $enable_number = $request -> input('enable_number' ,'');
+
+        foreach ( $sku_ids as $sku ){
+
+            StGoodsStock::where([['sku',$sku],['mall_id',$mall_id]])->update(['enable_number' => $enable_number]);
+        }
+
+        //应用平台同步
+
+        return response()->json(['code' => 200 ,'message' => '操作成功']);
+
+    }
+
+    /**
+     * 库存同步
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function sync(Request $request)
+    {
+
+
+        return response()->json(['code' => 200 ,'message' => 'ok']);
+    }
+
+    /**
+     * 数据结构转换
+     * @param $data
+     * @param $pId
+     * @return array|string
+     */
+    private function getTree($data, $pId)
+    {
+        $tree = '';
+
+        foreach ($data as $k => $v){
+            if($v['p_id'] == $pId)
+            {
+                $v['children'] = $this->getTree($data, $v['id']);
+                $tree[] = $v;
+            }
+        }
+        return $tree;
+    }
+}

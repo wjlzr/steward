@@ -1,0 +1,27 @@
+<?php
+
+namespace App\Http\Controllers\Api\App;
+
+use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
+
+
+use App\Services\App\AppSearchService;
+
+
+class AppController extends Controller
+{
+
+
+    //查询应用列表
+    public function get(Request $request)
+    {
+
+        $app_search = new AppSearchService();
+        $user_result = $app_search->search($request->input());
+        return response()->json($user_result);
+
+    }
+
+}
+

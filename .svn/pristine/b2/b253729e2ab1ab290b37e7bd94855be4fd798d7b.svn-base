@@ -1,0 +1,321 @@
+<?php
+namespace App\Services\Wm\JdDj\Request;
+
+use App\Models\Goods\StAppCategory;
+use App\Models\Goods\StAppGoodsSale;
+use App\Models\Goods\StCategory;
+use App\Models\Goods\StGoodsSale;
+use App\Services\Wm\GoodsFactoryInterface;
+use DB;
+
+class JdGoodsRequest implements GoodsFactoryInterface
+{
+
+    /**
+     * EleGoodsRequest constructor.
+     * @param $curl
+     */
+    public function __construct($curl)
+    {
+        $this->curl = $curl;
+    }
+
+    /**
+     * 查询商家店内分类信息接口
+     * @param $args
+     * @return mixed
+     */
+    public function get_shop_categories($args_data)
+    {
+
+        return $this->curl->call('/pms/queryCategoriesByOrgCode', [
+            'fields' => ['ID', 'PID', 'SHOP_CATEGORY_NAME', 'SHOP_CATEGORY_LEVEL', 'SORT']
+        ]);
+
+    }
+
+    /**
+     * 新增商家店内分类信息接口
+     * @param $args
+     * @return mixed
+     */
+    public function create_category($args_data)
+    {
+
+        if (!isset($args_data['mall_id']) || empty($args_data['mall_id'])) {
+            return $this->curl->response('店铺id不能为空');
+        }
+
+        if (!isset($args_data['category_id']) || empty($args_data['category_id'])) {
+            return $this->curl->response('分类id不能为空');
+        }
+
+        if (!isset($args_data['category_name']) || empty($args_data['category_name'])) {
+            return $this->curl->response('分类名称不能为空');
+        }
+
+        if (!isset($args_data['level']) || empty($args_data['level'])) {
+            return $this->curl->response('分类等级不能为空');
+        }
+
+        if (!isset($args_data['sort'])) {
+            return $this->curl->response('分类排序不能为空');
+        }
+
+        $st_category = StCategory::find($args_data['category_id']);
+        if (!$st_category) {
+            $this->curl->response('分类信息未找到');
+        }
+
+        $st_app_category =
+
+        $p_id = 0;
+        if ($args_data['level'] > 1) {
+            $st_app_category = StAppCategory::where('category_id', $st_category->p_id)->first(); //京东接口不支持门店 平台条件（后面加）
+            $p_id = $st_app_category->o_category_id;
+        }
+
+        $res = $this->curl->call('/pms/addShopCategory', [
+            'pid' => $p_id,
+            'shopCategoryName' => $args_data['name'],
+            'shopCategoryLevel' => $args_data['level'],
+            'sort' => $args_data['sort'],
+        ]);
+
+        if ($res != 200) {
+            return $this->curl->response($res['message']);
+        }
+
+        $st_new = new StAppCategory();
+        $st_new->creator = 'EleMeAPI';
+        $st_new->category_id = $args_data['category_id'];
+        $st_new->category_name = $args_data['category_name'];
+        $st_new->status = 1;
+        $st_new->level = $args_data['level'];
+        $st_new->p_id = $st_category->p_id;
+        $st_new->mall_id = $args_data['mall_id'];
+        $st_new->app_id = 100002;
+        $st_new->o_category_id = $res['data']['id'];//看jd返回数据结构
+        $st_new->save();
+
+        return $res;
+    }
+
+    /**
+     * 修改商家店内分类信息接口
+     * @param $args
+     * @return mixed
+     */
+    public function update_category($args_data)
+    {
+
+        if (!isset($args_data['category_id']) || empty($args_data['category_id'])) {
+            return $this->curl->response('分类id不能为空');
+        }
+        return $this->curl->call('/pms/updateShopCategory', ['id' => $args_data['category_id']]);
+
+    }
+
+    /**
+     * 删除商品分类
+     * @param $args_data
+     * @return mixed
+     */
+    public function delete_category($args_data)
+    {
+
+        if (!isset($args_data['category_id']) || empty($args_data['category_id'])) {
+            return $this->curl->response('分类id不能为空');
+        }
+        $st_app_category = StAppCategory::find($args_data['category_id']);
+        $res = $this->curl->call('/pms/delShopCategory', ['id' => $st_app_category->o_category_id]);
+        return $res;
+
+    }
+
+    /**
+     * 添加商品
+     * @param array $args_data
+     * @return array
+     */
+    public function create_product($args_data)
+    {
+
+        if (!isset($args_data['category_id']) || empty($args_data['category_id'])) {
+            return $this->curl->response('分类id不能为空');
+        }
+
+        $st_app_category = StAppCategory::where(['category_id' => $args_data['category_id'],
+            'mall_id' => $args_data['mall_id'], 'app_id' => 100002])->first();
+
+        $host = 'http://' . $_SERVER['HTTP_HOST'];
+
+        $result_code = [];
+        foreach ($args_data['spec'] as $specs) {
+            $st_goods_sale = StGoodsSale::where(['spec_id' => $specs['spec_id'],'mall_id'
+            => $args_data['mall_id'], 'app_id' => 100002])->first();
+
+            $st_app_goods_sale = new StAppGoodsSale();
+            $st_app_goods_sale->creator = 'EleMeAPI';
+            $st_app_goods_sale->goods_id = $args_data['goods_id'];
+            $st_app_goods_sale->spec_id = $specs['spec_id'];
+            $st_app_goods_sale->name = $args_data['goods_name'];
+            $st_app_goods_sale->spec = $specs['name'];
+            $st_app_goods_sale->erp_price = $specs['price'];
+            $st_app_goods_sale->price = $specs['price'];
+            $st_app_goods_sale->status = 0;
+            $st_app_goods_sale->sku = $specs['product_code'];
+            $st_app_goods_sale->upc = $specs['upc'];
+            $st_app_goods_sale->images = $st_goods_sale->images;
+            $st_app_goods_sale->mall_id = $args_data['mall_id'];
+            $st_app_goods_sale->app_id = 100002;
+            $st_app_goods_sale->o_goods_id = ''; //此处后面补充
+
+            $res = $this->curl->call('/pms/sku/addSku', [
+                'outSkuId' => $specs['product_code'],
+                'categoryId' => $st_app_category->o_category_id,
+                'brandId' => $st_goods_sale->brand, //这里是到家品牌id 后面更换
+                'skuName' => $args_data['goods_name'].$specs['name'],
+                'skuPrice' => $specs['price'],
+                'weight' => $specs['weight'],
+                'upcCode' => $specs['upc'],
+                'images' => $host.$st_goods_sale->images,
+                'fixedStatus' => 1,
+                'isSale' => true,
+            ]);
+
+            $result_code['code'][] = $res['code'];
+            $result_code['sku'][$res['data']['result']['skuId']] = $st_app_category;
+        }
+
+        foreach ($result_code['code'] as $code) {
+            if ($code != 200) {
+                return $this->curl->response('商品添加失败');
+            }
+        }
+
+        foreach ($result_code['sku'] as $k => $v) {
+            $v->o_sku_id = $k;
+            $v->save();
+        }
+
+        return $this->curl->response('操作成功', 200);
+
+    }
+
+    /**
+     * 批量新增商品
+     * @param $args
+     * @return mixed
+     */
+    public function batch_create_product($args_data)
+    {
+
+        $request_list = [];
+        foreach ($args_data as $goods) {
+            $st_app_category = StAppCategory::where(['category_id' => $goods['category_id'],
+                'mall_id' => $goods['mall_id'],'app_id' => 100002])->first();
+            $request_list[] = [
+                'uniqueCode' => $goods['upc'],
+                'outSku' => $goods['goods_id'],
+                'jdPrice' => $goods['price'],
+                'shopCategoryId' => $st_app_category->o_category_id,
+            ];
+        }
+        $this->curl->call('/pms/delShopCategory', ['batchSkuRequestList' => $request_list]);
+
+    }
+
+    /**
+     * 批量上下架商品
+     * @param array $args = [
+     *      $goods_id
+     * ]
+     * @param int $is_shelf 上下架：0、下架 1、上架
+     * @return mixed
+     */
+    public function batch_update_self($args)
+    {
+
+        $this->curl->call('/stock/updateVendibility', ['listBaseStockCenterRequest' => '']);
+
+    }
+
+    /**
+     * 批量修改商品价格
+     * @param $args
+     * @param $mall_code
+     */
+    public function batch_update_price($args)
+    {
+        $this->curl->call('/venderprice/updateStationPrice', ['listBaseStockCenterRequest' => '']);
+    }
+
+    /**
+     * 批量修改商品库存
+     * @param $args
+     */
+    public function batch_update_stock($args)
+    {
+    }
+
+    /**
+     * 编辑商品
+     * @param $args
+     * @return mixed
+     */
+    public function update_product($args)
+    {
+    }
+
+    /**
+     * 批量编辑商品
+     * @param $args
+     * @return mixed
+     */
+    public function batch_update_product($args)
+    {
+    }
+
+    /**
+     * 获取商品列表信息
+     * @param $args = [
+     *      'shop_id' => string 店铺id,
+     *      'page' => int 当前分页
+     *      'page_size' => int 分页条数（默认20）
+     * ]
+     * @return mixed
+     */
+    public function get_shop_product($args)
+    {
+
+    }
+
+    /**
+     * 批量删除商品
+     * @param array $args = [
+     *      'mall_code' => string 门店编号
+     *      'goods' => [
+     *          $goods_id
+     *      ]
+     * ]
+     * @return mixed
+     */
+    public function batch_delete_goods($args)
+    {
+    }
+
+    /**
+     * 设置分类排序
+     * @param $args = [
+     *      'mall_id' => int 门店id
+     *      'category_id' => int 分类id
+     *      'category_name' => string 分类名称
+     *      'sort' => int 排序
+     * ]
+     * @return mixed
+     */
+    public function set_sort_category($args)
+    {
+    }
+}

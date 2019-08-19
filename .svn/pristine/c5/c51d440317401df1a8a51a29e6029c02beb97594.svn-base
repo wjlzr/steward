@@ -1,0 +1,24 @@
+<?php
+
+namespace App\Services\User;
+
+use App\Models\User\StUser;
+
+
+class SearchService
+{
+
+
+    /**
+     * 用户列表搜索
+     * @param $args
+     * @return mixed
+     */
+    public function search($args) {
+
+        return [];
+
+    }
+
+
+}

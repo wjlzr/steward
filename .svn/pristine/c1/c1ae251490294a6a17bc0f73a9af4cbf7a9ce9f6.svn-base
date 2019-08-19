@@ -1,0 +1,293 @@
+<?php
+namespace App\Http\Controllers\Admin\Task;
+
+use Carbon\Carbon;
+use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
+use App\Http\Controllers\Admin\Task\TaskManageController;
+use DB;
+use Illuminate\Support\Facades\Redis as Redis;
+
+class StatSaleController extends Controller
+{
+
+    public function stat(Request $request) {
+
+        error_log(22222);
+
+        if (empty($request->input('task_log_id'))) {
+            die('参数错误');
+        }
+
+        $TaskManageController = new TaskManageController();
+
+        ini_set('memory_limit', '2048M');
+
+        set_time_limit(0);
+
+        //删除Redis
+        $redis_del = Redis::keys('StatSaleController_*');
+        if ( $redis_del ) {
+            foreach ( $redis_del as $del ) {
+                Redis::del($del);
+            }
+        }
+
+        //获取完成订单数据
+        $this->get_finish();
+
+        //保存商品分析数据
+        $this->st_stat_goods_analyse();
+
+        //保存商品分类分析数据
+        $this->st_stat_goods_category_analyse();
+
+        //删除Redis
+        $redis_del = Redis::keys('StatSaleController_*');
+        if ( $redis_del ) {
+            foreach ( $redis_del as $del ) {
+                Redis::del($del);
+            }
+        }
+
+        ini_restore('memory_limit');
+        echo '执行结束';
+
+        $TaskManageController->updateTaskLog( $request->input('task_log_id'), 'SUCCESS' );
+
+    }
+
+    public function get_finish() {
+
+        $page = 1;
+        $calDate = date('Y-m-d', strtotime('-1 day'));
+        $s_time = $calDate . ' 00:00:00';
+        $e_time = $calDate . ' 23:59:59';
+
+        while ( $page>=1 ) {
+
+            $orders = DB::table('st_order_trace')
+                ->select('order_id')
+                ->where('order_status', 4)
+                ->whereBetween('created_at', [$s_time, $e_time])
+                ->offset(($page-1)*5000)
+                ->limit(5000)
+                ->get()->toArray();
+
+            if ( empty($orders) ) {
+                break;
+            }
+
+            foreach ( $orders as $d ) {
+
+                $goods_data = DB::table('st_order')
+                    ->join('st_order_goods','st_order_goods.order_id','=','st_order.id')
+                    ->select(DB::raw('DATE_FORMAT(st_order.created_at,\'%Y-%m-%d\') AS days, app_id, mall_id,  
+                    goods_id, goods_name, goods_sku, goods_upc, goods_number, goods_price'))
+                    ->where('st_order.id', $d->order_id)
+                    ->groupBy('mall_id','app_id')
+                    ->get()->toArray();
+
+                if (empty($goods_data)) {
+                    continue;
+                }
+
+                foreach ( $goods_data as $g ) {
+                    //商品分析
+                    $go_redis = 'StatSaleController_goods_'.$g->days . '_' . $g->mall_id . '_' . $g->app_id.'_'.$g->goods_id;
+
+                    $go_data = Redis::get($go_redis);
+                    if ( empty($go_data) ) {
+                        $go_data = array(
+                            'goods_name' => $g->goods_name,
+                            'sku' => $g->goods_sku,
+                            'upc' => $g->goods_upc,
+                            'total_num' => 0,
+                            'total_bill_money' => 0
+                        );
+                    } else {
+                        $go_data = json_decode($go_data,true);
+                    }
+
+                    $go_data['total_num'] += $g->goods_number;
+                    $go_data['total_bill_money'] += $g->goods_number*$g->goods_price;
+
+                    Redis::set($go_redis,json_encode($go_data));
+
+
+                    //商品分类分析
+                    $category= DB::table('st_goods_sale')
+                        ->select('big_category_id','big_category_name','mid_category_id','mid_category_name','small_category_id','small_category_name')
+                        ->where('goods_id',$g->goods_id)
+                        ->get()->toArray();
+
+                    if ( empty($category) ){
+                        continue;
+                    }
+
+                    $ca_redis = 'StatSaleController_cate_'.$g->days . '_' . $g->mall_id . '_' . $g->app_id.'_'.$category[0]->big_category_id.'_'.$category[0]->mid_category_id.'_'.$category[0]->small_category_id;
+
+                    $ca_data = Redis::get($ca_redis);
+                    if ( empty($ca_data) ) {
+                        $ca_data = array(
+                            'first_level_name' => $category[0]->big_category_name,
+                            'second_level_name' => $category[0]->mid_category_name,
+                            'third_level_name' => $category[0]->small_category_name,
+                            'total_num' => 0,
+                            'total_bill_money' => 0
+                        );
+                    } else {
+                        $ca_data = json_decode($ca_data,true);
+                    }
+                    $ca_data['total_num'] += $g->goods_number;
+                    $ca_data['total_bill_money'] += $g->goods_number*$g->goods_price;
+
+                    Redis::set($ca_redis,json_encode($ca_data));
+
+                }
+
+            }
+
+            ++$page;
+
+        }
+
+    }
+
+    public function st_stat_goods_analyse() {
+
+        $redis_array = Redis::keys('StatSaleController_goods_*');
+
+        if ( empty($redis_array) ) {
+            return 0;
+        }
+
+        foreach ( $redis_array as $sg ) {
+
+            $data = json_decode(Redis::get($sg),true);
+
+            $sg = str_replace('StatSaleController_goods_','',$sg);
+            $index = explode('_',$sg);
+
+            $check = DB::table('st_stat_goods_analyse')
+                ->where([
+                    ['cal_date',$index[0]],
+                    ['mall_id',$index[1]],
+                    ['app_id',$index[2]],
+                    ['goods_id',$index[3]]
+                ])->get()->toArray();
+
+            $insert_sql = array();
+
+            if ( empty($check) ) {
+
+                $insert_sql[] = array(
+                    'updated_at' => Carbon::now(),
+                    'creator' => 'system',
+                    'created_at' => Carbon::now(),
+                    'cal_date' => $index[0],
+                    'mall_id' => $index[1],
+                    'app_id' => $index[2],
+                    'goods_id' => $index[3],
+                    'goods_name' => $data['goods_name'],
+                    'sku' => $data['sku'],
+                    'upc' => $data['upc'],
+                    'total_num' => $data['total_num'],
+                    'total_bill_money' => $data['total_bill_money']
+                );
+
+            } else {
+                DB::table('st_stat_goods_analyse')
+                    ->where([
+                        ['cal_date',$index[0]],
+                        ['mall_id',$index[1]],
+                        ['app_id',$index[2]],
+                        ['goods_id',$index[3]]
+                    ])->update([
+                        'total_num' => $check[0]->total_num + $data['total_num'],
+                        'total_bill_money' => $check[0]->total_bill_money + $data['total_bill_money']
+                    ]);
+            }
+
+            if ( $insert_sql ) {
+                DB::table('st_stat_goods_analyse')->insert($insert_sql);
+            }
+
+        }
+
+    }
+
+    public function st_stat_goods_category_analyse() {
+
+        $redis_array = Redis::keys('StatSaleController_cate_*');
+
+        if ( empty($redis_array) ) {
+            return 0;
+        }
+
+        foreach ( $redis_array as $sc ) {
+
+            $data = json_decode(Redis::get($sc),true);
+
+            $sc = str_replace('StatSaleController_cate_','',$sc);
+            $index = explode('_',$sc);
+
+            $check = DB::table('st_stat_goods_category_analyse')
+                ->where([
+                    ['cal_date',$index[0]],
+                    ['mall_id',$index[1]],
+                    ['app_id',$index[2]],
+                    ['first_level_id',$index[3]],
+                    ['second_level_id',$index[4]],
+                    ['third_level_id',$index[5]]
+                ])->get()->toArray();
+
+            $insert_sql = array();
+
+            if ( empty( $check ) ) {
+
+                $insert_sql[] = array(
+                    'updated_at' => Carbon::now(),
+                    'creator' => 'system',
+                    'created_at' => Carbon::now(),
+                    'cal_date' => $index[0],
+                    'mall_id' => $index[1],
+                    'app_id' =>$index[2],
+                    'first_level_id' => $index[3],
+                    'first_level_name' => $data['first_level_name'],
+                    'second_level_id' => $index[4],
+                    'second_level_name' => $data['second_level_name'],
+                    'third_level_id' => $index[5],
+                    'third_level_name' => $data['third_level_name'],
+                    'total_bill_money' => $data['total_bill_money'],
+                    'total_num' => $data['total_num'],
+                );
+
+            } else {
+                DB::table('st_stat_goods_category_analyse')
+                    ->where([
+                        ['cal_date',$index[0]],
+                        ['mall_id',$index[1]],
+                        ['app_id',$index[2]],
+                        ['first_level_id',$index[3]],
+                        ['second_level_id',$index[4]],
+                        ['third_level_id',$index[5]]
+                    ])->update([
+                        'total_bill_money' => $check[0]->total_bill_money + $data['total_bill_money'],
+                        'total_num' => $check[0]->total_num + $data['total_num']
+                    ]);
+            }
+
+            if ( $insert_sql ) {
+                DB::table('st_stat_goods_category_analyse')->insert($insert_sql);
+            }
+
+        }
+
+    }
+
+}
+
+
+
+

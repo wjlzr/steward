@@ -1,0 +1,245 @@
+<?php
+
+namespace App\Service\Wm\Ele;
+
+use App\Models\StApp;
+
+class Curl
+{
+
+    public $config;
+
+    /**
+     * API接口发起请求
+     * @param $action
+     * @param $args_data
+     * @param string $ver
+     * @return array
+     */
+    public function call($action, $args_data, $ver = '/api/')
+    {
+
+        $http_data = [
+            "nop" => '1.0.0',
+            "id" => $this->config['uuid'],
+            "action" => $action,
+            "token" => $this->config['token'],
+            "metas" => [
+                "app_key" => $this->config['appKey'],
+                "timestamp" => time(),
+            ],
+            "params" => $args_data,
+        ];
+        $http_data['signature'] = $this->signature($http_data);
+        if (count($args_data) == 0) {
+            $http_data["params"] = (object)[];
+        }
+
+        $request_url = $this->config['getWay'] . $ver . $this->config['version'] . '/';
+        $result = $this->post($request_url, $http_data);
+        return $result;
+
+    }
+
+    /**
+     * PRC调用请求
+     * @param $url
+     * @param $data
+     * @return array
+     */
+    private function post($url, $data) {
+
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_POST, 1);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-type: application/json; charset=utf-8", "Accept-Encoding: gzip']);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+        curl_setopt($ch, CURLOPT_USERAGENT, $this->config['userAgent']);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_ENCODING, 'gzip');
+        $request_response = curl_exec($ch);
+        $curl_http_status = curl_getinfo($ch,CURLINFO_HTTP_CODE);
+        $curl_http_info = curl_getinfo($ch);
+        if ($request_response == false || curl_errno($ch)) {
+            $error = curl_error($ch);
+            return array('code' => $curl_http_status, 'message' => $error,'http_info' => $curl_http_info);
+        }
+        $result = json_decode($request_response, true);
+
+        if (is_null($result)) {
+            $result = $request_response;
+        }
+        if (!empty($result['error'])) {
+            return ['code'=>$result['error']['code'], 'message'=>$result['error']['message']];
+        }
+
+        return [
+            'code'=>200,
+            'message'=>'ok',
+            'data' =>$result['result'],
+            'http_info' => $curl_http_info
+        ];
+
+    }
+
+    /**
+     * API接口签名验签
+     * @param $data
+     * @return string
+     */
+    private function signature($data)
+    {
+
+        $merged = array_merge($data['metas'], $data['params']);
+        ksort($merged);
+
+        $sign_str = '';
+        foreach ($merged as $key => $value) {
+            $json = json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            $sign_str .= $key . '=' . $json;
+        }
+        $splice = $data['action'] . $this->config['token'] . $sign_str . $this->config['appSecret'];
+        $encode = mb_detect_encoding($splice, ["ASCII", 'UTF-8', "GB2312", "GBK", 'BIG5']);
+        if ($encode != null) {
+            $splice = mb_convert_encoding($splice, 'UTF-8', $encode);
+        }
+
+        return strtoupper(md5($splice));
+
+    }
+
+    /**
+     * 消息推送签名方法
+     * @param $params
+     * @return string
+     */
+    public function push_signature($params)
+    {
+
+        unset($params['signature']);
+        ksort($params);
+        $sign_str = '';
+        foreach ($params as $key => $value) {
+            $sign_str .= $key . '=' . $value;
+        }
+
+        $md5 = md5($sign_str . $this->config['appSecret']);
+        return strtoupper($md5);
+
+    }
+
+    /**
+     * 信息返回
+     * @param $message
+     * @param int $code
+     * @param array $data
+     * @return array
+     */
+    public function response($message, $code = 400, $data = [])
+    {
+        return ['code'=>$code, 'message'=>$message, 'data'=>$data];
+    }
+
+    /**
+     * 通过授权码获取access_token
+     * @param $code
+     * @return array
+     */
+    public function get_access_token($code)
+    {
+
+        $res_token =  $this->urlencoded_request($this->config['getWay'] . '/token', [
+            'grant_type' => 'authorization_code',
+            'code' => $code,
+            'redirect_uri' => $this->config['callback'],
+            "client_id" => $this->config['appKey'],
+        ]);
+
+        if ($res_token['code'] != 200) {
+            return response()->json(['code'=>400, 'message'=>$res_token['message']]);
+        }
+
+        if (!isset($res_token['data']['access_token'])) {
+            return response()->json(['code'=>400, 'message'=>'access_token获取失败！']);
+        }
+
+        StApp::where('alias', strtolower($this->config['alias']))->update([
+            'access_token'=>$res_token['data']['access_token'],
+            'refresh_token'=>$res_token['data']['refresh_token']
+        ]);
+
+        return ['code'=>200, 'ok'];
+
+    }
+
+    /**
+     * 通过上次刷新token刷新access_token值
+     * @return array|\Illuminate\Http\JsonResponse
+     */
+    public function refresh_access_token()
+    {
+
+        $platform = StApp::where('alias', strtolower($this->config['alias']))->first();
+        if (!$platform) {
+            return ['code'=>404, 'message'=>'平台信息没有找到'];
+        }
+
+        $res_token = $this->urlencoded_request($this->config['getWay'] . '/token', [
+            'grant_type' => 'refresh_token',
+            'refresh_token' => $platform->refresh_token
+        ]);
+
+        if ($res_token['code'] != 200) {
+            return response()->json(['code'=>400, 'message'=>$res_token['message']]);
+        }
+
+        if (!isset($res_token['data']['access_token'])) {
+            return response()->json(['code'=>400, 'message'=>'access_token刷新失败！']);
+        }
+
+        StApp::where('alias', strtolower($this->config['alias']))->update([
+            'access_token'=>$res_token['data']['access_token'],
+            'refresh_token'=>$res_token['data']['refresh_token']
+        ]);
+
+        return ['code'=>200, 'message'=>'ok'];
+
+    }
+
+    /**
+     * urlencoded方式请求
+     * @param $url
+     * @param $data
+     * @return array
+     */
+    public function urlencoded_request($url, $data)
+    {
+
+        $headers_opt = [
+            "Authorization: Basic ".base64_encode(urlencode($this->config['appKey']).":".urlencode($this->config['appSecret'])),
+            "Content-Type: application/x-www-form-urlencoded; charset=utf-8",
+            "Accept-Encoding: gzip"
+        ];
+
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers_opt);
+        curl_setopt($ch, CURLOPT_POST, 1);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt($ch, CURLOPT_USERAGENT, "ebsig-eleme-openapi");
+        curl_setopt($ch, CURLOPT_ENCODING, "gzip");
+        $request_response = curl_exec($ch);
+
+        if (curl_errno($ch)) {
+            return ['code'=>400, 'message'=>curl_errno($ch)];
+        }
+        $response = json_decode($request_response, true);
+        if (is_null($response)) {
+            return ['code'=>400, 'message'=>'illegal response'];
+        }
+
+        return ['code'=>200, 'message'=>'ok', 'data'=>$response];
+
+    }
+
+}

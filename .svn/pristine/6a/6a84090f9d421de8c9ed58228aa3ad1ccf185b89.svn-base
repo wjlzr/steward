@@ -1,0 +1,234 @@
+<?php
+namespace App\Services\Wm;
+
+use App\Models\Order\StOrder;
+use App\Models\StApp;
+use App\Service\PushGoMqService;
+use App\Models\User\StUserDevices;
+use App\Models\User\StUserDevicesPush;
+use Push;
+
+use Illuminate\Support\Facades\Redis as Redis;
+
+class WmService
+{
+
+    /**
+     * 接口请求入口
+     * @param string $api_name 接口路径 例如：ele.goods.get_shop_categories
+     * @param array $request 请求接口参数数组
+     * @return array
+     */
+    public function send( $api_name, $request = [] ) {
+
+        $api_arr= explode('.', $api_name);
+        if (!isset($api_arr[2])) {
+            return ['code'=>400, 'message'=>'接口名称错误，请检查！'];
+        }
+
+        foreach($api_arr as $key=>$val) {
+            $api_arr[$key] = ucfirst($val);
+        }
+
+        $prefix = $api_arr[0];
+        $func_name = $api_arr[2];
+        $class_name = sprintf(__NAMESPACE__ . '\%s\Request\%sRequest', $prefix, $prefix . $api_arr[1]);
+        if (!class_exists($class_name)) {
+            return ['code'=>404, 'message'=>'接口无权访问，请检查接口文件是否存在！'];
+        }
+
+        $instance = new $class_name(self::curl_client($prefix));
+        if (!method_exists($instance, $func_name)) {
+            return ['code'=>404, 'message'=>'接口'.$func_name.'不存在，请检查！'];
+        }
+
+        return empty($request) ? $instance->$func_name() : $instance->$func_name($request);
+
+    }
+
+    /**
+     * 配置项提取
+     * @param $prefix
+     * @return array|null
+     */
+    private static function config($prefix) {
+
+        $class_name = sprintf(__NAMESPACE__ . '\%s\Config', $prefix);
+        $class_obj = new $class_name;
+        $class_val = get_class_vars(get_class($class_obj));
+
+        if (method_exists($class_obj, '_cover_attribute')) {
+            $class_val = array_replace($class_val, $class_obj->_cover_attribute());
+        }
+
+        if (!isset($class_val['alias'])) {
+            return null;
+        }
+
+        $config_res = StApp::where('alias', $class_val['alias'])->first();
+        if ($config_res) {
+            $class_val['appKey'] = $config_res->app_key;
+            $class_val['appSecret'] = $config_res->app_secret;
+            $class_val['token'] = $config_res->access_token;
+        }
+
+        return !empty($class_val) ? $class_val : [];
+
+    }
+
+    /**
+     * 接口请求资源建立
+     * @param $prefix
+     * @return mixed
+     */
+    public function curl_client($prefix) {
+        $prefix = ucfirst($prefix);
+        $class_name = sprintf(__NAMESPACE__ . '\%s\Curl', $prefix);
+        $curl_instance = new $class_name();
+        $curl_instance->config = self::config($prefix);
+        return $curl_instance;
+    }
+
+    /**
+     * 创建外卖订单
+     * @param $order_data = [
+     *      'wm_id' => int 外卖平台id
+     *      'order_id' => bigint 外卖订单号
+     *      'operator' => string 操作者
+     *      'user_fee' => string 应付金额
+     *      'mall_code' => string 商家门店编号
+     *      'send_time' => string 配送时间
+     *      'deliver_lng' => string 收货地址经纬度
+     *      'deliver_lat' => string 收货地址经纬度
+     *      'deliver_name' => string 收货人姓名
+     *      'deliver_mobile' => string 收货人手机号
+     *      'deliver_address' => string 收货人地址
+     *      'deliver_fee' => string 运费
+     *      'lunch_box_fee' => string 餐盒费
+     *      'discount_fee' => string 所有优惠金额
+     *      'need_invoice' => int 是否需要发票：0、不开发票 1、开发票
+     *      'invoice_title' => int 【选填】发票抬头
+     *      'invoice_type' => string 【选填】发票抬头类型：1、个人 2、单位
+     *      'taxer_id' => string 【选填】纳税人识别号
+     *      'remark' => string 订单备注，没有传空字符串
+     *      'goods' => [
+     *          [
+     *              'goods_name' => string 商品名称
+     *              'spec' => string 商品规格
+     *              'goods_number' => int 商品数量
+     *              'sale_price' => string 商品价格
+     *              'price' => string 商品实售价格
+     *              'product_code' => string 商家商品编码
+     *          ]
+     *      ]，
+     *      'wm_bill_json' => string 平台推送的原消息串
+     *
+     * ]
+     * @return array
+     */
+    public function create_order( $order_data) {
+
+        $requiredField = [
+            'wm_id', 'order_id', 'operator', 'user_fee', 'mall_code', 'send_time', 'deliver_lng', 'deliver_lat',
+            'deliver_name', 'deliver_mobile', 'deliver_address', 'deliver_fee', 'lunch_box_fee', 'discount_fee',
+            'need_invoice', 'remark', 'goods', 'wm_bill_json'
+        ];
+        $requiredInvoiceField = ['invoice_title', 'invoice_type', 'taxer_id'];
+
+        foreach($requiredField as $field) {
+
+            if (!isset($order_data[$field]))
+                return ['code'=>400, 'message'=>'缺少必要字段：'.$field];
+
+            if ($field == 'goods' && (!is_array($order_data[$field]) || empty($order_data[$field])))
+                return ['code'=>400, 'message'=>'订单商品不能为空'];
+
+        }
+
+        if ($order_data['need_invoice'] == 1) {
+            foreach($requiredInvoiceField as $field) {
+                if (!isset($order_data[$field]))
+                    return ['code'=>400, 'message'=>'缺少必要字段：'.$field];
+            }
+        }
+
+        $wm_platform = WmPlatform::where('id', $order_data['wm_id'])->first();
+        if (!$wm_platform) {
+            return ['code'=>404, 'message'=>'外卖平台没有找到'];
+        }
+
+        $wm_bill = WmBill::where(['wm_id'=>$wm_platform->id, 'wm_bill_no'=>$order_data['order_id']])->first();
+        if ($wm_bill) {
+            return ['code'=>400, 'message'=>'外卖订单：'.$order_data['order_id'].'已经存在'];
+        }
+
+        $bill_index = 'bill_' . $wm_platform->id . '_' . $order_data['order_id'];
+        Redis::setex($bill_index, 86400, json_encode($order_data));
+
+        $push_array = [
+            'call_url' => 'http://' . $_SERVER['HTTP_HOST'] . '/open-api/wm/order/add',
+            'bill_index' => "$bill_index"
+        ];
+
+        return PushGoMqService::async($push_array);
+
+    }
+
+    /**
+     * 推送极光消息给指定用户设备
+     * @param array $user_array 操作用户数组，包含用户对应的设备
+     * @param string $message 推送消息串
+     * @param int $type 消息类型：1、新订单 2、催单 3、退单
+     * @return bool
+     */
+    public function push_message($user_array, $message, $type) {
+
+        $push_device = [];
+        $ios_source = [
+            1 => 'new_bill.caf',
+            2 => 'remind_bill.caf',
+            3 => 'back_bill.caf'
+        ];
+
+        foreach ($user_array as $user) {
+
+            $st_user_devices = StUserDevices::where('user_id', $user->user_id)->get();
+            if ($st_user_devices->count() <= 0) {
+                continue;
+            }
+
+            foreach($st_user_devices as $device) {
+
+                if (empty($device->device) || in_array($device->device, $push_device) || $device->work_state == 0) {
+                    continue;
+                }
+
+                $st_user_devices_push_first = StUserDevicesPush::where([
+                                                        'device'=>$device->device,
+                                                        'type' => $type
+                                                    ])->first();
+                if ($st_user_devices_push_first && (time() - strtotime($st_user_devices_push_first->updated_at)) <= 10) {
+                    continue;
+                }
+
+                StUserDevicesPush::insert([
+                    'creator' => '',
+                    'device' => $device->device,
+                    'type' => $type,
+                    'user_id' => $device->user_id,
+                    'content' => $message
+                ]);
+
+            }
+
+        }
+
+        Push::send($message, $push_device, [
+                'android_source'=>$type,
+                'ios_source'=>$ios_source[$type]
+        ]);
+        return true;
+
+    }
+
+}

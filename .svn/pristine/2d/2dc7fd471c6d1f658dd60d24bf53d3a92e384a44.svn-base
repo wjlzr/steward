@@ -1,0 +1,21 @@
+<?php
+
+namespace App\Services;
+
+use JPush\Client as JPush;
+
+class PushService
+{
+
+    public function send($message,$registrationId) {
+        // 账号设置
+        $client = new JPush('a48e4096e80a028237873632', '9fc877a31693d91d815412b8');
+        $client->push()
+            ->setPlatform('all')
+            ->setNotificationAlert($message)
+            ->addRegistrationId($registrationId)
+            ->setOptions(100000, 3600, null, true)
+            ->send();
+    }
+
+}

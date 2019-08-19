@@ -1,0 +1,259 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
+
+
+class IndexController extends Controller
+{
+
+
+    /**
+     * 销售概况接口
+     * @param Request $request = [
+     *      'mall_id' => int 门店ID，
+     *      'date_type' => int 日期类型：1、今天 2、昨天 3、近7天 4、近30天
+     * ]
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function salesProfile(Request $request)
+    {
+
+        $mall_id = $request->input('mall_id', 0);
+        $date_type = $request->input('date_type', 1);
+
+        $return_result = [
+            'total_sales' => 0, //总营业额
+            'package_sales' => 0, //包装收入
+            'expect_sales' => 0, //预计收入
+            'valid_orders' => 0, //有效订单数
+            'total_orders' => 0, //总订单数
+            'avg_price' => 0 //客单价
+        ];
+
+        return response()->json(['code'=>200, 'message'=>'ok', 'data'=>$return_result]);
+
+    }
+
+
+    /**
+     * 平台销售占比接口
+     * @param Request $request = [
+     *      'mall_id' => int 门店ID
+     * ]
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function appOrdersSales(Request $request)
+    {
+
+        $mall_id = $request->input('mall_id', 0);
+
+        $return_result = [
+            'sales' => [ //销售额
+                ['name' => '饿了么', 'value' => 988],
+                ['name' => '京东到家', 'value' => 988],
+                ['name' => '百度外卖', 'value' => 988],
+                ['name' => '美团外卖', 'value' => 988],
+            ],
+            'orders' => [ //订单数
+                ['name' => '饿了么', 'value' => 23],
+                ['name' => '京东到家', 'value' => 45],
+                ['name' => '百度外卖', 'value' => 9],
+                ['name' => '美团外卖', 'value' => 32],
+            ]
+        ];
+
+        return response()->json(['code'=>200, 'message'=>'ok', 'data'=>$return_result]);
+
+    }
+
+
+    /**
+     * 商品、门店动销接口
+     * @param Request $request = [
+     *      'mall_id' => int 门店ID
+     * ]
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function goodsMallActSales(Request $request)
+    {
+
+        $mall_id = $request->input('mall_id', 0);
+
+        $return_result = [
+            'goods' => [
+                'total_number' => 0,    //总商品数
+                'shelf_number' => 0,    //上架商品数
+                'act_number' => 0   //动销商品数
+            ],
+            'malls' => [
+                'total_numb' => 0,    //总门店数
+                'shelf_number' => 0,    //上架门店数
+                'act_number' => 0   //动销门店数
+            ]
+        ];
+
+        return response()->json(['code'=>200, 'message'=>'ok', 'data'=>$return_result]);
+
+    }
+
+
+    /**
+     * 热销商品排行接口
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function hotSellGoodsRank(Request $request)
+    {
+
+        $mall_id = $request->input('mall_id', 0);
+
+        $return_result = [
+            [
+                'goods_name' => '',
+                'total_money' => 0,
+                'total_number' => 0,
+                'avg_price' => ''
+            ]
+        ];
+
+        return response()->json(['code'=>200, 'message'=>'ok', 'data'=>$return_result]);
+
+    }
+
+
+    /**
+     * 热销分类排行接口
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function hotSaleCategoryRank(Request $request)
+    {
+
+        $mall_id = $request->input('mall_id', 0);
+
+        $return_result = [
+            [
+                'category_name' => '',
+                'total_money' => 0,
+                'total_number' => 0,
+                'avg_price' => ''
+            ]
+        ];
+
+        return response()->json(['code'=>200, 'message'=>'ok', 'data'=>$return_result]);
+
+    }
+
+
+    /**
+     * 所有门店营收入排行
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function mallRevenueRank(Request $request)
+    {
+
+        $return_result = [
+            [
+                'total_sales' => 0, //总营业额
+                'package_sales' => 0, //包装收入
+                'expect_sales' => 0, //预计收入
+                'valid_orders' => 0, //有效订单数
+                'total_orders' => 0, //总订单数
+                'avg_price' => 0 //客单价
+            ]
+        ];
+
+        return response()->json(['code'=>200, 'message'=>'ok', 'data'=>$return_result]);
+
+    }
+
+
+    /**
+     * 所有门店订单效率排行
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function mallOrderEfficiencyRank(Request $request)
+    {
+
+        $return_result = [
+            [
+                'mall_name' => 0, //门店名称
+                'efficiency' => 0, //效率（秒计：s）
+            ]
+        ];
+
+        return response()->json(['code'=>200, 'message'=>'ok', 'data'=>$return_result]);
+
+    }
+
+
+    /**
+     * 门店统计营收排名
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function salesRank(Request $request)
+    {
+
+        $mall_id = $request->input('mall_id', 0);
+
+        $return_result = [
+            'low' => 0,
+            'avg' => 0,
+            'this' => 0,
+            'high' => 0
+        ];
+
+        return response()->json(['code'=>200, 'message'=>'ok', 'data'=>$return_result]);
+
+    }
+
+
+    /**
+     * 门店统计订单效率排名
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function orderEfficiencyRank(Request $request)
+    {
+
+        $mall_id = $request->input('mall_id', 0);
+
+        $return_result = [
+            'low' => 0,
+            'avg' => 0,
+            'this' => 0,
+            'high' => 0
+        ];
+
+        return response()->json(['code'=>200, 'message'=>'ok', 'data'=>$return_result]);
+
+    }
+
+
+    /**
+     * 门店订单状态数量统计
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function orderStatusCount()
+    {
+
+        $return_result = [
+            'new_orders' => 0,
+            'wait_send_orders' => 0,
+            'abnormal_orders' => 0,
+            'remind_orders' => 0,
+            'refund_orders' => 0
+        ];
+
+        return response()->json(['code'=>200, 'message'=>'ok', 'data'=>$return_result]);
+
+    }
+
+
+}

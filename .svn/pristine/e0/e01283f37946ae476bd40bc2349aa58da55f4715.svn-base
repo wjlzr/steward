@@ -1,0 +1,264 @@
+<?php
+
+namespace App\Http\Controllers\Admin\Goods;
+
+use App\Models\Goods\StAppCategory;
+use App\Models\Goods\StCategory;
+use App\Models\Goods\StGoods;
+use App\Models\Mall\StAppMall;
+use App\Models\Mall\StMall;
+use App\Models\StApp;
+use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
+use Wm;
+
+
+class CategoryController extends Controller
+{
+
+    /**
+     * 分类列表
+     * @return \Illuminate\Contracts\View\Factory|\Illuminate\View\View
+     */
+    public function index() {
+
+        return view('/admin/goods/category/index');
+    }
+
+    /**
+     * 分类查询
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function search( Request $request) {
+
+        $st_category = StCategory::orderBy('sort','ASC')->get();
+
+        if( !$st_category -> isEmpty()){
+
+            foreach ( $st_category as $c ){
+
+                $where = [];
+
+                if( $c -> level == 1 ){
+
+                    $where[] = ['big_category_id' , $c -> id ];
+                }else if( $c -> level == 2 ){
+
+                    $where[] = ['mid_category_id', $c -> id ];
+                }else{
+
+                    $where[] = ['small_category_id', $c -> id ];
+                }
+
+                $c -> goods_num = StGoods::where($where)->count();
+            }
+
+            $st_category = $this -> getTree( $st_category->toArray() , 0 );
+        }
+
+        $total = StGoods::count();
+
+        return response()->json(['code' => 200 ,'data' => $st_category,'total' => $total]);
+    }
+
+    /**
+     * 分类信息修改
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function edit(Request $request) {
+
+        $id = $request -> input('id' ,'');
+        $category_name = $request -> input('category_name', '');
+
+        if( empty($category_name) ){
+            return response()->json(['code' => 400 ,'message' => '请输入分类名称']);
+        }
+
+        $st_category = StCategory::find($id);
+
+        $category = StCategory::where([['name',$category_name],['p_id',$st_category -> p_id ]])->first();
+
+        if( $category ){
+            return response()->json(['code' => 400 ,'message' => '您输入的分类已存在']);
+        }
+
+        $st_category -> name = $category_name ;
+        $st_category ->save();
+
+        return response()->json(['code' => 200 ,'message' => '操作成功']);
+    }
+
+    /**
+     * 分类添加
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function add( Request $request ){
+
+        $p_id = $request -> input( 'p_id' , '');
+        $level = $request -> input( 'level' , '');
+        $category_name = $request -> input( 'category_name' , '');
+        $status = $request -> input( 'status' , '');
+        $sort = $request -> input( 'sort' , '');
+
+        if ( empty ($category_name)){
+            return response()->json(['code' => 400 , 'message' => '请输入商品分类名称']);
+        }
+
+        $st_category = StCategory::where([ ['name',$category_name],['p_id',$p_id]])->first();
+
+        if( $st_category ){
+            return response()->json(['code' => 400 ,'message' => '您添加的分类已存在']);
+        }
+
+        $st_category = new StCategory();
+        $st_category -> creator = 'system';
+        $st_category -> name = $category_name ;
+        $st_category -> status = $status;
+        $st_category -> sort = $sort + 1;
+        $st_category -> level = $level;
+        $st_category -> p_id = $p_id;
+        $st_category -> save();
+
+        return response()->json(['code' => 200 ,'message' => '添加成功']);
+    }
+
+    /**
+     * 启用/禁用分类
+     * @param Request $request
+     * @return \Illuminate\Contracts\Routing\ResponseFactory|\Illuminate\Http\JsonResponse|\Symfony\Component\HttpFoundation\Response
+     */
+    public function status(Request $request) {
+
+        $id = $request ->input('id','');
+        $status = $request -> input( 'status', 0 );
+
+        if( empty($id)){
+            return response(['code' => 400 ,'message' => '缺少分类参数']);
+        }
+
+        $st_category = StCategory::all()->toArray();
+
+        $st_category = $this->getTree( $st_category , $id );
+
+        $category_ids = [];
+
+        if( !empty($st_category) ){
+            foreach ( $st_category as $c ){
+                $category_ids [] = $c['id'];
+            }
+        }
+        $category_ids[] = $id;
+
+        StCategory::whereIn('id',$category_ids) -> update(['status' => $status]);
+
+        return response()->json(['code' => 200 , 'message' => '操作成功']);
+    }
+
+    /**
+     * 数据结构转换
+     * @param $data
+     * @param $pId
+     * @return array|string
+     */
+    private function getTree($data, $pId)
+    {
+        $tree = '';
+
+        foreach ($data as $k => $v){
+            if($v['p_id'] == $pId)
+            {
+                $v['children'] = $this->getTree($data, $v['id']);
+                $tree[] = $v;
+            }
+        }
+        return $tree;
+    }
+
+    /**
+     * 同步分类到平台
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function sync(Request $request){
+
+        $st_app = StApp::where('enable', 1 )->get();  //查询开通的应用
+
+        if( !$st_app->isEmpty()){
+
+            foreach ( $st_app as $app ){
+
+                $st_app_mall = StAppMall::where([['online_status',0],['app_id',$app -> id ]])->get();
+
+                if( !$st_app_mall->isEmpty()){
+
+                    foreach ($st_app_mall as $mall){
+
+                        $st_category = StCategory::where('status', 1)->orderBy('sort','ASC')->get()->toArray();
+
+                        if( !empty($st_category)){
+
+                            $st_category = $this -> getTree($st_category, 0 );
+
+                            foreach ( $st_category as $category ){
+
+                                $st_app_category = StAppCategory::where([['app_id',$app -> id],['mall_id',$mall->mall_id],['category_id',$category['id']]])->first();
+
+                                if( !$st_app_category ){
+
+                                    $args_data = [
+                                        'mall_id' => $mall->mall_id,
+                                        'category_id' => $category['id'],
+                                        'category_name' => $category['name'],
+                                        'level' => $category['level'] ,
+                                        'sort' => $category['sort'] ,
+                                        'parent_id' => $category['p_id'] ,
+                                    ];
+
+
+                                    $res = Wm::send( $app -> id .'.goods.create_category',$args_data);
+
+                                    if($res['code'] != 200){
+
+                                        return response()->json(['code' => 400 ,'message' => $res['message']]);
+                                    }
+                                }
+
+                                if( !empty($category['children'])){
+
+                                    foreach ( $category['children'] as $child ){
+
+                                        $st_app_category = StAppCategory::where([['app_id',$app -> id ],['mall_id',$mall->id],['category_id',$child['id']]])->first();
+
+                                        if( !$st_app_category ){
+
+                                            $args_data = [
+                                                'mall_id' => $mall->mall_id,
+                                                'category_id' => $child['id'],
+                                                'category_name' => $child['name'],
+                                                'level' => $child['level'] ,
+                                                'sort' => $child['sort'] ,
+                                                'parent_id' => $child['p_id'] ,
+                                            ];
+
+                                            $res = Wm::send($app->id .'.goods.create_category',$args_data);
+
+                                            if($res['code'] != 200){
+
+                                                return response()->json(['code' => 400 ,'message' => $res['message']]);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return response()->json(['code' => 200 , 'message' => '同步成功']);
+    }
+
+}

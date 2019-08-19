@@ -1,0 +1,956 @@
+<?php
+namespace App\Services\Wm\EleMe\Request;
+
+use App\Models\Goods\StAppCategory;
+use App\Models\Goods\StAppGoodsSale;
+use App\Models\Goods\StCategory;
+use App\Models\Goods\StGoods;
+use App\Models\Goods\StGoodsSale;
+use App\Models\Goods\StGoodsStock;
+use App\Models\Mall\StAppMall;
+use App\Services\Wm\GoodsFactoryInterface;
+use Mockery\CountValidator\Exception;
+use DB;
+use Wm;
+
+class EleMeGoodsRequest implements GoodsFactoryInterface
+{
+
+    /**
+     * EleGoodsRequest constructor.
+     * @param $curl
+     */
+    public function __construct($curl)
+    {
+        $this->curl = $curl;
+    }
+
+    /**
+     * 获取店铺商品分类,包含二级分类
+     * @param $args_data
+     * @return mixed
+     */
+    public function get_shop_categories($args_data)
+    {
+
+        if (!isset($args_data['mall_id']) || empty($args_data['mall_id'])) {
+            return $this->curl->response('店铺id不能为空');
+        }
+
+        $st_app_mall = StAppMall::where(['mall_id' => $args_data['mall_id'], 'app_id' => 100002])->first();
+
+        return $this->curl->call('eleme.product.category.getShopCategoriesWithChildren', ['shopId' => $st_app_mall->o_mall_id]);
+
+    }
+
+    /**
+     * 添加商品分类
+     * @param $args_data
+     * @return mixed
+     */
+    public function create_category($args_data)
+    {
+
+        error_log('=======res1111 ----');
+        error_log(var_export($args_data, 1));
+
+        if (!isset($args_data['mall_id']) || empty($args_data['mall_id'])) {
+            return $this->curl->response('店铺id不能为空');
+        }
+
+        if (!isset($args_data['category_id']) || empty($args_data['category_id'])) {
+            return $this->curl->response('分类id不能为空');
+        }
+
+        if (!isset($args_data['category_name']) || empty($args_data['category_name'])) {
+            return $this->curl->response('分类名称不能为空');
+        }
+
+        if (!isset($args_data['level']) || empty($args_data['level'])) {
+            return $this->curl->response('分类等级不能为空');
+        }
+
+        if (!isset($args_data['sort'])) {
+            return $this->curl->response('分类排序不能为空');
+        }
+
+        $st_category = StCategory::find($args_data['category_id']);
+        if (!$st_category) {
+            return $this->curl->response('未查询到分类信息');
+        }
+
+        if ($st_category->p_id == 0 && $st_category->level == 1 ) {
+            $p_id = 0;
+            $parent_id = 0;
+        }else {
+            $st_app_category = StAppCategory::where(['category_id' => $st_category->pid,'mall_id' => $args_data['mall_id']])->first();
+            $p_id = $st_category->pid;
+            $parent_id = $st_app_category->o_category_id;
+        }
+
+        $st_app_mall = StAppMall::where(['app_id' => 100002, 'mall_id' => $args_data['mall_id']])->first();
+        if (!$st_app_mall) {
+            return $this->curl->response('未查询到店铺信息');
+        }
+
+        if (!isset($args_data['description']) || empty($args_data['description'])) {
+            $args_data['description'] = '';
+        }
+        $res = $this->curl->call('eleme.product.category.createCategory', [
+            'shopId' => $st_app_mall->o_mall_id,
+            'name' => $args_data['category_name'],
+            'parentId' => $parent_id,
+            'description' => $args_data['description'],
+        ]);
+
+        error_log('=======res ----');
+        error_log(var_export($res, 1));
+
+        if ($res['code'] != 200) {
+            return $this->curl->response($res['message']);
+        }
+
+        $st_category_obj = new StAppCategory();
+        $st_category_obj->creator = 'EleMeAPI';
+        $st_category_obj->category_id = $args_data['category_id'];
+        $st_category_obj->category_name = $args_data['category_name'];
+        $st_category_obj->status = 1;
+        $st_category_obj->level = $args_data['level'];
+        $st_category_obj->p_id = $p_id;
+        $st_category_obj->mall_id = $args_data['mall_id'];
+        $st_category_obj->app_id = 100002;
+        $st_category_obj->o_category_id = $res['data']['id'];
+        $st_category_obj->save();
+
+        return $res;
+
+    }
+
+    /**
+     * 一级分类排序
+     * @param $args_data = [
+     *           'mall_id' => string 门店id ,
+     *           'categoryIds' => [$category_id] 分类id集合
+     * ]
+     * @return mixed
+     */
+    public function set_category_sequence($args_data)
+    {
+
+        if (!isset($args_data['mall_id']) || empty($args_data['mall_id'])) {
+            return $this->curl->response('店铺编号不能为空');
+        }
+
+        if (!isset($args_data['categoryIds']) || empty($args_data['categoryIds'])) {
+            return $this->curl->response('缺少需要排序的分类列表');
+        }
+        $st_app_mall = StAppMall::where(['app_id' => 100002, 'mall_id' => $args_data['mall_id']])->first();
+        $categoryIds = [];
+        foreach ($args_data['categoryIds'] as $category_id) {
+            $st_app_category = StAppCategory::where('category_id', $category_id);
+            if ($st_app_category->p_id != 0 || $st_app_category->level != 1) {
+                return $this->curl->response('请传入一级分类id');
+            }
+            $categoryIds[] = $st_app_category->o_category_id;
+        }
+        return $this->curl->call('eleme.product.category.setCategorySequence', ['shopId' => $st_app_mall->o_mall_id, 'categoryIds' => $categoryIds]);
+
+    }
+
+    /**
+     * 设置二级分类排序
+     * @param $args_data = [
+     *         'mall_id' => string 门店id ,
+     *         'categoryIds' => [
+     *              'parent_id' => int 一级分类ID
+     *               'children_id' => [
+     *                  $children_id    二级分类ID列表
+     *        ]
+     * ]
+     * @return mixed
+     */
+    public function set_category_children($args_data)
+    {
+
+        if (!isset($args_data['mall_id']) || empty($args_data['mall_id'])) {
+            return $this->curl->response('店铺编号不能为空');
+        }
+
+        if (!isset($args_data['categoryIds']) || !is_array($args_data['categoryIds'])) {
+            return $this->curl->response('缺少需要排序的分类列表');
+        }
+
+        $st_app_mall = StAppMall::where(['app_id' => 100002, 'mall_id' => $args_data['mall_id']])->first();
+
+        $categoryWithChildrenIds = [];
+        foreach ($args_data['categoryIds'] as $category_data) {
+            $parentId = $category_data['parent_id'];
+            if (!$parentId || !is_array($args_data['children_id'])) {
+                return $this->curl->response('参数错误');
+            }
+            $childrenIds = [];
+            foreach ($category_data['children_id'] as $children_id) {
+                $st_app_category = StAppCategory::where('category_id', $children_id);
+                if ($st_app_category->p_id != $parentId) {
+                    return $this->curl->response('分类归属关系错误');
+                }
+                $childrenIds[] = $st_app_category->o_category_id;
+            }
+            $categoryWithChildrenIds[] = [
+                'parentId' => $parentId,
+                'childrenIds' => $childrenIds
+            ];
+        }
+
+        return $this->curl->call('eleme.product.category.setCategoryPositionsWithChildren', [
+            'shopId' => $st_app_mall->o_mall_id,
+            'categoryWithChildrenIds' => $categoryWithChildrenIds
+        ]);
+
+    }
+
+    /**
+     * 修改商品分类
+     * @param $args_data
+     * @return mixed
+     */
+    public function update_category($args_data)
+    {
+
+        if (!isset($args_data['category_id']) || empty($args_data['category_id'])) {
+            return $this->curl->response('分类id不能为空');
+        }
+
+        if (!isset($args_data['name']) || empty($args_data['name'])) {
+            return $this->curl->response('分类名称不能为空');
+        }
+
+        if (!isset($args_data['description']) || empty($args_data['description'])) {
+            $args_data['description'] = '';
+        }
+        $st_app_category = StAppCategory::where('category_id', $args_data['category_id']);
+        if ($st_app_category->level > 1) {
+            $parent_obj = StAppCategory::where('category_id', $st_app_category->parent_id);
+        }
+
+        $request_data['name'] = $args_data['name'];
+        $request_data['categoryId'] = $args_data['category_id'];
+
+        $res = $this->curl->call('eleme.product.category.updateCategoryWithChildren', [
+            'categoryId' => $st_app_category->o_category_id,
+            'name' => $args_data['name'],
+            'parentId' => isset($parent_obj->o_category_id) ? $parent_obj->wm_category_id : 0,
+            'description' => $args_data['description'],
+        ]);
+
+        return $res;
+
+    }
+
+    /**
+     * 删除商品分类
+     * @param $args_data
+     * @return mixed
+     */
+    public function delete_category($args_data)
+    {
+
+        if (!isset($args_data['category_id']) || empty($args_data['category_id'])) {
+            return $this->curl->response('分类id不能为空');
+        }
+
+        if (!isset($args_data['level']) || empty($args_data['level'])) {
+            return $this->curl->response('分类等级不能为空');
+        }
+
+        $st_app_category = StAppCategory::where('category_id', $args_data['category_id']);
+        $res = $this->curl->call('eleme.product.category.invalidCategory', ['categoryId' => $st_app_category->o_category_id]);
+
+        if ($res['code'] == 200) {
+            StCategory::destroy($args_data['category_id']);
+            StAppCategory::destroy($args_data['category_id']);
+            $st_category = StCategory::where('p_id', $args_data['category_id'])->first();
+            if (count($st_category)) {
+                StCategory::destroy($st_category->id);
+                StAppCategory::destroy($st_category->category_id);
+            }
+        }
+
+        return $res;
+
+    }
+
+    /**
+     * 批量添加商品
+     * @param $args_data
+     * @return mixed
+     */
+    public function batch_create_product($args_data)
+    {
+
+        if (!isset($args_data) || empty($args_data) || !is_array($args_data)) {
+            return $this->curl->response('缺少参数：args_data');
+        }
+
+        $category_id = '';
+        $items = [];
+        $st_array = [];
+        $spec_array = [];
+        foreach ($args_data as $goods_array) {
+
+            if (is_array($goods_array)) {
+
+                $image = '';
+                $st_app_category = StAppCategory::where('category_id', $goods_array['category_id'])->first();
+
+                if (!$st_app_category) {
+                    return $this->curl->response('未查询到分类信息!');
+                }
+                $category_id = $st_app_category->o_category_id;
+
+                $st_app_mall = StAppMall::where(['app_id' => 100002, 'mall_id' => $goods_array['mall_id']])->first();
+                if (!$st_app_mall) {
+                    return $this->curl->response('未查询到外卖店铺信息!');
+                }
+
+                $specs = [];
+                foreach ($goods_array['spec'] as $goods_specs) {
+
+                    $st_array[$goods_specs['product_code']] = $goods_array['goods_id'];
+                    $spec_array[$goods_specs['product_code']] = $goods_specs['spec_id'];
+                    $st_goods_sale = StGoodsSale::find($goods_specs['spec_id']);
+                    if (!$st_goods_sale) {
+                        return $this->curl->response('商品规格信息未找到!');
+                    }
+
+                    $specs[] = [
+                        'specId' => 0,
+                        'name' => app_to_string($goods_specs['name']),
+                        'price' => app_to_decimal($goods_specs['price']),
+                        'stock' => app_to_int($goods_specs['stock']),
+                        'maxStock' => app_to_int($goods_specs['stock']),
+                        'packingFee' => app_to_decimal($st_goods_sale->package_price),
+                        'onShelf' => $st_goods_sale->status,
+                        'extendCode' => app_to_string($goods_specs['product_code']),
+                        'barCode' => app_to_string($st_goods_sale->upc),
+                        'weight' => app_to_int($st_goods_sale->weight),
+                        'activityLevel' => 0,
+                    ];
+
+                }
+
+                $items[] = [
+                    'name' => $goods_array['goods_name'],
+                    'imageHash' => $image,
+                    'specs' => $specs,
+                ];
+
+            }
+        }
+
+        if (empty($category_id)) {
+            return $this->curl->response('app分类id不能为空!');
+        }
+        $result_data = $this->curl->call('eleme.product.item.batchCreateItems', [
+            'categoryId' => $category_id,
+            'items' => $items
+        ]);
+
+        if ($result_data['code'] != 200) {
+            return $this->curl->response($result_data['message']);
+        }
+
+        try {
+            //开启事务
+            DB::beginTransaction();
+            if ($result_data['code'] == 200) {
+                foreach ($result_data['data'] as $goods_id => $goods) {
+                    $st_mall = StAppMall::where(['o_mall_id' => $goods['shopId'], 'app_id' => 100002])->first();
+                    foreach ($goods['specs'] as $specs) {
+                        $st_app_goods_sale = new StAppGoodsSale();
+                        $st_app_goods_sale->creator = 'EleMeAPI';
+                        $st_app_goods_sale->goods_id = $st_array[$specs['extendCode']];
+                        $st_app_goods_sale->spec_id = $spec_array[$specs['extendCode']];
+                        $st_app_goods_sale->name = $goods['name'];
+                        $st_app_goods_sale->spec = $specs['name'];
+                        $st_app_goods_sale->erp_price = $specs['price'];
+                        $st_app_goods_sale->price = $specs['price'];
+                        $st_app_goods_sale->status = 0;
+                        $st_app_goods_sale->sku = $specs['extendCode'];
+                        $st_app_goods_sale->upc = $specs['barCode'];
+                        $st_app_goods_sale->images = $goods['imageUrl'];
+                        $st_app_goods_sale->mall_id = $st_mall->mall_id;
+                        $st_app_goods_sale->app_id = 100002;
+                        $st_app_goods_sale->o_goods_id = $goods_id;
+                        $st_app_goods_sale->o_sku_id = $specs['specId'];
+                        $st_app_goods_sale->save();
+                    }
+                }
+            }
+            DB::commit();
+            return $result_data;
+        } catch (Exception $e) {
+            DB::rollback();
+            return $this->curl->response($e->getMessage(), $e->getCode());
+        }
+
+    }
+
+    /**
+     * 批量编辑商品
+     * @param $args
+     */
+    public function batch_update_product($args_data)
+    {
+        if (!isset($args_data) || empty($args_data || is_array($args_data))) {
+            return $this->curl->response('缺少参数：args_data');
+        }
+
+        $result_code = [];
+        foreach ($args_data as $goods_array) {
+
+            if (is_array($goods_array)) {
+
+                $st_app_goods_sale = StAppGoodsSale::where('goods_id', $goods_array['goods_id']);
+                if (!$st_app_goods_sale) {
+                    $this->curl->response('商品信息不存在');
+                }
+
+                $st_app_category = StAppCategory::where('category_id', $goods_array['category_id'])->first();
+                if (!$st_app_category) {
+                    return $this->curl->response('未查询到分类信息!');
+                }
+                $specs = [];
+                foreach ($goods_array['spec'] as $goods_specs) {
+
+                    $st_goods_sale = StGoodsSale::find($goods_specs['spec_id']);
+                    if (!$st_goods_sale) {
+                        return $this->curl->response('商品规格信息未找到!');
+                    }
+
+                    $specs[] = [
+                        'specId' => 0,
+                        'name' => $goods_specs['name'],
+                        'price' => $goods_specs['price'],
+                        'stock' => $goods_specs['stock'],
+                        'maxStock' => $goods_specs['stock'],
+                        'packingFee' => $st_goods_sale->package_price,
+                        'onShelf' => $st_goods_sale->status,
+                        'extendCode' => $goods_specs['product_code'],
+                        'barCode' => $st_goods_sale->upc,
+                        'weight' => $st_goods_sale->weight,
+                        'activityLevel' => 0,
+                    ];
+
+                }
+                $properties = [
+                    'name' => $goods_array['goods_name'],
+                    'specs' => $specs,
+                ];
+                $res = $this->curl->call('eleme.product.item.updateItem', [
+                    'itemId' => $st_app_goods_sale->o_goods_id,
+                    'categoryId' => $st_app_category->o_category_id,
+                    'properties' => $properties
+                ]);
+                $result_code[] = $res['code'];
+            }
+        }
+
+        if (in_array(400, $result_code)) {
+            return $this->curl->response('部分商品价格修改失败');
+        }
+        return $this->curl->response('ok', 200);
+
+    }
+
+    /**
+     * 上传图片返回hash
+     * @param $url
+     * @return mixed
+     */
+    public function upload_image($url)
+    {
+
+        if (!isset($url) || empty($url)) {
+            return $this->curl->response('图片地址不能为空');
+        }
+        $res = $this->curl->call('eleme.file.uploadImageWithRemoteUrl', ['url' => $url]);
+        error_log('==============////ele 图片hash');
+        error_log(var_export($res, 1));
+        return $res;
+
+    }
+
+    /**
+     * 获取商品列表信息
+     * @param $args_data
+     * @return mixed
+     */
+    public function get_shop_product($args_data)
+    {
+
+        $query_page = array();
+
+        if (!isset($args_data['mall_id']) || empty($args_data['mall_id'])) {
+            return $this->curl->response('店铺id不能为空');
+        }
+
+        $st_app_mall = StAppMall::where('mall_id', $args_data['mall_id'])->first();
+        if (!$st_app_mall) {
+            return $this->curl->response('店铺信息未找到');
+        }
+
+        if (!isset($args_data['page']) || empty($args_data['page'])) {
+            $args_data['page'] = 1;
+        }
+
+        if (!isset($args_data['page_size']) || empty($args_data['page_size'])) {
+            $args_data['page_size'] = 20;
+        }
+
+        $query_page["shopId"] = $st_app_mall->o_mall_id;
+        $query_page["offset"] = $args_data['page'];
+        $query_page["limit"] = $args_data['page_size'];
+
+        return $this->curl->call('eleme.product.item.queryItemByPage', ['queryPage' => $query_page]);
+
+    }
+
+    /**
+     * 批量上下架商品
+     * @param $args
+     * @return mixed
+     */
+    public function batch_update_self($args_data)
+    {
+
+        //1、上架操作 0、下架操作
+        if (!isset($args_data['is_shelf']) || !in_array($args_data['is_shelf'], [0, 1])) {
+            return $this->curl->response('缺少参数或者参数取值错误：is_shelf');
+        }
+
+        if (!isset($args_data['goods']) || !is_array($args_data['goods'])) {
+            return $this->curl->response('缺少商品ID列表参数：goods_id');
+        }
+
+        switch ($args_data['is_shelf']) {
+            case 0:
+                $fields = 'batchDelistItems';
+                break;
+            case 1:
+                $fields = 'batchListItems';
+                break;
+            default:
+                return null;
+        }
+
+        $itemids = [];
+        foreach ($args_data['goods'] as $spec_id) {
+            $st_goods = StAppGoodsSale::select('o_goods_id')->where(['spec_id' => $spec_id, 'app_id' => 100002])->first();
+            if (!$st_goods) {
+                return $this->curl->response('商品信息未找到');
+            }
+
+            $itemids[] = $st_goods->o_goods_id;
+        }
+
+
+        $res =  $this->curl->call('eleme.product.item.' . $fields, ['itemIds' => $itemids]);
+
+        if ($res['code'] != 200) {
+            return $this->curl->response($res['message']);
+        }
+
+        StAppGoodsSale::whereIn('spec_id', $args_data['goods'])->update(['status' => $args_data['is_shelf']]);
+
+        return $res;
+
+
+    }
+
+    /**
+     * 批量修改商品价格
+     * @param $args = [
+     *      'mall_id' => string 门店id
+     *      'goods' => [
+     *          $goods_id => [
+     *              $spec_id => $price
+     *          ]
+     *      ]
+     * ]
+     * @param $args
+     * @return mixed
+     */
+    public function batch_update_price($args_data)
+    {
+
+        if (!isset($args_data['mall_id']) || empty($args_data['mall_id'])) {
+            return $this->curl->response('店铺id不能为空');
+        }
+
+        if (!isset($args_data['goods']) || !is_array($args_data['goods'])) {
+            return $this->curl->response('缺少商品信息：goods');
+        }
+
+        $st_app_mall = StAppMall::where(['app_id' => 100002, 'mall_id' => $args_data['mall_id']])->first();
+
+        if (!$st_app_mall) {
+            return $this->curl->response('外卖店铺信息不存在');
+        }
+
+        $specPrices = [];
+        foreach ($args_data['goods'] as $k => $goods) {
+            $st_app_goods_sale = StAppGoodsSale::select('o_goods_id')->where('goods_id', $k)->first();
+            if (!$st_app_goods_sale) {
+                return $this->curl->response('商品id为:' . $k . '信息未找到');
+            }
+            $item = [];
+            foreach ($goods as $key => $v) {
+
+                $st_specs = StAppGoodsSale::select('o_sku_id')->where('spec_id', $key)->first();
+                if (!$st_specs) {
+                    return $this->curl->response('商品规格id为' . $key . '信息未找到');
+                }
+                $item[$st_specs->o_sku_id] = $v;
+            }
+
+
+            $specPrices[] = [
+                'itemId' => $st_app_goods_sale->o_goods_id,
+                'priceMap' => $item
+            ];
+        }
+
+        $res =  $this->curl->call('eleme.product.item.batchUpdatePrices', [
+            'shopId' => $st_app_mall->o_mall_id,
+            'specPrices' => $specPrices
+        ]);
+
+        if ($res['code'] != 200) {
+            return $this->curl->response($res['message']);
+        }
+
+        foreach ($args_data['goods'] as $goods_specs) {
+            foreach ($goods_specs as $spec_id => $price) {
+                StAppGoodsSale::where('spec_id',$spec_id)->update(['price'=>$price]);
+            }
+        }
+        return $res;
+
+    }
+
+    /**
+     * 批量修改商品库存
+     * @param $args
+     * @return mixed
+     */
+    public function batch_update_stock($args_data)
+    {
+
+        if (!isset($args_data) || !is_array($args_data)) {
+            return $this->curl->response('缺少参数或参数错误');
+        }
+
+        $item = [];
+        foreach ($args_data['goods'] as $k => $goods) {
+            $st_goods = StGoods::find($k);
+            if (!$st_goods) {
+                return $this->curl->response('商品信息未找到');
+            }
+            foreach ($goods as $key => $stock) {
+                $st_app_goods_sale = StAppGoodsSale::select('o_sku_id')->where('spec_id', $key)->first();
+                $item[$st_app_goods_sale->o_sku_id] = $stock;
+            }
+        }
+        return $this->curl->call('eleme.product.item.batchUpdateStock', ['stockMap' => $item]);
+
+    }
+
+    /**
+     * 获取一个分类下的所有商品
+     * @param $args_data
+     * @return mixed
+     */
+    public function getByCategoryId($args_data)
+    {
+
+        if (!isset($args_data['category_id']) || empty($args_data['category_id'])) {
+            return $this->curl->response('分类id不能为空');
+        }
+        $st_app_category = StAppCategory::where('category_id', $args_data['category_id'])->first();
+        if (!$st_app_category) {
+            return $this->curl->response('分类信息没有找到');
+        }
+        return $this->curl->call('eleme.product.item.getItemsByCategoryId', ['categoryId' => $st_app_category->o_category_id]);
+
+    }
+
+    /**
+     * 查询商品详情
+     * @param $args_data
+     * @return mixed
+     */
+    public function get($args_data)
+    {
+
+        if (!isset($args_data['goods_id']) || empty($args_data['goods_id'])) {
+            return $this->curl->response('商品id不能为空');
+        }
+        $st_goods = StAppGoodsSale::where('goods_id', $args_data['goods_id']);
+        if (!$st_goods) {
+            return $this->curl->response('商品信息不存在');
+        }
+        return $this->curl->call('eleme.product.item.getItem', ['itemId' => $st_goods->o_goods_id]);
+    }
+
+    /**
+     * 根据商品扩展码获取商品
+     * @param $args_data
+     * @return mixed
+     */
+    public function get_goods_detail_by_extend_code($args_data)
+    {
+
+        if (!isset($args_data['mall_id']) || !isset($args_data['mall_id'])) {
+            return $this->curl->response('店铺id不能为空');
+        }
+
+        $st_app_mall = StAppMall::where('mall_id', $args_data['mall_id'])->first();
+        if (!$st_app_mall) {
+            return $this->curl->response('门店信息不存在');
+        }
+
+        $st_goods_stock = StGoodsStock::where(['sku' => $args_data['product_code'], 'mall_id' => $args_data['mall_id']])->first();
+        if (empty($st_goods_stock)) {
+            return $this->curl->response('商品信息未找到');
+        }
+        return $this->curl->call('eleme.product.item.getItemByShopIdAndExtendCode', ['shopId' => $st_app_mall->o_mall_id, 'extendCode' => $args_data['product_code']]);
+    }
+
+    /**
+     * 批量删除商品
+     * @param array $args = [
+     *       [
+     *          'mall_code' => string 门店编号
+     *          'goods' => [$goods_id]
+     *      ]
+     * ]
+     * @return mixed
+     */
+    public function batch_delete_goods($args_data)
+    {
+        
+        $itemIds = [];
+        foreach ($args_data as $item) {
+            if (!is_array($item)) {
+                return $this->curl->response('参数错误');
+            }
+            $st_app_mall = StAppMall::where(['mall_code' => $item['mall_code'], 'app_id' => 100002])->first();
+            if (!$st_app_mall) {
+                return $this->curl->response('门店信息未找到');
+            }
+            foreach ($item['goods'] as $goods_id) {
+                $st_app_sale = StAppGoodsSale::where(['goods_id' => $goods_id, 'mall_id' => $st_app_mall->mall_id,'app_id' => 100002])->first();
+                if (!$st_app_sale) {
+                    return $this->curl->response('商品信息不存在');
+                }
+                $itemIds[] = $st_app_sale->o_goods_id;
+            }
+        }
+
+        $res = $this->curl->call('eleme.product.item.batchRemoveItems', ['itemIds' => $itemIds]);
+
+        error_log(var_export($res,1));
+
+    }
+
+    /**
+     * 添加商品(单个)
+     * @param $args_data
+     * @return mixed
+     */
+    public function create_product($args_data)
+    {
+
+        if (!isset($args_data) || empty($args_data) || !is_array($args_data)) {
+            return $this->curl->response('缺少参数：args_data');
+        }
+
+        $st_app_category = StAppCategory::where('category_id', $args_data['category_id'])->first();
+
+        if (!$st_app_category) {
+            return $this->curl->response('未查询到分类信息!');
+        }
+
+        $category_id = $st_app_category->o_category_id;
+
+        $st_app_mall = StAppMall::where(['app_id' => 100002, 'mall_id' => $args_data['mall_id']])->first();
+        if (!$st_app_mall) {
+            return $this->curl->response('未查询到外卖店铺信息!');
+        }
+
+//        $host = $_SERVER['HTTP_HOST'];
+        $host = 'http://hg.ebsig.com';
+        $res = Wm::send('100002.goods.upload_image', $host . $args_data['goods_image']);
+
+        if ($res['code'] != 200) {
+            return $this->curl->response($res['message']);
+        }
+        $image = $res['data'];
+
+        $specs = [];
+        $specs_array = [];
+        foreach ($args_data['spec'] as $goods_specs) {
+
+            $st_goods_sale = StGoodsSale::find($goods_specs['spec_id']);
+
+            $specs_array[$goods_specs['product_code']] = $goods_specs['spec_id'];
+
+            if (!$st_goods_sale->first()) {
+                return $this->curl->response('商品规格信息未找到');
+            }
+            $specs[] = [
+                'specId' => 0,
+                'name' => app_to_string($goods_specs['name']),
+                'price' => app_to_decimal($goods_specs['price']),
+                'stock' => app_to_int($goods_specs['stock']),
+                'maxStock' => app_to_int($goods_specs['stock']),
+                'packingFee' => app_to_decimal($st_goods_sale->package_price),
+                'onShelf' => $st_goods_sale->status,
+                'extendCode' => app_to_string($goods_specs['product_code']),
+                'barCode' => app_to_string($st_goods_sale->upc),
+                'weight' => app_to_int($st_goods_sale->weight),
+                'activityLevel' => 0,
+            ];
+        }
+
+        $properties = [
+            'name' => $args_data['goods_name'],
+            'imageHash' => $image,
+            'specs' => $specs,
+        ];
+
+        $result_data = $this->curl->call('eleme.product.item.createItem', [
+            'categoryId' => $category_id,
+            'properties' => $properties
+        ]);
+
+        if ($result_data['code'] != 200) {
+            return $this->curl->response($result_data['message']);
+        }
+
+        foreach ($result_data['data']['specs'] as $specs_data) {
+
+            $st_app_goods_sale = new StAppGoodsSale();
+            $st_app_goods_sale->creator = 'EleMeAPI';
+            $st_app_goods_sale->goods_id = $args_data['goods_id'];
+            $st_app_goods_sale->spec_id = $specs_array[$specs_data['extendCode']];
+            $st_app_goods_sale->name = $args_data['goods_name'];
+            $st_app_goods_sale->spec = $specs_data['name'];
+            $st_app_goods_sale->erp_price = $specs_data['price'];
+            $st_app_goods_sale->price = $specs_data['price'];
+            $st_app_goods_sale->status = 0;
+            $st_app_goods_sale->sku = $specs_data['extendCode'];
+            $st_app_goods_sale->upc = $specs_data['barCode'];
+            $st_app_goods_sale->images = $result_data['data']['imageUrl'];
+            $st_app_goods_sale->mall_id = $args_data['mall_id'];
+            $st_app_goods_sale->app_id = 100002;
+            $st_app_goods_sale->o_goods_id = $result_data['data']['id'];
+            $st_app_goods_sale->o_sku_id = $specs_data['specId'];
+            $st_app_goods_sale->save();
+
+        }
+
+        return $result_data;
+
+
+    }
+
+    /**
+     * 编辑商品(单个商品)
+     * @param $args
+     * @return mixed
+     */
+    public function update_product($args_data)
+    {
+
+        if (!isset($args_data) || empty($args_data) || !is_array($args_data)) {
+            return $this->curl->response('缺少参数：args_data');
+        }
+
+        $st_app_category = StAppCategory::where('category_id', $args_data['category_id'])->first();
+
+        if (!$st_app_category) {
+            return $this->curl->response('未查询到分类信息!');
+        }
+
+        $category_id = $st_app_category->o_category_id;
+
+        $st_app_mall = StAppMall::where(['app_id' => 100002, 'mall_id' => $args_data['mall_id']])->first();
+        if (!$st_app_mall) {
+            return $this->curl->response('未查询到外卖店铺信息!');
+        }
+
+        $st_app_sale = StAppGoodsSale::where(['goods_id' => $args_data['goods_id'], 'app_id' => 100002])->first();
+        if (!$st_app_sale) {
+            return $this->curl->response('商品信息未找到');
+        }
+
+//        $host = $_SERVER['HTTP_HOST'];
+        $host = 'http://hg.ebsig.com';
+        $st_goods = StGoods::find($args_data['goods_id']);
+        $res = Wm::send('100002.goods.upload_image', $host . $st_goods->image);
+
+        if ($res['code'] != 200) {
+            return $this->curl->response($res['message']);
+        }
+        $image = $res['data'];
+
+        $specs = [];
+        $specs_array = [];
+        foreach ($args_data['spec'] as $goods_specs) {
+
+            $st_goods_sale = StGoodsSale::find($goods_specs['spec_id']);
+
+            $specs_array[$goods_specs['product_code']] = $goods_specs['spec_id'];
+
+            if (!$st_goods_sale->first()) {
+                return $this->curl->response('商品规格信息未找到');
+            }
+            $specs[] = [
+                'specId' => 0,
+                'name' => app_to_string($goods_specs['name']),
+                'price' => app_to_decimal($goods_specs['price']),
+                'stock' => app_to_int($goods_specs['stock']),
+                'maxStock' => app_to_int($goods_specs['stock']),
+                'packingFee' => app_to_decimal($st_goods_sale->package_price),
+                'onShelf' => $st_goods_sale->status,
+                'extendCode' => app_to_string($goods_specs['product_code']),
+                'barCode' => app_to_string($st_goods_sale->upc),
+                'weight' => app_to_int($st_goods_sale->weight),
+                'activityLevel' => 0,
+            ];
+        }
+
+        $properties = [
+            'name' => $args_data['goods_name'],
+            'imageHash' => $image,
+            'specs' => $specs,
+        ];
+
+        $result_data = $this->curl->call('eleme.product.item.updateItem', [
+            'itemId' => $st_app_sale->o_goods_id,
+            'categoryId' => $category_id,
+            'properties' => $properties
+        ]);
+
+        if ($result_data['code'] != 200) {
+            return $this->curl->response($result_data['message']);
+        }
+
+        return $result_data;
+
+    }
+
+
+}

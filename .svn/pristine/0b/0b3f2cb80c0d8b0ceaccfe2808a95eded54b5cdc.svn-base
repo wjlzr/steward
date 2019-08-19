@@ -1,0 +1,155 @@
+<?php
+
+namespace App\Http\Controllers\Admin\Analyse;
+
+use DB;
+
+use Log;
+
+use Illuminate\Http\Request;
+
+use App\Models\StApp;
+
+use App\Models\Goods\StStatGoodsCategoryAnalyse;
+
+use App\Http\Controllers\Controller;
+
+class categoryController extends Controller
+{
+
+
+    public function categoryList( Request $request )
+    {
+
+        $startDate = $request->input('startDate');
+        $endDate = $request->input('endDate');
+
+        $where = [];
+
+        if ( !empty( $startDate ) ) {
+            $where[] = ['cal_date','>=',$startDate];
+        }
+        if ( !empty( $endDate ) ) {
+            $where[] = ['cal_date','<=',$endDate];
+        }
+
+        $category = DB::table('st_stat_goods_category_analyse')
+            ->select(DB::raw('first_level_id,second_level_id,third_level_id,first_level_name,second_level_name,third_level_name,SUM(total_bill_money) as total_bill_money'))
+            ->where($where)
+            ->groupBy('first_level_id','second_level_id','third_level_id')
+            ->orderby('total_bill_money','desc')
+            ->paginate($request->input('limit'))
+            ->toArray();
+
+        //返回数组
+        $return = [
+            'total' => $category['total'],
+            'rows' => []
+        ];
+
+        if ( $category['data'] ) {
+
+            foreach ( $category['data'] as $k=>$item ) {
+
+                $where = [];
+
+                if ( !empty( $item->first_level_id ) ) {
+                    $where[] = ['first_level_id','=',$item->first_level_id];
+                }
+                if ( !empty( $item->second_level_id ) ) {
+                    $where[] = ['second_level_id','=',$item->second_level_id];
+                }
+                if ( !empty( $item->third_level_id ) ) {
+                    $where[] = ['third_level_id','=',$item->third_level_id];
+                }
+                if ( !empty( $startDate ) ) {
+                    $where[] = ['cal_date','>=',$startDate];
+                }
+                if ( !empty( $endDate ) ) {
+                    $where[] = ['cal_date','<=',$endDate];
+                }
+
+                $category_id = StStatGoodsCategoryAnalyse::select('app_id','total_bill_money')->where($where)->get()->toArray();
+
+                $bill_money = [];
+
+                if ( $category_id ) {
+
+                     foreach ( $category_id as $v ) {
+                         $app_data = StApp::getCache( $v['app_id'] );
+                         if ( $app_data ){
+
+                         }
+
+                         $other_where =  [];
+                         if ( !empty( $v['app_id'] ) ) {
+                             $other_where[] =  ['app_id','=',$v['app_id']];
+                         }
+                         if ( !empty( $item->first_level_id ) ) {
+                             $other_where[]  = ['first_level_id','=',$item->first_level_id];
+                         }
+                         if ( !empty( $item->second_level_id ) ) {
+                             $other_where[]  = ['second_level_id','=',$item->second_level_id];
+                         }
+                         if ( !empty( $item->third_level_id ) ) {
+                             $other_where[]  = ['third_level_id','=',$item->third_level_id];
+                         }
+                         if ( !empty( $startDate ) ) {
+                             $other_where[] = ['cal_date','>=',$startDate];
+                         }
+                         if ( !empty( $endDate ) ) {
+                             $other_where[] = ['cal_date','<=',$endDate];
+                         }
+
+                         $analyse = StStatGoodsCategoryAnalyse::select('total_bill_money')->where($other_where)->first();
+
+                         if ( $analyse ) {
+                             $bill_money[$v['app_id']] = [
+                                    'bill_money'=>$analyse->total_bill_money,
+                                    'rate'=>$analyse->total_bill_money/$item->total_bill_money,
+                             ];
+                         }
+                     }
+                }
+
+                $level = '';
+                if ( !empty( $item->first_level_name ) ) {
+                    $level.= $item->first_level_name;
+                }
+                if ( !empty( $item->second_level_name ) ) {
+                    $level.= '->'.$item->second_level_name;
+                }
+                if ( !empty( $item->third_level_name ) ) {
+                    $level.= '->'.$item->third_level_name;
+                }
+
+                $money = [];
+                foreach ( $bill_money as $kk=>$vv ) {
+
+                    $rate = round( $vv['rate']*100 ,2).'%';
+
+//                    $money[$kk] = '<div class="add-member fl crm-progress-box"><span class="fl">'.$vv['bill_money'].'</span><div class="crm-progress fl"><div class="crm-progress-bar" style="width: '.$rate.'"></div></div></div><span class="fl">'.$rate.'%</span>';
+                    $money[$kk] = '<span class="fl">'.$vv['bill_money'].'&nbsp;</span><div class="progress" style="width: 100px;"><div class="progress-bar" role="progressbar" aria-valuenow="60" aria-valuemin="0" aria-valuemax="100" style="width: '.$rate.';color: #F90C0C;background:#CFB8B8;">'.$rate.'</div></div>';
+
+                }
+
+//                $money_zero = '<span class="fl">0&nbsp;</span><div class="progress" style="width: 100px;"><div class="progress-bar" role="progressbar" aria-valuenow="60" aria-valuemin="0" aria-valuemax="100" style="width: 0;color: #F90C0C;background:#CFB8B8;">0</div></div>';
+
+                $return['rows'][] = [
+                    'level' => $level,
+                    'total_bill_money' => $item->total_bill_money,
+                    'BdFood' => isset( $money[1] ) ? $money[1] : 0,
+                    'EleMe' => isset( $money[2] ) ? $money[2] : 0,
+                    'MtFood' => isset( $money[3] ) ? $money[3] : 0,
+                    'JdDj' => isset( $money[4] ) ? $money[4] : 0
+                ];
+            }
+        }
+
+
+        return response()->json($return);
+
+    }
+
+
+}

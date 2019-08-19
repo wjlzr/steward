@@ -1,0 +1,117 @@
+<?php
+
+namespace App\Http\Controllers\Admin\Goods;
+
+use App\Models\Goods\StCategory;
+use App\Models\Goods\StGoods;
+use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
+
+
+class CategoryController extends Controller
+{
+
+    /**
+     * 分类列表
+     * @return \Illuminate\Contracts\View\Factory|\Illuminate\View\View
+     */
+    public function index() {
+
+
+        return view('/admin/goods/category/index');
+    }
+
+    /**
+     * 分类查询
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function search( Request $request) {
+
+        $st_category = StCategory::orderBy('sort','DESC')->get();
+
+        if( !$st_category -> isEmpty()){
+
+            foreach ( $st_category as $c ){
+
+                $where = [];
+
+                if( $c -> level == 1 ){
+
+                    $where[] = ['big_category_id' , $c -> id ];
+                }else if( $c -> level == 2 ){
+
+                    $where[] = ['mid_category_id', $c -> id ];
+                }else{
+
+                    $where[] = ['small_category_id', $c -> id ];
+                }
+
+                $c -> goods_num = StGoods::where($where)->count();
+            }
+
+            $st_category = $this -> getTree( $st_category->toArray() , 0 );
+        }
+
+        return response()->json(['code' => 200 ,'data' => $st_category]);
+    }
+
+
+    public function edit() {
+
+    }
+
+    public function add( Request $request ){
+
+        $p_id = $request -> input( 'p_id' , '');
+        $level = $request -> input( 'level' , '');
+        $category_name = $request -> input( 'category_name' , '');
+        $status = $request -> input( 'status' , '');
+
+        if ( empty ($category_name)){
+            return response()->json(['code' => 400 , 'message' => '请输入商品分类名称']);
+        }
+
+        $st_category = StCategory::where([ ['name',$category_name],['p_id',$p_id]])->first();
+
+        if( $st_category ){
+            return response()->json(['code' => 400 ,'message' => '您添加的分类已存在']);
+        }
+
+        $st_category = new StCategory();
+        $st_category -> creator = 'system';
+        $st_category -> name = $category_name ;
+        $st_category -> status = $status;
+        $st_category -> level = $level;
+        $st_category -> p_id = $p_id;
+        $st_category -> save();
+
+        return response()->json(['code' => 200 ,'message' => '添加成功']);
+    }
+
+    public function status() {
+
+
+    }
+
+    /**
+     * 数据结构转换
+     * @param $data
+     * @param $pId
+     * @return array|string
+     */
+    private function getTree($data, $pId)
+    {
+        $tree = '';
+
+        foreach ($data as $k => $v){
+            if($v['p_id'] == $pId)
+            {
+                $v['children'] = $this->getTree($data, $v['id']);
+                $tree[] = $v;
+            }
+        }
+        return $tree;
+    }
+
+}

@@ -1,0 +1,934 @@
+<?php
+namespace App\Services\Wm\MtFood\Request;
+
+use DB;
+use Carbon\Carbon;
+use App\Models\Goods\StGoods;
+use App\Models\Mall\StMall;
+use App\Models\Goods\StCategory;
+use App\Models\Goods\StGoodsSale;
+use App\Models\Goods\StAppCategory;
+use App\Models\Goods\StAppGoodsSale;
+use Mockery\CountValidator\Exception;
+use App\Services\Wm\GoodsFactoryInterface;
+
+class MtFoodGoodsRequest implements GoodsFactoryInterface
+{
+
+    public function __construct($curl)
+    {
+        $this->curl = $curl;
+    }
+
+    /**
+     * 获取店铺商品分类
+     * @param $args
+     * @return mixed
+     */
+    public function get_shop_categories($args){
+
+        if (!isset($args['mall_code']) || empty($args['mall_code'])) {
+            return ['code' => 400, 'message' => '参数错误：mall_code'];
+        }
+
+        $request = [
+            'app_poi_code' => $args['mall_code']
+        ];
+
+        return $this->curl->call($request, 'retailCat/list');
+    }
+
+    /**
+     * 添加商品分类
+     * @param $args
+     * @return array
+     */
+    public function create_category($args){
+
+        if (!isset($args['parent_id'])) {
+            return ['code' => 400, 'message' => '缺少参数：parent_id'];
+        }
+
+        if (!isset($args['level'])) {
+            return ['code' => 400, 'message' => '缺少参数：level'];
+        }
+
+        if (!isset($args['mall_id']) || empty($args['mall_id'])) {
+            return ['code' => 400, 'message' => '参数错误：mall_id'];
+        }
+
+        if (!isset($args['category_id']) || empty($args['category_id'])) {
+            return ['code' => 400, 'message' => '参数错误：category_id'];
+        }
+
+        if (!isset($args['category_name']) || empty($args['category_name'])) {
+            return ['code' => 400, 'message' => '参数错误：category_name'];
+        }
+
+        if (!isset($args['sort']) || empty($args['sort'])) {
+            return ['code' => 400, 'message' => '参数错误：sort'];
+        }
+
+        $mall_data = StMall::find($args['mall_id']);
+
+        $category_data = StAppCategory::where(['mall_id' => $args['mall_id'],'app_id' => 100003])->get();
+
+        foreach ($category_data as $category) {
+            if ($category->name == $args['category_name']) {
+                return ['code' => 400, 'message' => '此分类名称已存在,请更换后重试'];
+            }
+        }
+
+        if ($args['level'] == 1) {
+            $request = [
+                'app_poi_code' => $mall_data->code,
+                'category_name_origin' => isset($args['category_name_origin'])?$args['category_name_origin']:'',
+                'category_name' => $args['category_name'],
+                'secondary_category_name' => isset($args['secondary_category_name'])?$args['secondary_category_name']:'',
+                'sequence' => $args['sort']
+            ];
+        }else{
+
+            $category = StCategory::find($args['parent_id']);
+
+            $request = [
+                'app_poi_code' => $mall_data->code,
+                'category_name_origin' => isset($args['category_name_origin'])?$args['category_name_origin']:'',
+                'category_name' => $category->name,
+                'secondary_category_name' => $args['category_name'],
+                'sequence' => $args['sort']
+            ];
+        }
+
+        $StAppCategory = new StAppCategory();
+        $StAppCategory->updated_at = Carbon::now();
+        $StAppCategory->creator = 'mt-api';
+        $StAppCategory->created_at = Carbon::now();
+        $StAppCategory->category_id = $args['category_id'];
+        $StAppCategory->category_name = $args['category_name'];
+        $StAppCategory->status = 1;
+        $StAppCategory->level = $args['level'];
+        $StAppCategory->p_id = !empty($args['parent_id'])?$args['parent_id']:0;
+        $StAppCategory->mall_id = $args['mall_id'];
+        $StAppCategory->app_id = 100003;
+        $StAppCategory->o_category_id = $args['category_name'];
+
+        try {
+
+            DB::beginTransaction();
+
+            $result = $this->curl->call($request, 'retailCat/update','post');
+
+            if ($result['code'] == 200) {
+                $StAppCategory->save();
+            }else{
+                throw new Exception($result['message'],$result['code']);
+            }
+
+            DB::commit();
+
+            return ['code' => $result['code'], 'message' => $result['message']];
+
+        } catch (Exception $e) {
+
+            DB::rollBack();
+
+            return ['code' => $e->getCode(), 'message' => $e->getMessage()];
+
+        }
+
+    }
+
+    /**
+     * 修改商品分类
+     * @param $args
+     * @return mixed
+     */
+    public function update_category($args)
+    {
+
+        if (!isset($args['mall_id']) || empty($args['mall_id'])) {
+            return ['code' => 400, 'message' => '参数错误：mall_id'];
+        }
+
+        if (!isset($args['category_name']) || empty($args['category_name'])) {
+            return ['code' => 400, 'message' => '参数错误：category_name'];
+        }
+
+        if (!isset($args['category_old_name']) || empty($args['category_old_name'])) {
+            return ['code' => 400, 'message' => '参数错误：category_name_origin'];
+        }
+
+        $mall_data = StMall::find($args['mall_id']);
+
+        $request = [
+            'app_poi_code' => $mall_data->code,
+            'category_name_origin' => $args['category_old_name'],
+            'category_name' => $args['category_name'],
+            'secondary_category_name' => isset($args['secondary_category_name'])?$args['secondary_category_name']:'',
+            'sequence' => isset($args['sort'])?$args['sort']:1
+        ];
+
+        try {
+
+            DB::beginTransaction();
+
+            $result = $this->curl->call($request, 'retailCat/update','post');
+
+            if ($result['code'] == 200) {
+                StAppCategory::where(['category_id' => $args['category_id'],
+                    'mall_id' => $args['mall_id'],'app_id' => 100003])
+                    ->update(['category_name' => $args['category_name']]);
+            }else{
+                throw new Exception($result['message'],$result['code']);
+            }
+
+            DB::commit();
+
+            return ['code' => $result['code'], 'message' => $result['message']];
+
+        } catch (Exception $e) {
+
+            DB::rollBack();
+
+            return ['code' => $e->getCode(), 'message' => $e->getMessage()];
+
+        }
+
+    }
+
+    /**
+     * 删除商品分类
+     * @param $args
+     * @return mixed
+     */
+    public function delete_category($args){
+
+        if (!isset($args['mall_code']) || empty($args['mall_code'])) {
+            return ['code' => 400, 'message' => '参数错误：order_id'];
+        }
+
+        if (!isset($args['category_name']) || empty($args['category_name'])) {
+            return ['code' => 400, 'message' => '参数错误：category_name'];
+        }
+
+        $request = [
+            'app_poi_code' => $args['mall_code'],
+            'category_name' => $args['category_name']
+        ];
+
+        try {
+
+            DB::beginTransaction();
+
+            $result = $this->curl->call($request, 'retailCat/delete','post');
+
+            if ($result['code'] == 200) {
+                StAppCategory::where('category_name',$args['category_name'])->delete();
+            }else{
+                throw new Exception($result['message'],$result['code']);
+            }
+
+            DB::commit();
+
+            return ['code' => $result['code'], 'message' => $result['message']];
+
+        } catch (Exception $e) {
+
+            DB::rollBack();
+
+            return ['code' => $e->getCode(), 'message' => $e->getMessage()];
+
+        }
+
+    }
+
+    /**
+     * 查询商品详情
+     * @param $app_poi_code
+     * @param $app_food_code
+     * @return array
+     */
+    public function get($app_poi_code, $app_food_code)
+    {
+
+        $request = [
+            'app_poi_code' => $app_poi_code,
+            'app_food_code' => $app_food_code,
+        ];
+
+        return $this->curl->call($request, 'retail/get');
+
+    }
+
+    /**
+     * 商品列表
+     * @param $orderId
+     * @param int $offset
+     * @param int $limit
+     * @return array
+     */
+    public function sku_list($orderId, $offset = 0, $limit = 10)
+    {
+
+        $args_data = [
+            'app_poi_code' => $orderId,
+            'offset' => $offset,
+            'limit' => $limit
+        ];
+
+        return $this->curl->call($args_data, 'retail/list');
+    }
+
+    /**
+     * 批量更新库存
+     * @param $args_data
+     * @return mixed
+     */
+    public function batch_update_stock($args_data)
+    {
+
+        if (!isset($args_data['mall_id']) || empty($args_data['mall_id'])) {
+            return $this->curl->response('缺少必要参数：mall_id');
+        }
+
+        if (!isset($args_data['goods']) || empty($args_data['goods'])) {
+            return $this->curl->response('缺少必要参数：goods');
+        }
+
+        $mall_data = StMall::find($args_data['mall_id']);
+
+        $data = [];
+        foreach ($args_data['goods'] as $key=>$item) {
+
+            foreach ($item as $value) {
+
+                foreach ($value as $k => $v) {
+
+                    $StGoodsSale = StGoodsSale::find($k);
+
+                    $skus[] = [
+                        'sku_id' => $StGoodsSale->sku,
+                        'stock' => $v
+                    ];
+                }
+            }
+            $data[] = [
+                'app_food_code' => $key,
+                'skus' => $skus
+            ];
+        }
+
+        $args_data = [
+            'app_poi_code' => $mall_data->code,
+            'food_data' => json_encode($data)
+        ];
+
+        return $this->curl->call($args_data,'retail/sku/stock','post');
+    }
+
+    /**
+     * 批量添加商品
+     * @param $args_data
+     * @return array
+     */
+    public function batch_create_product ($args_data) {
+
+        if (empty($args_data) || !is_array($args_data)) {
+            return $this->curl->response('缺少参数:args_data');
+        }
+
+        error_log('=====//美团添加商品');
+        error_log(var_export($args_data,1));
+
+        $food_data = [];
+        foreach ($args_data as $item) {
+
+            //查询分类名称
+            $category = StCategory::find($item['category_id']);
+
+            //门店信息
+            $mall_data = StMall::find($item['mall_id']);
+
+            //主商品信息
+            $goods_master = StGoods::find($item['goods_id']);
+
+            //商品名称长度处理
+            if (mb_strlen($item['goods_name']) > 30) {
+                $goodsName = mb_substr($item['goods_name'],0,30);
+            }else{
+                $goodsName = $item['goods_name'];
+            }
+
+            $skus = [];
+            foreach ($item['spec'] as $val) {
+
+                if (mb_strlen($val['name']) > 20) {
+                    $specGoodsName = mb_substr($val['name'],0,20);
+                }else{
+                    $specGoodsName = $val['name'];
+                }
+
+                $StAppGoodsSale = new StAppGoodsSale();
+                $StAppGoodsSale->updated_at = Carbon::now();
+                $StAppGoodsSale->creator = 'system';
+                $StAppGoodsSale->goods_id = $item['goods_id'];
+                $StAppGoodsSale->spec_id = $val['spec_id'];
+                $StAppGoodsSale->name = $goodsName;
+                $StAppGoodsSale->price = $val['price'];
+                $StAppGoodsSale->status = 1;
+                $StAppGoodsSale->sku = $val['product_code'];
+                $StAppGoodsSale->upc = $val['upc'];
+                $StAppGoodsSale->images = $goods_master->image;
+                $StAppGoodsSale->mall_id = $item['mall_id'];
+                $StAppGoodsSale->app_id = 100003;
+                $StAppGoodsSale->o_goods_id = '';
+                $StAppGoodsSale->o_sku_id = '';
+
+                $StAppGoodsSaleObj[] = $StAppGoodsSale;
+
+                $skus[] = [
+                    'sku_id' => $val['product_code'],
+                    'spec' => !empty($specGoodsName)?$specGoodsName:'默认',
+                    'price' => $val['price'],
+                    'stock' => !empty($val['stock'])?$val['stock']:10
+                ];
+
+            }
+
+            $food_data[] = [
+                'app_food_code' => $item['goods_id'],
+                'app_poi_code' => $mall_data->code,
+                'box_num' => 0,
+                'box_price' => 0,
+                'category_name' => '每日精选',
+                'is_sold_out' => 0,
+                'min_order_count' => 1,
+                'name' => $goodsName,
+                'unit' => !empty($goods_master->unitName)?$goods_master->unitName:'件',
+                'price' => '100',
+                'skus' => $skus
+            ];
+
+        }
+
+        $request = [
+            'app_poi_code' => 'SHJT1001',
+            'food_data' => json_encode($food_data)
+        ];
+
+        try {
+
+            //开启事务
+            DB::beginTransaction();
+
+            $insert_res =  $this->curl->call($request, 'retail/batchinitdata', 'post');
+
+            if ($StAppGoodsSaleObj) {
+                foreach ($StAppGoodsSaleObj as $goods) {
+                    $goods->save();
+                }
+            }
+
+            if ($insert_res['code'] != 200) {
+                throw new Exception($insert_res['message'],400);
+            }
+
+            DB::commit();
+
+            return $this->curl->response($insert_res['message'],$insert_res['code']);
+
+        } catch (Exception $e) {
+
+            DB::rollback();
+
+            return $this->curl->response($e->getMessage(),$e->getCode());
+        }
+
+    }
+
+    /**
+     * 批量修改商品
+     * @param $args_data
+     * @return array
+     */
+    public function batch_update_product ($args_data) {
+
+        if (empty($args_data) || !is_array($args_data)) {
+            return $this->curl->response('缺少参数:args_data');
+        }
+
+        /*error_log('=====//美团修改商品');
+        error_log(var_export($args_data,1));*/
+
+        $food_data = [];
+        $where = [];
+        $update = [];
+        foreach ($args_data as $item) {
+
+            //查询分类名称
+            $category = StCategory::find($item['category_id']);
+
+            //门店信息
+            $mall_data = StMall::find($item['mall_id']);
+
+            //商品名称长度处理
+            if (mb_strlen($item['goods_name']) > 30) {
+                $goodsName = mb_substr($item['goods_name'],0,30);
+            }else{
+                $goodsName = $item['goods_name'];
+            }
+
+            $skus = [];
+            foreach ($item['spec'] as $val) {
+
+                if (mb_strlen($val['name']) > 20) {
+                    $specGoodsName = mb_substr($val['name'],0,20);
+                }else{
+                    $specGoodsName = $val['name'];
+                }
+
+                $where = ['spec_id'=>$val['spec_id'],'mall_id'=>$mall_data->code,'app_id'=>100001];
+
+                $update[] = [
+                    'updated_at'=>Carbon::now(),
+                    'name'=>$item['goods_name'],
+                    'spec'=>$val['name'],
+                    'price'=>$val['price'],
+                    'sku'=>$val['product_code'],
+                    'upc'=>$val['upc']
+                ];
+
+                $skus[] = [
+                    'sku_id' => $val['product_code'],
+                    'spec' => !empty($specGoodsName)?$specGoodsName:'默认',
+                    'price' => $val['price'],
+                    'upc' => $val['upc'],
+                    'stock' => !empty($val['stock'])?$val['stock']:10,
+                    'weight' => $val['weight']
+                ];
+
+            }
+
+            $food_data[] = [
+                'app_food_code' => $item['goods_id'],
+                'app_poi_code' => $mall_data->code,
+                'category_name' => '每日精选',
+                'name' => $goodsName,
+                'price' => '100',
+                'skus' => $skus
+            ];
+
+        }
+
+        $request = [
+            'app_poi_code' => 'SHJT1001',
+            'food_data' => json_encode($food_data)
+        ];
+
+        try {
+
+            //开启事务
+            DB::beginTransaction();
+
+            $insert_res =  $this->curl->call($request, 'retail/batchinitdata', 'post');
+
+            foreach ($update as $item) {
+                StAppGoodsSale::where($where)->update($item);
+            }
+
+            if ($insert_res['code'] != 200) {
+                throw new Exception($insert_res['message'],400);
+            }
+
+            DB::commit();
+
+            return $this->curl->response($insert_res['message'],$insert_res['code']);
+
+        } catch (Exception $e) {
+
+            DB::rollback();
+
+            return $this->curl->response($e->getMessage(),$e->getCode());
+        }
+
+    }
+
+    /**
+     * 批量上下架商品
+     * @param array $args_data = [
+     *      'is_shelf' => int 上下架：0、下架 1、上架
+     *      'mall_id' => int 门店id
+     *      'goods' => [
+     *          $goods_id
+     *      ]
+     * ]
+     * @return mixed
+     */
+    public function batch_update_self($args_data)
+    {
+
+        if (!isset($args_data['goods']) || empty($args_data['goods'])) {
+            return $this->curl->response('缺少商品ID列表参数：goods');
+        }
+
+        if (!isset($args_data['mall_id']) || empty($args_data['mall_id'])) {
+            return $this->curl->response('缺少商品ID列表参数：mall_id');
+        }
+
+        if (!isset($args_data['is_shelf']) || !in_array($args_data['is_shelf'], [0, 1])) {
+            return $this->curl->response('缺少参数或者参数取值错误：is_shelf');
+        }
+
+        $mall_data = StMall::find($args_data['mall_id']);
+
+        $food_data = [];
+        foreach ($args_data['goods'] as $goodsID) {
+
+            $StGoods = StGoods::find($goodsID);
+
+            $food_data[] = [
+                'app_food_code' => $StGoods->id,
+                'app_poi_code' => $args_data['mall_code'],
+                'box_num' => 0,
+                'box_price' => 0,
+                'category_name' => $StGoods->category_name,
+                'is_sold_out' => $args_data['is_shelf'] == 1 ? 0 : 1,
+                'name' => $StGoods->name,
+                'unit' => !empty($StGoods->unitName)?$StGoods->unitName:'件',
+                'min_order_count' => 1,
+                'price' => '100',
+                'skus' => []
+            ];
+
+        }
+
+        $request = [
+            'app_poi_code' => $mall_data->code,
+            'food_data' => json_encode($food_data)
+        ];
+
+        return $this->curl->call($request, 'retail/batchinitdata', 'post');
+
+    }
+
+    /**
+     * 编辑商品
+     * @param $args
+     * @return mixed
+     */
+    public function update_product($args)
+    {
+        return ['code' => 200, 'message' => 'ok'];
+    }
+
+    /**
+     * 批量修改商品价格
+     * @param $args_data = [
+     *      'mall_id' => string 门店id
+     *      'goods' => [
+     *          $goods_id => [
+     *              $spec_id => $price
+     *          ]
+     *      ]
+     * ]
+     * @return mixed
+     */
+    public function batch_update_price($args_data)
+    {
+
+        if (!isset($args_data['mall_id']) || empty($args_data['mall_id'])) {
+            return $this->curl->response('缺少必要参数：mall_id');
+        }
+
+        if (!isset($args_data['goods']) || empty($args_data['goods'])) {
+            return $this->curl->response('缺少必要参数：goods');
+        }
+
+        $mall_data = StMall::find($args_data['mall_id']);
+
+        $data = [];
+        foreach ($args_data['goods'] as $key=>$item) {
+
+            foreach ($item as $value) {
+
+                foreach ($value as $k => $v) {
+
+                    $StGoodsSale = StGoodsSale::find($k);
+
+                    $skus[] = [
+                        'sku_id' => $StGoodsSale->sku,
+                        'price' => $v
+                    ];
+                }
+            }
+            $data[] = [
+                'app_food_code' => $key,
+                'skus' => $skus
+            ];
+        }
+
+        $request = [
+            'app_poi_code' => $mall_data->code,
+            'food_data' => json_encode($data)
+        ];
+
+        return $this->curl->call($request,'retail/sku/price','post');
+    }
+
+    /**
+     * 获取商品列表信息
+     * @param $args_data = [
+     *      'shop_id' => string 店铺id,
+     *      'page' => int 当前分页
+     *      'page_size' => int 分页条数（默认20）
+     * ]
+     * @return mixed
+     */
+    public function get_shop_product($args_data)
+    {
+        error_log('=======//获取商品列表');
+        error_log(var_export($args_data,true));
+
+        if (!isset($args_data['mall_code']) || empty($args_data['mall_code'])) {
+            return ['code' => 400, 'message' => '参数错误：mall_code'];
+        }
+
+        if (!isset($args_data['page']) || empty($args_data['page'])) {
+            $args_data['page'] = 0;
+        }
+
+        if (!isset($args_data['page_size']) || empty($args_data['page_size'])) {
+            $args_data['page_size'] = 5;
+        }
+
+        $request = [
+            'app_poi_code' => $args_data['mall_code'],
+            'offset' => $args_data['page'],
+            'limit' => $args_data['page_size']
+        ];
+
+        $result = $result = $this->curl->call($request,'retail/list');
+        error_log('=======//result');
+        error_log(var_export($result,true));
+        return $result;
+    }
+
+    /**
+     * 商品公共分类接口
+     * @param $request_data
+     * @return array
+     */
+    public function category_list ($request_data) {
+
+        $args_data = [
+            ''
+        ];
+        return $this->curl->call($args_data, 'sku.category.list');
+
+    }
+
+    /**
+     * 批量删除商品
+     * @param array $args_data
+     * @return array
+     */
+    public function batch_delete_goods($args_data)
+    {
+
+        /*error_log('=====//美团删除商品');
+        error_log(var_export($args_data,true));*/
+
+        if (!isset($args_data) || !is_array($args_data)) {
+            return ['code' => 400, 'message' => '缺少参数'];
+        }
+
+        foreach ($args_data as $value) {
+
+            if (!isset($value['mall_code']) || empty($value['mall_code'])) {
+                return ['code' => 400, 'message' => '参数错误：mall_code'];
+            }
+
+            if (!isset($value['goods']) || empty($value['goods'])) {
+                return ['code' => 400, 'message' => '参数错误：goods'];
+            }
+
+            $mall_data = StMall::where('code',$value['mall_code'])->first();
+
+            foreach ($value['goods'] as $goods_id) {
+
+                $request = [
+                    'app_poi_code' => $value['mall_code'],
+                    'app_food_code' => $goods_id
+                ];
+
+                $result = $this->curl->call($request, 'food/delete', 'post');
+
+                if ($result['code'] != 200) {
+                    return ['code' => $result['code'], 'message' => $result['message']];
+                }else{
+                    StAppGoodsSale::where(['goods_id' => $goods_id,'mall_id' => $mall_data->id,'app_id' => 100003])->delete();
+                }
+            }
+        }
+
+        return ['code' => 200, 'message' => 'ok'];
+
+    }
+
+    /**
+     * 添加商品
+     * @param array $args_data = [
+     *      'mall_id' => string 商家门店ID
+     *      'category_id' => int 商家外卖分类id
+     *      'goods_name' => string 商家外卖商品名称
+     *      'goods_image' => string 商品图片
+     *      'goods_id' => int 商家主商品id(大于等于0)
+     *      'spec' => [
+     *          [
+     *              'spec_id' => int 规格ID
+     *              'name' => string 商家商品规格商品名
+     *              'price' => string 商家商品规格商品价
+     *              'stock' => int 商家商品规格商品库存
+     *              'product_code' => string 商家商品编号
+     *              'upc' => string 商家商品条码
+     *          ]
+     *      ]
+     * ]
+     * @param $args_data
+     * @return mixed
+     */
+    public function create_product($args_data)
+    {
+        if (empty($args_data) || !is_array($args_data)) {
+            return $this->curl->response('缺少参数:args_data');
+        }
+
+        error_log('=====//美团添加商品');
+        error_log(var_export($args_data,1));
+
+        //查询分类名称
+        $category = StCategory::find($args_data['category_id']);
+
+        //门店信息
+        $mall_data = StMall::find($args_data['mall_id']);
+
+        //主商品信息
+        $goods_master = StGoods::find($args_data['goods_id']);
+
+        //商品名称长度处理
+        if (mb_strlen($args_data['goods_name']) > 30) {
+            $goodsName = mb_substr($args_data['goods_name'],0,30);
+        }else{
+            $goodsName = $args_data['goods_name'];
+        }
+
+        $skus = [];
+        foreach ($args_data['spec'] as $val) {
+
+            if (mb_strlen($val['name']) > 20) {
+                $specGoodsName = mb_substr($val['name'],0,20);
+            }else{
+                $specGoodsName = $val['name'];
+            }
+
+            $StAppGoodsSale = new StAppGoodsSale();
+            $StAppGoodsSale->updated_at = Carbon::now();
+            $StAppGoodsSale->creator = 'mt-api';
+            $StAppGoodsSale->goods_id = $args_data['goods_id'];
+            $StAppGoodsSale->spec_id = $val['spec_id'];
+            $StAppGoodsSale->name = $goodsName;
+            $StAppGoodsSale->price = $val['price'];
+            $StAppGoodsSale->status = 1;
+            $StAppGoodsSale->sku = $val['product_code'];
+            $StAppGoodsSale->upc = $val['upc'];
+            $StAppGoodsSale->images = $goods_master->image;
+            $StAppGoodsSale->mall_id = $args_data['mall_id'];
+            $StAppGoodsSale->app_id = 100003;
+            $StAppGoodsSale->o_goods_id = '';
+            $StAppGoodsSale->o_sku_id = '';
+
+            $StAppGoodsSaleObj[] = $StAppGoodsSale;
+
+            $skus[] = [
+                'sku_id' => $val['product_code'],
+                'spec' => !empty($specGoodsName)?$specGoodsName:'默认',
+                'price' => $val['price'],
+                'stock' => !empty($val['stock'])?$val['stock']:10
+            ];
+
+        }
+
+        $request[] = [
+            'app_food_code' => $args_data['goods_id'],
+            'app_poi_code' => $mall_data->code,
+            'name' => $goodsName,
+            'price' => '100',
+            'box_num' => 0,
+            'box_price' => 0,
+            'category_name' => '每日精选',
+            'is_sold_out' => 0,
+            'min_order_count' => 1,
+            'unit' => !empty($goods_master->unitName)?$goods_master->unitName:'件',
+            'skus' => json_encode($skus)
+        ];
+
+        error_log('=====//request参数');
+        error_log(var_export($request,true));
+
+        try {
+
+            //开启事务
+            DB::beginTransaction();
+
+            $insert_res =  $this->curl->call($request, 'retail/initdata', 'post');
+
+            if ($StAppGoodsSaleObj) {
+                foreach ($StAppGoodsSaleObj as $goods) {
+                    $goods->save();
+                }
+            }
+
+            if ($insert_res['code'] != 200) {
+                throw new Exception($insert_res['message'],400);
+            }
+
+            DB::commit();
+
+            return $this->curl->response($insert_res['message'],$insert_res['code']);
+
+        } catch (Exception $e) {
+
+            DB::rollback();
+
+            return $this->curl->response($e->getMessage(),$e->getCode());
+        }
+    }
+
+    /**
+     * 添加商品
+     * @return mixed
+     */
+    public function create_shop()
+    {
+
+        $request_data = [
+            'app_poi_code' => '2222',
+            'app_food_code' => '976',
+            'name' => '夏威夷果',
+            'stock' => 88,
+            'price' => 0.01,
+            'min_order_count' => 1,
+            'unit' => '盒',
+            'box_num' => 0,
+            'box_price' => 0,
+            'category_name' => '年货会场',
+            'is_sold_out' => 0
+        ];
+
+        $result = $result = $this->curl->call($request_data,'retail/initdata','post');
+        error_log('=======//result');
+        error_log(var_export($result,true));
+        return $result;
+    }
+}

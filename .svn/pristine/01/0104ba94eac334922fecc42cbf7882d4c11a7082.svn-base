@@ -1,0 +1,685 @@
+<?php
+
+namespace App\Http\Controllers\Admin\Mall;
+
+use App\Models\Mall\StAppMall;
+use App\Models\Mall\StMall;
+use App\Models\StApp;
+use App\Models\StRegion;
+use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
+use Wm;
+
+class MallController extends Controller
+{
+
+    public function index()
+    {
+
+        $count = StMall::select()->count();
+
+        $open_data = StApp::select('st_app.id', 'st_app.logo', 'st_app_mall.status')
+            ->leftJoin('st_app_mall', 'st_app.id', '=', 'st_app_mall.app_id')
+            ->get()
+            ->groupBy('id')
+            ->toArray();
+
+        $return_data = [];
+        foreach ($open_data as $key => $open) {
+            $o_num = 0;
+            $c_num = 0;
+            foreach ($open as $k => $v) {
+                if (isset($v['status']) && $v['status'] == 1) {
+                    $o_num++;
+                } elseif (isset($v['status']) && $v['status'] == 0) {
+                    $c_num++;
+                } else {
+                    $o_num = 0;
+                    $c_num = 0;
+                }
+                $return_data[$key] = [
+                    'id' => $v['id'],
+                    'logo' => $v['logo'],
+                    'o_num' => $o_num,
+                    'c_num' => $c_num
+                ];
+            }
+
+        }
+
+        return view('admin/mall/index', [
+            'count' => $count,
+            'return_data' => $return_data
+        ]);
+
+
+    }
+
+
+    /**
+     * 门店列表数据查询
+     * @param Request $request
+     * @return array
+     */
+    public function search(Request $request)
+    {
+
+        $rp = $request->input('rp', 10);   //分页
+        $offset = $request->input('offset', 0); //偏移量
+        $app_name = $request->input('app_name');
+        $mall_code = $request->input('mall_code');
+        $mall_name = $request->input('mall_name');
+        $status = $request->input('status');
+
+        $return_data = [];
+
+        $where = [];
+
+        //平台名称
+        if (isset($app_name) && !empty($app_name)) {
+            $where[] = ['name', 'like', '%' . $app_name . '%'];
+        }
+        //门店号
+        if (isset($mall_code) && !empty($mall_code)) {
+            $where[] = ['code', 'like', '%' . $mall_code . '%'];
+        }
+        //门店名称
+        if (isset($mall_name) && !empty($mall_name)) {
+            $where[] = ['name', 'like', '%' . $mall_name . '%'];
+        }
+        //门店状态
+        if (isset($status) && in_array($status, [0, 1])) {
+            $where[] = ['status', $status];
+        }
+
+        //查询门店信息
+        $mall_data = StMall::where($where)
+            ->orderBy('updated_at', 'desc')
+            ->offset($offset)->limit($rp)
+            ->get()
+            ->toArray();
+
+        $result_data = [
+            'code' => 0,
+            'count' => '',
+            'data' => $return_data
+        ];
+
+        if (!empty($mall_data)) {
+            $total = count($mall_data);
+            foreach ($mall_data as $mall) {
+
+                $status = $mall['status'] == 1 ? '已启用' : '已禁用';
+                $st_mall = array_column(StAppMall::select('app_id')->where('mall_id', $mall['id'])->where('online_status', '<>', 2)->get()->toArray(), 'app_id');
+
+                $image = '';
+                if (in_array(100001, $st_mall)) {
+                    $image .= '<span><img src="/images/admin/app/order-icon5.png"></span>&nbsp;';
+                }
+                if (in_array(100002, $st_mall)) {
+                    $image .= '<span><img src="/images/admin/app/order-icon1.png"></span>&nbsp;';
+                }
+                if (in_array(100003, $st_mall)) {
+                    $image .= '<span><img src="/images/admin/app/order-icon4.png"></span>&nbsp;';
+                }
+                if (in_array(100004, $st_mall)) {
+                    $image .= '<span><img src="/images/admin/app/order-icon3.png"></span>&nbsp;';
+                }
+
+                $operation = '<span><a href="javascript:void(0)" class="edit_mall" data_id="' . $mall['id'] . '">编辑</a>&nbsp;&nbsp;';
+                $operation .= '<span><a href="javascript:void(0)" class="change" data_id="' . $mall['id'] . '" data_type="' . $mall['status'] . '">' . $status . '</a>&nbsp;&nbsp;';
+                $operation .= '<a href="javascript:void(0)" class="platform" data_id="' . $mall['id'] . '">上线平台</a>&nbsp;&nbsp;';
+                $operation .= '<a href="javascript:void(0)" class="platstatus" data_id="' . $mall['id'] . '">营业状态</a>&nbsp;</span>';
+
+                $return_data[] = array(
+                    'operation' => $operation,
+                    'mall_code' => $mall['code'],
+                    'mall_name' => $mall['name'],
+                    'city' => $mall['city'],
+                    'address' => $mall['address'],
+                    'business_time' => $mall['business_time'],
+                    'app_platform' => $image,
+                    'stock_rate' => '<span>' . $mall['shar_rate'] * 100 . '&nbsp;&nbsp;<a href="javascript:void(0)" class="update" data-toggle="popover" data_type="1" data_id="' . $mall['id'] . '" data="' . $mall['shar_rate']*100 . '"><img src="/images/admin/icon/updates.png"></a></span>',
+                    'stock_limit' => '<span>' . $mall['safety_stock'] . '&nbsp;&nbsp;<a href="javascript:void(0)" class="update" data-toggle="popover" data_type="2" data_id="' . $mall['id'] . '" data="' . $mall['safety_stock'] . '"><img src="/images/admin/icon/updates.png"></a></span>',
+                    'created_time' => $mall['created_at'],
+                    'update_time' => $mall['updated_at'],
+                );
+
+            }
+
+            $result_data = [
+                'code' => 0,
+                'count' => $total,
+                'data' => $return_data
+            ];
+
+        }
+
+        return $result_data;
+
+    }
+
+    /**
+     * 门店禁用&启用
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function status(Request $request)
+    {
+
+        $request_data = $request->input('data');
+        error_log(var_export($request_data,1));
+        if (!isset($request_data) || empty($request_data)) {
+            return response()->json(['code' => 400, 'message' => '缺少参数']);
+        }
+        $mall_data = explode(',', $request_data);
+        $status = $mall_data[1] == 1 ? 0 : 1;
+        StMall::where('id', $mall_data[0])->update(['status' => $status]);
+        return response()->json(['code' => 200, 'message' => '操作成功', 'data' => []]);
+
+    }
+
+    /**
+     * 库存信息修改
+     * @param Request $request
+     * @return mixed
+     */
+    public function updateStock(Request $request)
+    {
+
+        $type = $request->input('type');
+        $mall_id = $request->input('mall_id');
+        $stock = $request->input('stock');
+        $update_stock = '';
+        $message = '';
+
+        if ($type == 1) {
+            $update_stock = 'shar_rate';
+            $stock = $stock / 100;
+            $message = '修改库存共享率成功';
+        }
+        if ($type == 2) {
+            $update_stock = 'safety_stock';
+            $message = '修改安全库存成功';
+        }
+
+        StMall::where('id', $mall_id)->update([$update_stock => $stock]);
+
+        return response()->json(['code' => 200, 'message' => $message, 'data' => []]);
+
+    }
+
+
+    /**
+     * 新增/编辑门店资料页
+     * @param Request $request
+     * @return \Illuminate\Contracts\View\Factory|\Illuminate\View\View
+     */
+    public function edit(Request $request)
+    {
+
+        $mall_id = $request->input('mall_id', '');
+
+        if (isset($mall_id) && !empty($mall_id)) {
+            $st_mall = StMall::find($mall_id);
+            $time_arr = [];
+            switch ($st_mall->business_time_type) {
+                case 0:
+                    $time_arr[] = explode('-', $st_mall->business_time);
+                    break;
+                case 1:
+                    $time_str = explode(',', $st_mall->business_time);
+                    foreach ($time_str as $k => $v) {
+                        $value = explode('-', $v);
+                        $time_arr[$k] = $value;
+                    }
+                    break;
+                default:
+                    return null;
+                    break;
+
+            }
+
+        }
+
+        return view('admin/mall/edit', [
+            'mall_id' => $mall_id,
+            'st_mall' => !empty($st_mall) ? $st_mall : '',
+            'time_arr' => !empty($time_arr) ? $time_arr : ''
+        ]);
+
+    }
+
+
+    /**
+     * 新增/编辑提交门店资料信息
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function submit(Request $request)
+    {
+
+        $request_data = $request->all();
+
+        if (!isset($request_data['mall_name']) || empty($request_data['mall_name'])) {
+            return response()->json(['code' => 400, 'message' => '门店名称不能为空']);
+        }
+
+        if (!isset($request_data['mall_code']) || empty($request_data['mall_code'])) {
+            return response()->json(['code' => 400, 'message' => '门店号不能为空']);
+        }
+
+        if (!isset($request_data['phone']) || empty($request_data['phone'])) {
+            return response()->json(['code' => 400, 'message' => '门店电话不能为空']);
+        }
+
+        if (!isset($request_data['status']) || !in_array($request_data['status'], [0, 1])) {
+            return response()->json(['code' => 400, 'message' => '营业时间不能为空']);
+        }
+
+        if ($request_data['status'] == 1) {
+
+            $start_data = $request->input('start_arr');
+            $end_data = $request->input('end_arr');
+
+            if (empty($start_data) || empty($end_data)) {
+                return response()->json(['code' => 400, 'message' => '请选择营业时间']);
+            }
+            $time_data = array_combine($start_data, $end_data);
+            $time_str = '';
+
+            foreach ($time_data as $s_time => $e_time) {
+                $time_str .= $s_time . '-' . $e_time . ',';
+            }
+        }
+
+        if (!isset($request_data['latitude']) || empty($request_data['latitude'])) {
+            return response()->json(['code' => 400, 'message' => '纬度不能为空']);
+        }
+
+        if (!isset($request_data['longitude']) || empty($request_data['longitude'])) {
+            return response()->json(['code' => 400, 'message' => '经度不能为空']);
+        }
+
+        if (!isset($request_data['province_id']) || empty($request_data['province_id'])) {
+            return response()->json(['code' => 400, 'message' => '请选择门店地址']);
+        }
+
+        if (!isset($request_data['city_id']) || empty($request_data['city_id'])) {
+            return response()->json(['code' => 400, 'message' => '请选择门店地址']);
+        }
+
+        if (!isset($request_data['address']) || empty($request_data['address'])) {
+            return response()->json(['code' => 400, 'message' => '详细地址不能为空']);
+        }
+
+        if (!isset($request_data['mall_logo']) || empty($request_data['mall_logo'])) {
+            return response()->json(['code' => 400, 'message' => '门店logo不能为空']);
+        }
+
+        $province_obj = StRegion::find($request_data['province_id']);
+        $city_obj = StRegion::find($request_data['city_id']);
+        if (empty($province_obj) || empty($city_obj)) {
+            return response()->json(['code' => 400, 'message' => '地区数据未找到']);
+        }
+
+        if (isset($request_data['county_id']) && !empty($request_data['county_id'])) {
+            $county_obj = StRegion::find($request_data['county_id']);
+        }
+
+        if (isset($request_data['mall_id']) && !empty($request_data['mall_id'])) {
+            $st_obj = StMall::find($request_data['mall_id']);
+            if (!$st_obj) {
+                return response()->json(['code' => 404, 'message' => '门店信息不存在']);
+            }
+        } else {
+            $st_obj = new StMall();
+        }
+
+        $st_obj->creator = 'system';
+        $st_obj->name = $request_data['mall_name'];
+        $st_obj->code = $request_data['mall_code'];
+        $st_obj->province = $province_obj->name;
+        $st_obj->city = $city_obj->name;
+        $st_obj->county = !empty($county_obj->name) ? $county_obj->name : '';
+        $st_obj->province_id = $request_data['province_id'];
+        $st_obj->city_id = $request_data['city_id'];
+        $st_obj->county_id = $request_data['county_id'] ? $request_data['county_id'] : '';
+        $st_obj->address = $request_data['address'];
+        $st_obj->latitude = $request_data['latitude'];
+        $st_obj->longitude = $request_data['longitude'];
+        $st_obj->address = $request_data['address'];
+        $st_obj->phone = $request_data['phone'];
+        $st_obj->business_time_type = $request_data['status'];
+        $st_obj->business_time = $request_data['status'] == 1 ? rtrim($time_str) : '00::00-23::59';
+        $st_obj->status = $request_data['status'];
+        $st_obj->logo = $request_data['mall_logo'];
+        $st_obj->shar_rate = $request_data['shar_rate'] ? $request_data['shar_rate'] : '';
+        $st_obj->safety_stock = $request_data['safety_stock'] ? $request_data['safety_stock'] : '';
+        $st_obj->save();
+
+        return response()->json(['code' => 200, 'message' => '操作成功', 'data' => []]);
+
+    }
+
+    /**
+     * 获取平台营业状态
+     * @param $mall_id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function searchStatus($mall_id)
+    {
+
+        $st_app_mall = StAppMall::select('app_id', 'status', 'o_mall_id')->where('mall_id', $mall_id)->get();
+
+        if (!$st_app_mall->isEmpty()) {
+            foreach ($st_app_mall as $mall) {
+                switch ($mall->app_id) {
+                    case "100001" :
+
+                        $mall->image = '/images/admin/app/order-icon5.png';
+                        $mall->status_name = $mall->status == 1 ? '营业中' : '暂停营业';
+                        $mall->o_id = $mall->o_mall_id;
+
+                        break;
+                    case "100002" :
+
+
+                        $mall->image = '/images/admin/app/order-icon1.png';
+                        $mall->status_name = $mall->status == 1 ? '营业中' : '暂停营业';
+                        $mall->o_id = $mall->o_mall_id;
+
+                        break;
+                    case "100003" :
+
+
+                        $mall->image = '/images/admin/app/order-icon4.png';
+                        $mall->status_name = $mall->status == 1 ? '营业中' : '暂停营业';
+                        $mall->o_id = $mall->o_mall_id;
+
+                        break;
+                    case "100004" :
+
+
+                        $mall->image = '/images/admin/app/order-icon3.png';
+                        $mall->status_name = $mall->status == 1 ? '营业中' : '暂停营业';
+                        $mall->o_id = $mall->o_mall_id;
+
+                        break;
+
+                    default:
+                        return null;
+                        break;
+                }
+            }
+        }
+
+        return response()->json(['code' => 200, 'data' => $st_app_mall]);
+
+    }
+
+    /**
+     * 获取门店绑定平台信息
+     * @param $mall_id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getPlatform($mall_id)
+    {
+
+        $st_app_mall = StAppMall::where('mall_id', $mall_id)->get();
+
+        $return_data = [
+            'publish' => [],
+            'nopublish' => []
+        ];
+
+        $app_id_arr = [];
+        foreach ($st_app_mall as $mall) {
+            $app_id_arr[] = $mall->app_id;
+            $st_app_p = StApp::where('id', $mall->app_id)->get();
+            foreach ($st_app_p as $app) {
+                $return_data['publish'][] = [
+                    'image' => $app->logo,
+                    'status_name' => '已上线',
+                    'o_id' => $mall->o_mall_id,
+                ];
+            }
+        }
+
+        $st_app_p = StApp::whereNotIn('id', $app_id_arr)->get();
+        foreach ($st_app_p as $app) {
+            $return_data['nopublish'][] = [
+                'image' => $app->logo,
+                'status_name' => '未上线',
+                'o_id' => '',
+                'app_id' => $app->id
+            ];
+        }
+
+        return response()->json(['code' => 200, 'data' => $return_data]);
+
+    }
+
+    /**
+     * 更新营业状态
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function setStatus(Request $request)
+    {
+
+        $request_data = $request->input('data', '');
+        $mall_id = $request->input('mall_id', '');
+        $st_app_mall = StAppMall::where('mall_id', $mall_id)->first();
+
+        if (!$st_app_mall) {
+            return response()->json(['code' => 404, 'message' => '店铺信息不存在']);
+        }
+
+        if (empty($request_data)) {
+            return response()->json(['code' => 400, 'message' => '参数错误']);
+        }
+
+        foreach ($request_data as $item) {
+
+            $args = [
+                'mall_id' => $st_app_mall->o_mall_id,
+                'status' => $item['status']
+            ];
+
+            StAppMall::where([['mall_id', $mall_id], ['app_id', $item['app_id']]])->update(['status' => $item['status']]);
+
+            //同步状态到平台
+            switch ($item['app_id']) {
+                case 100001:
+                    break;
+                case 100002:
+                    $res = Wm::send('100002.shop.edit_shop', $args);
+                    break;
+                case 100003:
+                    break;
+                case 100004:
+                    break;
+                default:
+                    return null;
+                    break;
+            }
+
+            if ($res['code'] != 200) {
+
+                return response()->json(['code' => 400, 'message' => $res['message']]);
+            }
+        }
+
+        return response()->json(['code' => 200, 'message' => 'ok']);
+
+    }
+
+    /**
+     * 设置营业时间段
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function setTime(Request $request)
+    {
+
+        $status = $request->input('status');
+        $mall_ids = $request->input('mall_arr', '');
+        $start_data = $request->input('start_arr', '');
+        $end_data = $request->input('end_arr', '');
+        if ($status == 0) {
+            foreach ($mall_ids as $mall_id) {
+                StMall::where('id', $mall_id)->update(['business_time_type' => $status, 'business_time' => '00:00-23:55']);
+                $st_app_mall = StAppMall::where('mall_id', $mall_id)->first();
+                if ($st_app_mall) {
+                    $res = Wm::send('100002.shop.edit_shop', ['mall_id' => $st_app_mall->o_mall_id, 'business_time' => '00:00-23:55']);
+                    if ($res['code'] != 200) {
+                        return response()->json(['code' => 400, 'message' => '操作失败']);
+                    }
+                }
+
+            }
+        } elseif ($status == 1) {
+            $time_data = array_combine($start_data, $end_data);
+            $time_str = '';
+            foreach ($time_data as $s_time => $e_time) {
+                $time_str .= $s_time . '-' . $e_time . ',';
+            }
+            foreach ($mall_ids as $mall_id) {
+                StMall::where('id', $mall_id)->update(['business_time_type' => $status, 'business_time' => rtrim($time_str, ',')]);
+                $st_app_mall = StAppMall::where('mall_id', $mall_id)->first();
+                if ($st_app_mall) {
+                    $res = Wm::send('100002.shop.edit_shop', ['mall_id' => $st_app_mall->o_mall_id, 'business_time' => rtrim($time_str, ',')]);
+                    if ($res['code'] != 200) {
+                        return response()->json(['code' => 400, 'message' => '操作失败']);
+                    }
+                }
+
+            }
+        }
+
+        return response()->json(['code' => 200, 'message' => '操作成功', 'data' => '']);
+
+    }
+
+    /**
+     * 设置上线平台
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function setOnline(Request $request)
+    {
+
+        $mall_id = $request->input('mall_id');
+        $app_ids = $request->input('app_ids');
+        $app_arr = $request->input('app_arr');
+
+        if (!isset($mall_id) || empty($mall_id)) {
+            return response()->json(['code' => 400, 'message' => '参数错误']);
+        }
+
+        $st_mall = StMall::find($mall_id);
+        if (!$st_mall) {
+            return response()->json(['code' => 404, 'message' => '门店信息不存在']);
+        }
+
+        $app_data = array_combine($app_ids, $app_arr);
+
+        foreach ($app_data as $app_id => $o_id) {
+
+            //bd
+            if ($app_id == 1 && !empty($o_id)) {
+
+            }
+
+            //ele
+            if ($app_id == 2 && !empty($o_id)) {
+
+            }
+
+            //mt
+            if ($app_id == 3 && !empty($o_id)) {
+
+                $args_data = [
+                    'app_poi_code' => $st_mall->code,
+                    'name' => $st_mall->name,
+                    'address' => $st_mall->address,
+                    'latitude' => $st_mall->latitude,
+                    'longitude' => $st_mall->longitude,
+                    'phone' => $st_mall->phone,
+                    'shipping_fee' => 0,
+                    'shipping_time' => $st_mall->business_time_type == 1 ? $st_mall->business_time : '00:00-23:55',
+                    'open_level' => 1,
+                    'is_online' => 1,
+                    'third_tag_name' => ''
+                ];
+                $res = Wm::send('MtFood.shop.createShop', $args_data);
+
+                error_log('======测试绑定平台 test');
+                error_log(var_export($res, 1));
+                if ($res['code'] == 200) {
+                    $st_app_mall = new StAppMall();
+                    $st_app_mall->creator = 'mtfood-api';
+                    $st_app_mall->mall_id = $st_mall->id;
+                    $st_app_mall->mall_name = $st_mall->name;
+                    $st_app_mall->mall_code = $st_mall->code;
+                    $st_app_mall->status = 1;
+                    $st_app_mall->online_status = 0;
+                    $st_app_mall->app_id = $app_id;
+                    $st_app_mall->o_mall_id = '';
+                    $st_app_mall->save();
+                }
+            }
+
+            //jd
+            if ($app_id == 4 && !empty($o_id)) {
+
+                $args_data = [
+                    'stationName' => $st_mall->name,
+                    'outSystemId' => $o_id,
+                    'phone' => $st_mall->phone,
+                    'city' => 1,
+                    'county' => 1,
+                    'stationAddress' => $st_mall->address,
+                    'operator' => 'jd-api',
+                    'serviceTimeStart1' => '',
+                    'serviceTimeEnd1' => '',
+                    'lat' => $st_mall->latitude,
+                    'lon' => $st_mall->longitude,
+                    'coordinateType' => '',
+                    'standByPhone' => ''
+                ];
+                $res = Wm::send('jddj.shop.creat_shop', $args_data);
+            }
+
+        }
+
+        return response()->json(['code' => $res['code'], 'message' => $res['message']]);
+
+    }
+
+    /**
+     * 地区三级联动
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function searchRegion(Request $request)
+    {
+
+        $id = $request->input('id');
+        $st_region = StRegion::where(['status' => 1, 'p_id' => $id])->orderBy('sort', 'asc')->get();
+        return response()->json(['code' => 200, 'message' => 'ok', 'data' => $st_region]);
+
+    }
+
+    /**
+     * 商品导入模板下载
+     * @return \Symfony\Component\HttpFoundation\BinaryFileResponse
+     */
+    public function download(){
+
+        return response()->download(public_path().'/mall_master.xls', '门店导入模板.xls');
+    }
+
+
+}

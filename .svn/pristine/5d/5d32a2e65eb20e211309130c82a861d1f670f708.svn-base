@@ -1,0 +1,47 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
+
+use App\Models\StApp;
+use App\Services\Order\OrderSearchService;
+
+
+class OrderController extends Controller
+{
+
+
+    //订单列表
+    public function index(Request $request)
+    {
+
+        $order_type = $request->input('anchor', 1);
+        return view('admin/order/index', ['type' => $order_type]);
+
+    }
+
+
+    //订单列表数据查询
+    public function search()
+    {
+
+        $result_app = StApp::where('enable', 1)->get();
+        return view('admin/order/search', ['app_list' => $result_app]);
+
+    }
+
+
+    //订单详情
+    public function detail($id)
+    {
+
+        $order_search = new OrderSearchService();
+        $order_result = $order_search->detail($id);
+        return view('admin/order/detail', $order_result['data']);
+
+    }
+
+
+}

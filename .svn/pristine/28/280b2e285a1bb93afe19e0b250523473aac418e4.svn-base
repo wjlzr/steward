@@ -1,0 +1,120 @@
+<?php
+
+namespace App\Http\Controllers\Api\Eoa;
+
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+
+use App\Models\Eoa\App;
+use App\Models\Eoa\AppPush;
+use GuzzleHttp\Client;
+
+
+class SystemController extends Controller
+{
+
+
+    /**
+     * 应用消息推送
+     * @param Request $request
+     * @return array|\Illuminate\Http\JsonResponse
+     */
+    public function appMsgPush(Request $request)
+    {
+
+        $project_id = $request->input('project_id');
+        $action = $request->input('action');
+        $message = $request->input('message');
+
+        if (empty($project_id)) {
+            return response()->json(['code'=>400, 'message'=>'缺少必要参数：project_id']);
+        }
+
+        if (empty($action)) {
+            return response()->json(['code'=>400, 'message'=>'缺少必要参数：action']);
+        }
+
+        if (empty($message)) {
+            return response()->json(['code'=>400, 'message'=>'缺少必要参数：message']);
+        }
+
+        $client = new Client();
+
+        $app_id_array = [];
+        $push_url_array = [];
+
+        $app = $app = App::where(['project_id'=>$project_id, 'enable'=>1])->get();
+        if ($app->count() > 0) {
+
+            foreach($app as $a) {
+                $app_id_array[] = $a->id;
+                $push_url_array[$a->id] = $a->push_url;
+            }
+
+            $app_push = AppPush::where('action', $action)
+                ->whereIn('app_id', $app_id_array)
+                ->get();
+
+        }
+
+        if (isset($app_push) && $app_push->count() > 0) {
+
+            $post_data = [
+                'appId' => $app->id,
+                'timestamp' => time(),
+                'action' => $action,
+                'message' => json_encode($message)
+            ];
+
+            foreach($app_push as $push) {
+
+                $post_data['sign'] = $this->autograph($post_data, $app->secret);
+                $request = $client->request('POST', $push_url_array[$push->app_id], [
+                    'form_params' => $post_data
+                ]);
+                if ($request->getStatusCode() != 200) {
+                    return ['code' => $request->getStatusCode(), 'message' => '请求失败'];
+                }
+
+                $res_content = $request->getBody()->getContents();
+                $res = json_decode($res_content, true);
+                if (isset($res['data']) && $res['data'] == 'ok') {
+                    error_log('ok record!');
+                } else {
+                    error_log('error record!');
+                }
+
+            }
+
+        }
+
+        return response()->json(['code'=>200, 'message'=>'发送成功']);
+
+    }
+
+
+    /**
+     * 推送验证签名
+     * @param $data
+     * @param $secret
+     * @return string
+     */
+    private function autograph($data, $secret)
+    {
+
+        ksort($data);
+        $sign_str = '';
+
+        foreach ($data as $k => $v) {
+            if ($v != '')
+                continue;
+            $sign_str .= $k . '=' . $v;
+        }
+
+        $sign_str .= $secret;
+        return strtoupper(md5($sign_str));
+
+    }
+
+
+}

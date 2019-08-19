@@ -1,0 +1,176 @@
+<?php
+namespace App\Services\Wm;
+
+
+interface GoodsFactoryInterface
+{
+
+    /**
+     * 获取店铺商品分类
+     * @param $args = [
+     *      'shop_id' => string 外卖店铺id
+     * ]
+     * @return mixed
+     */
+    public function get_shop_categories($args);
+
+    /**
+     * 添加商品分类
+     * @param $args = [
+     *      'mall_id' => 门店id
+     *      'category_id' => 分类id
+     *      'category_name' => 分类名称
+     *      'level' => 级别
+     *      'sort' => 排序
+     *      'parent_id' => 父级id
+     * ]
+     * @return mixed
+     */
+    public function create_category($args);
+
+    /**
+     * 修改商品分类
+     * @param $args = [
+     *      'mall_id' => int 门店ID【必须】
+     *      'o_mall_id' => string 平台门店标识【必须】
+     *      'category_id' => string 分类ID【必须】
+     *      'category_name' => string 分类名称【必须】
+     *      'category_old_name' => string 原分类名称【必须】
+     *      'description' => string 分类描述【选填】
+     * ]
+     * @return mixed
+     */
+    public function update_category($args);
+
+    /**
+     * 删除商品分类
+     * @param $args = [
+     *      'category_id' => int 商家外卖商品分类id
+     * ]
+     * @return mixed
+     */
+    public function delete_category($args);
+
+    /**
+     * 获取商品列表信息
+     * @param $args = [
+     *      'shop_id' => string 店铺id,
+     *      'page' => int 当前分页
+     *      'page_size' => int 分页条数（默认20）
+     * ]
+     * @return mixed
+     */
+    public function get_shop_product($args);
+
+    /*
+     * 添加商品
+     * @param array $args = [
+     *      'mall_id' => string 商家门店ID
+     *      'category_id' => int 商家外卖分类id
+     *      'goods_name' => string 商家外卖商品名称
+     *      'goods_image' => string 商品图片
+     *      'goods_id' => int 商家主商品id(大于等于0)
+     *      'spec' => [
+     *          [
+     *              'spec_id' => int 规格ID
+     *              'name' => string 商家商品规格商品名
+     *              'price' => string 商家商品规格商品价
+     *              'stock' => int 商家商品规格商品库存
+     *              'product_code' => string 商家商品编号
+     *              'upc' => string 商家商品条码
+     *          ]
+     *      ]
+     * ]
+     */
+    public function create_product($args);
+
+    /*
+     * 编辑商品
+     * @param array $args = [
+     *      'mall_id' => string 商家门店ID
+     *      'category_id' => int 商家外卖分类id
+     *      'goods_name' => string 商家外卖商品名称
+     *      'goods_id' => int 商家主商品id(大于等于0)
+     *      'spec' => [
+     *          [
+     *              'spec_id' => int 规格ID
+     *              'name' => string 商家商品规格商品名
+     *              'price' => string 商家商品规格商品价
+     *              'product_code' => string 商家商品编号
+     *              'upc' => string 商家商品条码
+     *              'stock' => int 库存数量
+     *              'weight' => string 重量
+     *          ]
+     *      ]
+     * ]
+     */
+    public function update_product($args);
+
+    /**
+     * 批量新增商品
+     * @param $args
+     * @return mixed
+     */
+    public function batch_create_product($args);
+
+    /**
+     * 批量编辑商品
+     * @param $args
+     * @return mixed
+     */
+    public function batch_update_product($args);
+
+    /**
+     * 批量上下架商品
+     * @param array $args = [
+     *      'is_shelf' => int 上下架：0、下架 1、上架
+     *      'mall_id' => int 门店id
+     *      'goods' => [
+     *           $goods_id
+     *      ]
+     * ]
+     * @return mixed
+     */
+    public function batch_update_self($args);
+
+    /**
+     * 批量修改商品价格
+     * @param $args = [
+     *      'mall_code' => string 门店编号
+     *      'goods' => [
+     *          $goods_id => [
+     *              $spec_id => $price
+     *          ]
+     *      ]
+     * ]
+     * @return mixed
+     */
+    public function batch_update_price($args);
+
+    /**
+     * 批量修改商品库存
+     * @param $args = [
+     *      'mall_id' => $mall_id
+     *      'goods' => [
+     *          $goods_id => [
+     *              $spec_id => $stock
+     *          ]
+     *      ]
+     * ]
+     * @return mixed
+     */
+    public function batch_update_stock($args);
+
+    /**
+     * 批量删除商品
+     * @param array $args = [
+     *      'mall_code' => string 门店编号
+     *      'goods' => [
+     *          $goods_id
+     *      ]
+     * ]
+     * @return mixed
+     */
+    public function batch_delete_goods($args);
+
+}

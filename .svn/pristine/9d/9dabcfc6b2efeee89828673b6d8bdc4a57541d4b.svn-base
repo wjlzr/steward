@@ -1,0 +1,47 @@
+<?php
+
+use Illuminate\Http\Request;
+
+/*
+|--------------------------------------------------------------------------
+| API Routes
+|--------------------------------------------------------------------------
+|
+| Here is where you can register API routes for your application. These
+| routes are loaded by the RouteServiceProvider within a group which
+| is assigned the "api" middleware group. Enjoy building your API!
+|
+*/
+
+Route::middleware('auth:api')->get('/user', function (Request $request) {
+    return $request->user();
+});
+
+Route::get('/open/eleme/push', 'Receive/EleMeController@index');
+Route::get('/open/eleme/callback', 'Receive/EleMeController@callback');
+
+Route::middleware(['api.service'])->group(function () {
+
+    Route::get('/user/login', 'Api\User\UserController@login');
+
+    Route::get('/order/index', 'Api\Order\OrderController@index');
+    Route::get('/order/search', 'Api\Order\OrderController@search');
+    Route::get('/order/detail/{id}', 'Api\Order\OrderController@detail');
+    Route::get('/order/receive', 'Api\Order\OrderController@receive');
+    Route::get('/order/agree_refund', 'Api\Order\OrderController@agreeRefund');
+    Route::get('/order/disagree_refund', 'Api\Order\OrderController@disagreeRefund');
+    Route::get('/order/delivery', 'Api\Order\OrderController@delivery');
+    Route::get('/order/cancel', 'Api\Order\OrderController@cancel');
+    Route::get('/order/complete', 'Api\Order\OrderController@complete');
+    Route::get('/order/reply_remind', 'Api\Order\OrderController@replyRemind');
+    Route::get('/order/hang_up', 'Api\Order\OrderController@hangUp');
+    Route::get('/order/cancel_hang_up', 'Api\Order\OrderController@cancelHangUp');
+    Route::get('/order/packs', 'Api\Order\OrderController@packs');
+    Route::get('/order/complete_packs', 'Api\Order\OrderController@completePacks');
+    Route::get('/order/prompts', 'Api\Order\OrderController@prompts');
+    Route::post('/order/prints', 'Api\Order\OrderController@prints');
+
+    Route::any('/ele/callback', 'Receive\EleMeController@callback');
+    Route::any('/ele/push', 'Receive\EleMeController@index');
+
+});

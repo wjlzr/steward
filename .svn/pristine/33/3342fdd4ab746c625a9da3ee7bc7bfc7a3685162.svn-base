@@ -1,0 +1,238 @@
+/*公共*/
+a {
+    text-decoration: none;
+    color: #000
+}
+* {
+    margin: 0;
+    padding: 0
+}
+/*订单*/
+em,i{
+    font-style: normal;
+}
+.order-list-detail li{
+    cursor: normal;
+}
+.top-item{
+    margin-bottom:10px;
+}
+.top-item span.order-num{
+    margin-left:10px;
+}
+.order-detail-content{
+    border-bottom: 1px solid #eee;
+    overflow: hidden;
+    zoom:1;
+}
+.shop-list{
+    width: 70%;
+    float: left;
+    padding:20px 1% 0;
+    *width: 68%;
+}
+.cart-list{
+    float: left;
+    width:30%;
+    *width: 26%;
+    padding: 20px 2% 40px;
+    border-left:1px solid #eee;
+    margin-right:-1px;
+}
+.body-title{
+    background: #fbfbfb;
+    padding: 0 20px;
+    line-height: 45px;
+}
+
+.order-title p span{
+    font-size: 14px;
+}
+.order-title p:first-child{
+    width: 60%;
+    text-align: left;
+}
+.shop-tab{
+    overflow: auto;
+}
+.shop-tab li{
+    border-bottom:1px solid #eee;
+    height: 100px;
+    padding: 0 20px;
+    white-space: nowrap;
+    min-width: 800px;
+}
+.shop-tab>li:first-child{
+    height: 40px;
+    line-height: 40px;
+}
+.shop-tab li .top-th{
+    width:10%;
+    display: inline-block;
+    text-align: right;
+    min-width: 80px;
+}
+.shop-tab li .top-th:first-child{
+    width: 60%;
+    text-align: left;
+}
+.list-shop-li{
+    width:10%;
+    height:100px;
+    line-height:100px;
+    display: inline-block;
+    text-align: center;
+    min-width: 80px;
+    zoom:1;
+    *display: inline;
+    text-align: right;
+}
+.list-shop-li:first-child{
+    width:60%;
+    text-align: left;
+}
+.goods-item{
+    float: left;
+    width: 60%;
+    line-height:100px;
+}
+.goods-name{
+    height:100px;
+    overflow: hidden;
+    white-space: normal;
+    margin-left:5px;
+}
+.goods-item:first-child{
+    width:80px;
+}
+.list-shop-li:first-child .goods-name{
+    line-height:25px;
+    vertical-align: middle;
+    display: inline-block;
+    zoom:1;
+    *display: inline;
+}
+.goods-item span{
+    /*line-height: 25px;*/
+    vertical-align: middle;
+    display: inline-block;
+    zoom:1;
+    *display: inline;
+}
+.total{
+    float: right;
+    width:220px;
+    margin-top:20px;
+    padding-right: 40px;
+}
+.total p{
+    line-height: 20px;
+    text-align: right;
+}
+.total .text{
+    float: left;
+}
+.total .value{
+    top:0;
+    right:0;
+    line-height:20px;
+    margin:0;
+    padding:0;
+}
+.distru-box{
+    border-bottom:1px solid #eee;
+    padding: 20px;
+}
+.distru-box p{
+    line-height: 26px;
+
+}
+.distru-box p .phone, .distru-box p .name{
+    font-size:16px;
+}
+.distru-box span{
+    margin-right: 10px;
+}
+.gray-text-sm{
+    color: #999;
+    font-size: 12px;
+}
+.logistics{
+    padding:20px;
+}
+.logistics-list{
+    position: relative;
+}
+.logistics-list li{
+    padding: 10px 0;
+    position: relative;
+}
+.logistics-list li .border-line-top{
+    border-left:1px solid #eee;
+    width:1px;
+    height:50%;
+    position: absolute;
+    top:0;
+    left:10px;
+}
+.logistics-list li .border-line-bot{
+    border-left:1px solid #eee;
+    width:1px;
+    height:50%;
+    position: absolute;
+    bottom:0;
+    left:10px;
+}
+.logistics-list li .circle{
+    font-size:60px;
+    line-height:30px;
+    position: absolute;
+    top:0;
+    left: 4px;
+    background: url("/images/admin/circle.png") no-repeat center center;
+    -webkit-background-size: 6px;
+    background-size: 6px;
+    width:12px;
+    height:100%;
+    z-index:1000;
+}
+.logistics-list li.on .circle{
+    font-size:60px;
+    line-height:30px;
+    position: absolute;
+    top:0;
+    left: 4px;
+    background: url("/images/admin/circle-light.png") no-repeat center center;
+    -webkit-background-size: 12px;
+    background-size: 12px;
+    width:12px;
+    height:100%;
+    z-index:1000;
+}
+.logistics-list li.on .active{
+    color: #5f8af7;
+}
+.logistics-list li.on .border-line-bot{
+    border-left:none;
+}
+.logistics-list li:first-child .border-line-top{
+    border-left:none;
+}
+/*.logistics-list>li+li .border-line-top{*/
+    /*top:-50%;*/
+/*}*/
+/*.logistics-list>li+li .border-line-bot{*/
+    /*top:0;*/
+/*}*/
+.text-box{
+    margin-left: 25px;
+}
+
+.mid-info{
+    float: left;
+    margin-top: 35px;
+    padding-left: 50px;
+}
+.mid-info p{
+    color: #898787;
+}

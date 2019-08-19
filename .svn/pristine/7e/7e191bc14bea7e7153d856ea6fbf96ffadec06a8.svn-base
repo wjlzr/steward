@@ -1,0 +1,26 @@
+<?php
+
+namespace App\Http\Controllers\Api\Mall;
+
+use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
+
+use App\Services\Mall\MallSearchService;
+
+
+class MallController extends Controller
+{
+
+
+    //ÃÅµêÁĞ±íËÑË÷
+    public function search(Request $request)
+    {
+
+        $mall_search = new MallSearchService();
+        $mall_result = $mall_search->search($request->input());
+        return $mall_result;
+
+    }
+
+
+}

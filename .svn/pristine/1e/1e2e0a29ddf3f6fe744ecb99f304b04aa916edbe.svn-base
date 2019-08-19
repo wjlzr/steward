@@ -1,0 +1,208 @@
+@extends('admin.layoutList')
+@section('css')
+    <style>
+        .col-extend-css {
+            width:100%;
+            text-align: left;
+        }
+        .app-content{
+            min-height:0px;
+        }
+    </style>
+@endsection
+@section('title')
+    <li class="cur">
+        <span>选择商品</span>
+    </li>
+@endsection
+
+@section('search')
+    <div class="form-group" >
+        <label for="app_name">商家编码：</label>
+        <input style="width: 125px" type="text" class="form-control" name="product_code" id="product_code">&nbsp;&nbsp;
+    </div>
+    <div class="form-group" >
+        <label for="mall_code">商品名称：</label>
+        <input style="width: 125px" type="text" class="form-control" name="goods_name" id="goods_name">
+    </div>
+    <div class="form-group" >
+        <label for="mall_name">商品分类：</label>
+        <select class="form-control" id="bigCategory" name="bigCategory">
+            <option value="0">请选择</option>
+        </select>
+        <select class="form-control" id="midCategory" name="midCategory" style="display: none;">
+            <option value="0">请选择</option>
+        </select>
+        <select class="form-control" id="smallCategory" name="smallCategory" style="display: none;">
+            <option value="0">请选择</option>
+        </select>
+    </div>
+
+@endsection
+
+@section('extend-content')
+    <div class="bottom_fixbox">
+        <div class="rectbox tac" style="text-align: center;margin-top: 60px;">
+            <input type="button" id="select-goods" class="btn btn-primary" style="margin-right: 20px" value="选择" />
+            <input type="button" class="btn btn-default" id="goods-cancel-btn" value="关闭">
+        </div>
+    </div>
+@endsection
+
+@section('js')
+    <script type="text/javascript">
+
+        var bootstrap_table_ajax_url = '/admin/plugin/search';
+        bootstrap_table({
+            sortName : 'updated_at',
+            sortOrder : 'desc',
+            columns: [ //字段
+                { title: 'checkStatus',checkbox : true},
+                { title: '商品编码',  field: 'product_code', align: 'left' },
+                { title: '商品名称', field: 'goods_name', align: 'left', width:'180px' },
+                { title: '规格', field: 'spec', align: 'left', width:'100px' },
+                { title: '大分类', field: 'big_category', align: 'left', width:'140px' },
+                { title: '中分类', field: 'mid_category', align: 'left', width:'140px' },
+                { title: '小分类', field: 'small_category', align: 'left', width:'140px' }
+            ]
+        });
+
+        $(function () {
+
+            var category_data = JSON.parse('{!! $category_data !!}');
+
+            if (category_data.length != 0) {
+                $.each(category_data,function(k,v){
+                    $('#bigCategory').append('<option value="' + v.bigCategoryID + '">' + v.categoryName + '</option>')
+                });
+            }
+
+            $(document).on('change', '#bigCategory', function () { //切换商品大分类
+
+                $('#midCategory').html('<option value="0">请选择</option>').hide();
+                $('#smallCategory').html('<option value="0">请选择</option>').hide();
+
+                var id = $(this).val();
+
+                if (id > 0) {
+
+                        if( !$.isEmptyObject(category_data[id]['mid'])){
+
+                        var mid_categry_data = category_data[id]['mid'];
+                        $.each(mid_categry_data, function (k, v) {
+                            $('#midCategory').append('<option value="' + v.midCategoryID + '">' + v.categoryName + '</option>');
+                        });
+
+                        $('#midCategory').show();
+                    }
+
+                }
+
+            }).on('change', '#midCategory', function () { //切换商品中分类
+
+                $('#smallCategory').html('<option value="0">请选择</option>').hide();
+
+                var id = $(this).val();
+
+                if (id > 0) {
+
+                    var big_id = $('#bigCategory').val();
+
+                    if( !$.isEmptyObject(category_data[big_id]['mid'][id]['small'])){
+
+                        //小分类数据
+                        var small_categry_data = category_data[big_id]['mid'][id]['small'];
+
+                        $.each(small_categry_data, function (k, v) {
+                            $('#smallCategory').append('<option value="' + v.smallCategoryID + '">' + v.categoryName + '</option>');
+                        });
+                        $('#smallCategory').show();
+
+                    }
+
+                }
+
+            });
+
+            $(document).on('click','#re-set',function(){
+                $('#midCategory').hide();
+                $('#smallCategory').hide();
+            }).on('click','#goods-cancel-btn',function(){
+                goods.close();
+            });
+
+            var goods = {
+
+                check_data: {},
+
+                choose_num: 0,
+
+                close: function () {
+                    var index = parent.layer.getFrameIndex(window.name);
+                    parent.layer.close(index);
+                }
+            };
+
+            //选择商品
+            $(document).on('click','#select-goods',function(){
+
+                var _num = 0;
+
+                var dt = {
+                    'id_arr' : []
+                };
+
+                $('.selected').each(function(){
+                    _num = 1;
+
+                    var id = $(this).find('span').attr('data-id');
+
+                    dt.id_arr.push(id);
+                });
+
+                if (!_num) {
+                    layer.alert('请选择商品',{icon:2,time:1500});
+                    return false;
+                }
+
+                $.ajax({
+                    type:'GET',
+                    url:'/admin/plugin/goods',
+                    data: dt,
+                    dataType: 'json',
+                    success: function (obj) {
+                        if(obj.code == 200){
+                            $.each(obj.data,function(k,v){
+                                goods.check_data[v.id] = {
+                                    id: v.id,
+                                    goods_id: v.goods_id,
+                                    name: v.name,
+                                    price: v.price,
+                                    spec: v.spec,
+                                    status: v.status,
+                                    sku: v.sku,
+                                    upc: v.upc,
+                                    sku_spec: v.sku_spec,
+                                    big_category_id: v.big_category_id,
+                                    big_category_name: v.big_category_name,
+                                    mid_category_id: v.mid_category_id,
+                                    mid_category_name: v.mid_category_name,
+                                    small_category_id:v.small_category_id,
+                                    small_category_name:v.small_category_name,
+                                    brand:v.brand,
+                                    unit:v.unit
+                                };
+                                goods.choose_num = k + 1;
+                            });
+                        }
+                    },
+                    complete: function(){
+                        parent.plugin.goods(goods.check_data,goods.choose_num);
+                        goods.close();
+                    }
+                });
+            });
+        });
+
+    </script>
+@endsection

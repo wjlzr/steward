@@ -1,0 +1,80 @@
+<?php
+
+namespace App\Http\Controllers\Admin\Goods;
+
+
+use App\Models\Goods\StGoods;
+use App\Models\Goods\StGoodsSale;
+use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\DB;
+
+
+class GoodsController extends Controller
+{
+
+
+    //商品资料列表首页
+    public function index(Request $request)
+    {
+
+        return view('admin/goods/index', []);
+
+    }
+
+
+    //商品列表数据查询
+    public function search(Request $request)
+    {
+
+        $st_goods = StGoods::orderBy($request->input('sort'), $request->input('order'))
+                            ->paginate($request->input('limit'), ['*'], '', $request->input('offset') / 10 + 1 )
+                            ->toArray();
+
+        //返回数组
+        $result_data = [
+            'total' => 0,
+            'rows' =>[]
+        ];
+
+        if( !empty($st_goods)){
+
+            $result_data['total'] = $st_goods['total'];
+
+            foreach ( $st_goods as $goods){
+
+                $st_goods_sale = StGoodsSale::select('sku','upc',DB::raw(' max(price) as max_price, min(price) as min_price ,max(weight) as max_weight ,min(weight) as min_weight'))
+                                            ->where('goods_id',$goods->id)
+                                            ->get();
+
+                if( !$st_goods_sale->isEmpty()){
+
+                    $sku =
+                }
+            }
+        }
+
+
+        return response()->json(['code'=>200, 'message'=>'ok', 'data'=>[]]);
+
+    }
+
+
+    //新增/编辑商品资料页
+    public function edit()
+    {
+
+        return view('admin/mall/index', []);
+
+    }
+
+
+    //新增/编辑提交商品资料信息
+    public function submit()
+    {
+
+        return response()->json(['code'=>200, 'message'=>'ok', 'data'=>[]]);
+
+    }
+
+}

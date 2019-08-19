@@ -1,0 +1,322 @@
+<?php
+
+namespace App\Http\Controllers\Api\Order;
+
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+
+use App\Services\Order\OrderSearchService;
+use App\Services\Order\OrderEditService;
+use App\Services\Order\OrderSubmitService;
+
+
+class OrderController extends Controller
+{
+
+
+    /**
+     * 订单创建接口
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function add(Request $request)
+    {
+
+        $order_submit = new OrderSubmitService();
+        $order_result = $order_submit->add($request->input('order_index'));
+        return response()->json($order_result);
+
+    }
+
+
+    /**
+     * 订单列表接口
+     * @param Request $request
+     * @return array
+     */
+    public function index(Request $request)
+    {
+        
+        error_log('=======//订单列表');
+
+        $list_type = $request->input('list_type', 0);
+        $app_id = $request->input('app_id', 0);
+        $mall_id = $request->input('mall_id', 0);
+        $page_size = $request->input('page_size', 10);
+        $app_client = $request->input('app_client', 0);
+
+        $order_search = new OrderSearchService();
+        $order_result = $order_search->index($list_type, $mall_id, $page_size, $app_id, $app_client);
+        return response()->json([ 'code'=>200, 'message'=>'ok', 'data'=>$order_result ]);
+
+    }
+
+
+    /**
+     * 订单列表数据查询
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function search(Request $request)
+    {
+
+        $order_search = new OrderSearchService();
+        $order_result = $order_search->search($request->input());
+        return response()->json(['code'=>200, 'message'=>'ok', 'data'=>$order_result]);
+
+    }
+
+
+    /**
+     * 订单详情接口
+     * @param Request $request
+     * @return mixed
+     */
+    public function detail(Request $request)
+    {
+        $id = $request->input('order_id');
+
+        $order_search = new OrderSearchService();
+        $order_result = $order_search->detail($id);
+        return response()->json($order_result);
+
+    }
+
+
+    /**
+     * 获取提醒订单接口
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function prompts(Request $request)
+    {
+
+        $client = $request->input('app_client', 0);
+        $devices = $request->input('devices', '');
+
+        $order_search = new OrderSearchService();
+        $order_result = $order_search->prompts($client, $devices);
+        return response()->json(['code'=>200, 'data'=>$order_result]);
+
+    }
+
+
+    /**
+     * 订单自动接单接口
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function auto_receive(Request $request)
+    {
+
+        $order_ids = $request->input('order_ids', '');
+        $client = $request->input('app_client', 0);
+        $device = $request->input('device', '');
+
+        $order_edit = new OrderEditService();
+        $order_result = $order_edit->autoReceive($order_ids, $client, $device);
+        return response()->json(['code'=>200, 'data'=>$order_result]);
+
+    }
+
+
+    /**
+     * 订单接单
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function receive(Request $request)
+    {
+        $order_id = $request->input('order_id');
+        $user_name = $request->input('user_name');
+
+        $order_edit = new OrderEditService();
+        $order_result = $order_edit->receive($order_id, $user_name);
+        return json_encode($order_result);
+
+    }
+
+
+    /**
+     * 同意申请取消单/退单接口
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function agreeRefund (Request $request)
+    {
+
+        $order_id = $request->input('order_id');
+        $user_name = $request->input('user_name');
+
+        $order_edit = new OrderEditService();
+        $order_result = $order_edit->agreeRefund($order_id, $user_name);
+        return response()->json($order_result);
+
+    }
+
+
+    /**
+     * 不同意申请接口
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function disagreeRefund (Request $request)
+    {
+
+        $order_id = $request->input('order_id');
+        $user_name = $request->input('user_name');
+        $refuse_reason = $request->input('refuse_reason', '');
+
+        $order_edit = new OrderEditService();
+        $order_result = $order_edit->disagreeRefund($order_id, $refuse_reason, $user_name);
+        return response()->json($order_result);
+
+    }
+
+
+    /**
+     * 订单发货接口
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function delivery(Request $request)
+    {
+
+        $order_id = $request->input('order_id');
+        $user_name = $request->input('user_name');
+
+        $order_edit = new OrderEditService();
+        $order_result = $order_edit->delivery($order_id, $user_name);
+        return response()->json($order_result);
+
+    }
+
+
+    /**
+     * 订单取消接口
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function cancel(Request $request)
+    {
+
+        $order_id = $request->input('order_id');
+        $user_name = $request->input('user_name');
+        $reason = $request->input('reason', '');
+        $reason_id = $request->input('reason_id', 0);
+
+        $order_edit = new OrderEditService();
+        $order_result = $order_edit->cancel($order_id, $reason_id, $reason, $user_name);
+        return response()->json($order_result);
+
+    }
+
+
+    /**
+     * 订单完成接口
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function complete(Request $request)
+    {
+
+        $order_id = $request->input('order_id');
+        $user_name = $request->input('user_name');
+
+        $order_edit = new OrderEditService();
+        $order_result = $order_edit->complete($order_id, $user_name);
+        return response()->json($order_result);
+
+    }
+
+
+    /**
+     * 回复催单接口
+     * @param $request
+     * @return array
+     */
+    public function replyRemind (Request $request) {
+
+        $order_id = $request->input('order_id');
+        $user_name = $request->input('user_name');
+        $reply_content = $request->input('reply_content', '');
+
+        $order_edit = new OrderEditService();
+        $order_result = $order_edit->replyRemind($order_id, $reply_content, $user_name);
+        return response()->json($order_result);
+
+    }
+
+
+    /**
+     * 挂起订单接口
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function hangUp(Request $request)
+    {
+
+        $order_id = $request->input('order_id');
+        $user_name = $request->input('user_name');
+
+        $order_edit = new OrderEditService();
+        $order_result = $order_edit->hangUp($order_id, $user_name);
+        return response()->json($order_result);
+
+    }
+
+    /**
+     * 订单取消挂起
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function cancelHangUp(Request $request)
+    {
+
+        $order_id = $request->input('order_id');
+        $user_name = $request->input('user_name');
+
+        $order_edit = new OrderEditService();
+        $order_result = $order_edit->cancelHangUp($order_id, $user_name);
+        return response()->json($order_result);
+
+    }
+
+
+    /**
+     * 订单配货接口
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function packs(Request $request)
+    {
+
+        $order_id = $request->input('order_id');
+        $user_name = $request->input('user_name');
+
+        $order_edit = new OrderEditService();
+        $order_result = $order_edit->packs($order_id, $user_name);
+        return response()->json($order_result);
+
+    }
+
+
+    /**
+     * 配货完成接口
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function completePacks(Request $request)
+    {
+
+        $order_id = $request->input('order_id');
+        $user_name = $request->input('user_name');
+
+        $order_edit = new OrderEditService();
+        $order_result = $order_edit->completePacks($order_id, $user_name);
+        return response()->json($order_result);
+
+    }
+
+
+}

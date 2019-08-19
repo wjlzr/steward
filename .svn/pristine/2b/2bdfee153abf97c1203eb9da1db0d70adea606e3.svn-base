@@ -1,0 +1,217 @@
+<?php
+
+namespace App\Services\Order;
+
+use App\Models\Order\StOrder;
+use App\Models\Order\StOrderGoods;
+use App\Models\Order\StOrderTrace;
+use App\Models\Goods\StGoodsSale;
+use App\Models\StApp;
+use App\Models\Mall\StMall;
+use App\Models\User\StUser;
+use App\Services\LbsMapService;
+
+use Mockery\CountValidator\Exception;
+use Illuminate\Support\Facades\Redis as Redis;
+use DB;
+use Wm;
+
+
+class OrderSubmitService
+{
+
+    const BD_LBS_AK = 'mGi6xeiGPBvUmcVGuys1fhvO';
+
+
+    /**
+     * 订单创建
+     * @param $order_index
+     * @return array|\Illuminate\Http\JsonResponse
+     */
+    public function add($order_index)
+    {
+
+        $order_json = Redis::get($order_index);
+        $order_data = json_decode($order_json, true);
+
+        $app_id = $order_data['app_id'];
+        $operator = $order_data['operator'];
+
+        $mall_act_fee = isset($order_data['mall_act_fee'])
+            ? $order_data['mall_act_fee']
+            : 0;
+
+        $app_act_fee = isset($order_data['app_act_fee'])
+            ? $order_data['app_act_fee']
+            : 0;
+
+        $points_fee = isset($order_data['points_fee'])
+            ? $order_data['points_fee']
+            : 0;
+
+        $balance_fee = isset($order_data['balance_fee'])
+            ? $order_data['balance_fee']
+            : 0;
+
+        $card_fee = isset($order_data['card_fee'])
+            ? $order_data['card_fee']
+            : 0;
+
+        $discount_fee = $points_fee + $balance_fee;
+
+        $app = StApp::find($app_id);
+        if (!$app) {
+            return $this->log_write('应用平台信息没有找到');
+        }
+
+        $mall = StMall::where('code', $order_data['mall_code'])->first();
+        if (!$mall) {
+            return $this->log_write('门店信息没有找到');
+        }
+
+        $lbs_map = new LbsMapService();
+
+        $map_result = $lbs_map->reverseAddress($order_data['deliver_lat'], $order_data['deliver_lng']);
+        $map_result = $map_result['data'];
+
+        $order = new StOrder();
+        $order->creator = $operator;
+        $order->app_order_id = $order_data['order_id'];
+        $order->day_sequence = $order_data['day_sequence'];
+        $order->status = 0;
+        $order->total_fee = 0;
+        $order->user_fee = $order_data['user_fee'];
+        $order->order_fee = $order_data['order_fee'];
+        $order->mall_fee = $order_data['mall_fee'];
+        $order->service_fee = $order_data['service_fee'];
+        $order->mall_act_fee = $mall_act_fee;
+        $order->app_act_fee = $app_act_fee;
+        $order->discount_fee = $discount_fee;
+        $order->points_fee = $points_fee;
+        $order->balance_fee = $balance_fee;
+        $order->card_fee = $card_fee;
+        $order->package_fee = $order_data['package_fee'];
+        $order->freight_fee = $order_data['freight_fee'];
+        $order->pay_type = 2;
+        $order->pacakge_weight = 0;
+        $order->total_goods_number = 0;
+        $order->mall_id = $mall->id;
+        $order->mall_name = $mall->name;
+        $order->mall_code = $mall->name;
+        $order->send_time = $order_data['send_time'];
+        $order->send_type = 1;
+        $order->province_id = $map_result['province_id'];
+        $order->city_id = $map_result['city_id'];
+        $order->county_id = $map_result['county_id'];
+        $order->province = $map_result['province'];
+        $order->city = $map_result['city'];
+        $order->county = $map_result['county'];
+        $order->deliver_name = $order_data['deliver_name'];
+        $order->deliver_mobile = $order_data['deliver_mobile'];
+        $order->deliver_address = $order_data['deliver_address'];
+        $order->remark = $order_data['remark'];
+        $order->app_id = $app_id;
+        $order->app_order_json = $order_data['app_order_json'];
+        if (isset($order_data['invoice']) && $order_data['invoice'] == 1) {
+            $order->invoice = 1;
+            $order->invoice_title = $order_data['invoice_title'];
+            $order->taxer_id = $order_data['taxer_id'];
+        }
+
+        $order_goods_array = [];
+
+        foreach($order_data['goods'] as $goods) {
+
+            $order_goods = new StOrderGoods();
+            $order_goods->creator = $operator;
+            $goods_sale = StGoodsSale::where('sku', $goods['sku'])->first();
+            if ($goods_sale) {
+                $goods_images = explode(',', $goods_sale->images);
+                $order_goods->goods_id = $goods_sale->goods_id;
+                $order_goods->spec_id = $goods_sale->id;
+                $order_goods->goods_image = $goods_images[0];
+                if (!empty($goods_sale->small_category_id)) {
+                    $c_name_id = $goods_sale->small_category_id;
+                    $c_name_name = $goods_sale->small_category_name;
+                } else if (!empty($goods_sale->mid_category_id)) {
+                    $c_name_id = $goods_sale->mid_category_id;
+                    $c_name_name = $goods_sale->mid_category_name;
+                }
+                $order_goods->category_id = isset($c_name_id)
+                    ? $c_name_id
+                    : $goods_sale->big_category_id;
+                $order_goods->category_name = isset($c_name_name)
+                    ? $c_name_name
+                    : $goods_sale->big_category_name;
+            }
+
+            $order_goods->goods_name = $goods['goods_name'];
+            $order_goods->goods_number = $goods['goods_number'];
+            $order_goods->goods_price = $goods['price'];
+            $order_goods->goods_sku = $goods['sku'];
+            $order_goods->goods_upc = $goods_sale->upc;
+            $order_goods->goods_from = $goods['goods_from'];
+            $order_goods->total_price = $goods['price'] * $goods['goods_number'];
+
+            $order->total_fee += $order_goods->total_price;
+            $order->total_goods_number += $goods['goods_number'];
+            $order_goods_array[] = $order_goods;
+
+        }
+
+        if (empty($order_goods_array)) {
+            return $this->log_write('订单商品信息没有找到');
+        }
+
+        $order_trace = new StOrderTrace();
+        $order_trace->creator = $operator;
+        $order_trace->order_status = $order->status;
+        $order_trace->content = '来自'.$app->name.'平台的订单已创建成功！';
+
+        $mall_user = StUser::where('status', 1)
+            ->where(function($query) use ($mall) {
+                $query->where('mall_id', $mall->id)
+                    ->orWhere('type', 1);
+            })->get();
+
+        try {
+
+            DB::beginTransaction();
+
+            $order->save();
+
+            foreach($order_goods_array as $order_goods) {
+                $order_goods->order_id = $order->id;
+                $order_goods->save();
+            }
+
+            $order_trace->order_id = $order->id;
+            $order_trace->save();
+
+            DB::commit();
+            if ($mall_user->count() > 0) {
+                Wm::push_message($mall_user, '您有新订单，请注意查收', 1);
+            }
+
+            return ['code'=>200, 'message'=>'ok'];
+
+        } catch (Exception $e) {
+            DB::rollBack();
+            return $this->log_write('订单创建失败'.$e->getMessage());
+        }
+
+    }
+
+
+
+    /**
+     * 错误处理
+     * @param $log_msg
+     * @return \Illuminate\Http\JsonResponse
+     */
+    private function log_write($log_msg) {
+        return ['code'=>400, 'message'=>$log_msg];
+    }
+
+
+}

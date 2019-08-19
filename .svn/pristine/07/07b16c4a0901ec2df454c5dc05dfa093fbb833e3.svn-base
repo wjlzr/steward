@@ -1,0 +1,119 @@
+@extends('admin.layoutList')
+@section('css')
+    <style>
+        .col-extend-css {
+            width:100%;
+            text-align: left;
+        }
+        .app-content{
+            min-height:0;
+        }
+    </style>
+@endsection
+@section('title')
+    <li class="cur">
+        <span>选择门店</span>
+    </li>
+@endsection
+
+@section('search')
+    <div class="form-group" >
+        <label for="app_name">门店编号：</label>
+        <input style="width: 125px" type="text" class="form-control" name="code" id="code">&nbsp;&nbsp;
+    </div>
+    <div class="form-group" >
+        <label for="mall_code">门店名称：</label>
+        <input style="width: 125px" type="text" class="form-control" name="name" id="name">
+    </div>
+
+@endsection
+
+@section('extend-content')
+    <div class="bottom_fixbox">
+        <div class="rectbox tac" style="text-align: center;margin-top: 60px;">
+            <input type="button" id="select-mall" class="btn btn-primary" style="margin-right: 20px" value="选择" />
+            <input type="button" class="btn btn-default" id="mall-cancel-btn" value="关闭">
+        </div>
+    </div>
+@endsection
+
+@section('js')
+    <script type="text/javascript">
+
+        var bootstrap_table_ajax_url = '/admin/plugin/mall/search';
+        bootstrap_table({
+            sortName : 'updated_at',
+            sortOrder : 'desc',
+            columns: [ //字段
+                { title: 'checkStatus',checkbox : true},
+                { title: '门店编号',  field: 'code', align: 'left' },
+                { title: '门店名称', field: 'name', align: 'left' }
+            ]
+        });
+
+        $(function () {
+
+            var mall = {
+
+                check_data: {},
+
+                choose_num: 0,
+
+                close: function () {
+                    var index = parent.layer.getFrameIndex(window.name);
+                    parent.layer.close(index);
+                }
+            };
+
+            //选择门店
+            $(document).on('click','#select-mall',function(){
+
+                var _num = 0;
+
+                var dt = {
+                    'id_arr' : []
+                };
+
+                $('.selected').each(function(){
+                    _num = 1;
+
+                    var id = $(this).find('span').attr('data-id');
+
+                    dt.id_arr.push(id);
+                });
+
+                if (!_num) {
+                    layer.alert('请选择门店',{icon:2,time:1500});
+                    return false;
+                }
+
+                $.ajax({
+                    type:'GET',
+                    url:'/admin/plugin/mall/query',
+                    data: dt,
+                    dataType: 'json',
+                    success: function (obj) {
+                        if(obj.code == 200){
+                            $.each(obj.data,function(k,v){
+                                mall.check_data[v.id] = {
+                                    id: v.id,
+                                    name: v.name,
+                                    code: v.code,
+                                    city: v.city,
+                                    spec: v.spec,
+                                    business_time: v.business_time
+                                };
+                                mall.choose_num = k + 1;
+                            });
+                        }
+                    },
+                    complete: function(){
+                        parent.plugin.mall(mall.check_data,mall.choose_num);
+                        mall.close();
+                    }
+                });
+            });
+        });
+
+    </script>
+@endsection

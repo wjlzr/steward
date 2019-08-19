@@ -1,0 +1,12 @@
+@extends('admin.layout')
+@section('css')
+@endsection
+
+
+@section('content')
+
+    index page !
+
+@endsection
+@section('js')
+@endsection

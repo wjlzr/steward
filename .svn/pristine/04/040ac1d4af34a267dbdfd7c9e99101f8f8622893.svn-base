@@ -1,0 +1,1181 @@
+<?php
+
+namespace App\Http\Controllers\Api\Wm;
+
+use App\Models\Mall\MallUser;
+use App\Models\Wm\WmGoods;
+use App\Models\Wm\WmGoodsCategory;
+use App\Models\Wm\WmGoodsSale;
+use App\Models\Wm\WmShop;
+use Carbon\Carbon;
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Redis as Redis;
+
+use App\Models\Goods\GoodsSale;
+use App\Models\Goods\GoodsStore;
+use App\Models\Bill\Bill;
+use App\Models\Bill\BillGoods;
+use App\Models\Bill\BillPay;
+use App\Models\Bill\BillTrace;
+use App\Models\Mall\Mall;
+use App\Models\Customer\Customer;
+use App\Models\Customer\CustDeliver;
+use App\Models\SysRegion;
+use App\Models\Wm\WmBill;
+
+use Wm;
+
+class ComController extends Controller
+{
+
+    const BD_LBS_AK = 'mGi6xeiGPBvUmcVGuys1fhvO';
+
+    /**
+     * 创建订单
+     * @param Request $request
+     * @return array
+     */
+    public function order(Request $request)
+    {
+
+        $bill_index = $request->input('bill_index', 0);
+
+        if (empty($bill_index)) {
+            return response()->json(['code'=>400, 'message'=>'参数错误']);
+        }
+
+        $bill_json = Redis::get($bill_index);
+        if (!$bill_json) {
+            return response()->json(['code'=>400, 'message'=>'订单信息没有找到']);
+        }
+
+        $bill_data = json_decode($bill_json, true);
+
+        $wm_shop = WmShop::where('mall_code', $bill_data['mall_code'])->first();
+        if (!$wm_shop) {
+            $this->log_write('外卖订单：'.$bill_data['order_id'].'店铺信息没有找到');
+        }
+
+        $bill_no = generate_seqno('seqno_bill', '1', true);
+        $operator = $bill_data['operator'];
+        $datetime = Carbon::now();
+        $mapWmPlatform = [ 1 => 5, 2 => 7, 3 => 6, 4 => 8 ];
+        $billGoodsData = [];
+        $billPayData = [];
+        $totalAmount = 0;
+        $totalPaid = 0;
+        $totalMoney = 0;
+
+        $member_data = Customer::where('custID', $bill_data['deliver_mobile'])->first();
+        if (!$member_data) {
+            $member_data = Customer::where('mobile', $bill_data['deliver_mobile'])->first();
+            if (!$member_data) {
+                $cust_master = new Customer();
+                $cust_master->createTime = $datetime;
+                $cust_master->custID = $bill_data['deliver_mobile'];
+                $cust_master->timeStamp = $datetime;
+                $cust_master->creator = $operator;
+                $cust_master->pcustID = generate_seqno('seqno_customer', null, true);
+                $cust_master->pwd = get_random_string(8);
+                $cust_master->useFlg = 1;
+                $cust_master->custType = 3;
+                $cust_master->nickName = '';
+                $cust_master->rankName = '';
+                $member_data = $cust_master;
+            }
+        }
+
+        $request_url = 'http://api.map.baidu.com/geocoder/v2/?ak='.self::BD_LBS_AK.'&callback=renderReverse&location='.$bill_data['deliver_lat'].','.$bill_data['deliver_lng'].'&output=xml&pois=1';
+        $data = file_get_contents($request_url);
+        $xmlData = simplexml_load_string($data);
+
+        $addressComponent = $xmlData->result->addressComponent;
+        $province = $this->regionIdByName($addressComponent->province, 0, 1);
+        $city = $this->regionIdByName($addressComponent->city, $province[0], 2);
+        $county = $this->regionIdByName($addressComponent->district, $city[0], 3);
+
+        $cust_deliver_data = CustDeliver::where([
+                                        'custName' => $bill_data['deliver_name'],
+                                        'mobile' => $bill_data['deliver_mobile'],
+                                        'pcustID' => $member_data->pcustID,
+                                        'address' => $bill_data['deliver_address']
+                                    ])->first();
+
+        if ( !$cust_deliver_data ) {
+            $cust_deliver = new CustDeliver();
+            $cust_deliver->uuid = makeUuid();
+            $cust_deliver->creator = $operator;
+            $cust_deliver->pcustID = $member_data->pcustID;
+            $cust_deliver->deliverID = generate_seqno('seqno_custdeliver');
+            $cust_deliver->provinceid = $province[0];
+            $cust_deliver->cityid = $city[0];
+            $cust_deliver->countyid = $county[0];
+            $cust_deliver->provinceName = $province[1];
+            $cust_deliver->cityName = $city[1];
+            $cust_deliver->countyName = $county[1];
+            $cust_deliver->address = $bill_data['deliver_address'];
+            $cust_deliver->custName = $bill_data['deliver_name'];
+            $cust_deliver->mobile = $bill_data['deliver_mobile'];
+            $cust_deliver_data = $cust_deliver;
+        }
+
+        foreach($bill_data['goods'] as $goods) {
+
+            $bill_goods = new BillGoods();
+            $bill_goods->uuid = makeUuid();
+            $bill_goods->timeStamp = $datetime;
+            $bill_goods->creator = $operator;
+            $bill_goods->createTime = $datetime;
+            $bill_goods->bill_no = $bill_no;
+            $bill_goods->bill_goods_no = generate_seqno('seqno_bill_goods');
+            $bill_goods->goods_goodsID = 0;
+            $bill_goods->goods_postID = 0;
+            $bill_goods->goods_name = $goods['goods_name'];
+            $bill_goods->goods_spec = $goods['spec'];
+            $bill_goods->goods_amount = $goods['goods_number'];
+            $bill_goods->goods_marketPrice = $goods['sale_price'];
+            $bill_goods->goods_storePrice = $goods['sale_price'];
+            $bill_goods->goods_purchasePrice = $goods['price'];
+            $bill_goods->goods_pointsPrice = 0;
+            $bill_goods->goods_points = 0;
+            $bill_goods->goods_from = 50;
+            $bill_goods->goods_groupID = 0;
+            $bill_goods->goods_status = 1;
+            $bill_goods->goods_weight = 0;
+            $bill_goods->product_code = $goods['product_code'];
+
+            $goods_sale = GoodsSale::where('product_code', $goods['product_code'])->first();
+            if ($goods_sale) {
+                $bill_goods->goods_goodsID = $goods_sale->goodsID;
+                $bill_goods->goods_postID = $goods_sale->postID;
+                $enable_sale_num = GoodsStore::search($goods_sale->product_code, $goods_sale->product_spec, $mall_data->mallID);
+                $enable_sale_num -= $bill_goods->goods_amount;
+                $billGoodsData['batch_stock'][$goods['product_code']] = $enable_sale_num  > 0 ? $enable_sale_num  : 0;
+            }
+
+            $totalMoney += $goods['sale_price'] * $goods['goods_number'];
+            $totalPaid += $goods['price'] * $goods['goods_number'];
+            $totalAmount += $goods['goods_number'];
+            $billGoodsData['list'][] = $bill_goods;
+            $billGoodsData['name'][] = $goods['goods_name'];
+
+        }
+
+        if (!isset($billGoodsData['list']) || empty($billGoodsData['list'])) {
+            $this->log_write('外卖订单：'.$bill_data['order_id'].'商品信息没有找到');
+        }
+
+        $bill_pay = new BillPay();
+        $bill_pay->uuid = makeUuid();
+        $bill_pay->timeStamp = $datetime;
+        $bill_pay->creator = $operator;
+        $bill_pay->createTime = $datetime;
+        $bill_pay->bill_no = $bill_no;
+        $bill_pay->payTypeID = 4;
+        $bill_pay->payTypeName = '在线支付';
+        $bill_pay->type = 2;
+        $bill_pay->pay_amount = $bill_data['user_fee'];
+        $bill_pay->deduct_amount = $bill_data['user_fee'];
+        $bill_pay->pay_time = $bill_data['user_fee'] == 0 ? $datetime : null;
+
+        $billPayData['list'][] = $bill_pay;
+        $billPayData['id'][] = 4;
+        $billPayData['name'][] = '支付宝';
+
+        $bill_master = new Bill();
+        $bill_master->uuid = makeUuid();
+        $bill_master->createTime = $datetime;
+        $bill_master->timeStamp = $datetime;
+        $bill_master->creator = $operator;
+        $bill_master->bill_no = $bill_no;
+        $bill_master->pcustID = $member_data->pcustID;
+        $bill_master->custID = $member_data->custID;
+        $bill_master->bill_status = 1;
+        $bill_master->bill_return_status = 0;
+        $bill_master->bill_refund_status = 0;
+        $bill_master->bill_totalMoney = $totalMoney;
+        $bill_master->bill_totalPaid = $totalPaid;
+        $bill_master->bill_totalPoints = 0;
+        $bill_master->bill_pointsPrice = 0;
+        $bill_master->bill_subtract_money = $bill_data['discount_fee'];
+        $bill_master->bill_points_money = 0;
+        $bill_master->bill_balance_money = 0;
+        $bill_master->bill_coupon_money = 0;
+        $bill_master->bill_card_money = 0;
+        $bill_master->bill_payable = $bill_data['user_fee'];
+        $bill_master->bill_total_amount = $totalAmount;
+        $bill_master->deliverid = $cust_deliver_data->deliverid;
+        $bill_master->deliver_name = $cust_deliver_data->custName;
+        $bill_master->deliver_province = $cust_deliver_data->provinceName;
+        $bill_master->deliver_provinceid = $cust_deliver_data->provinceid;
+        $bill_master->deliver_city = $cust_deliver_data->cityName;
+        $bill_master->deliver_cityid = $cust_deliver_data->cityid;
+        $bill_master->deliver_county = $cust_deliver_data->cityName;
+        $bill_master->deliver_countyid = $cust_deliver_data->cityid;
+        $bill_master->deliver_address = $cust_deliver_data->address;
+        $bill_master->deliver_mobile = $cust_deliver_data->mobile;
+        $bill_master->sendTypeID = 1;
+        $bill_master->sendTypeName = '送货上门';
+        $bill_master->ziti = 0;
+        $bill_master->send_region_id = 0;
+        $bill_master->send_region_name = '';
+        $bill_master->deliver_fee = $bill_data['deliver_fee'];
+        $bill_master->deliver_feePaid = $bill_data['deliver_fee'];
+        $bill_master->pay_type = 2;
+        $bill_master->payTypeID = 4;
+        $bill_master->payTypeName = '支付宝';
+        $bill_master->send_time = $bill_data['send_time'];
+        $bill_master->pay_status = 1;
+        $bill_master->pay_id_str = implode(',', $billPayData['id']);
+        $bill_master->pay_name_str = implode(',', $billPayData['name']);
+        $bill_master->goods_name_str = implode(',', $billGoodsData['name']);
+        $bill_master->billPlatform = $mapWmPlatform[$bill_data['wm_id']];
+        $bill_master->billChannel = 4;
+        $bill_master->billType = 21;
+        $bill_master->bill_stock_type = 1;
+        $bill_master->split_type = 1;
+        $bill_master->mallID = $mall_data->mallID;
+        $bill_master->mallCode = $mall_data->mallCode;
+        $bill_master->mallName = $mall_data->mallName;
+        $bill_master->remark = $bill_data['remark'];
+        $bill_master->invoice = 0;
+        if ($bill_data['need_invoice'] == 1) {
+            $bill_master->invoice = 1;
+            $bill_master->invoice_title = $bill_data['invoice_title'];
+            $bill_master->invoice_type = 1;
+            $bill_master->invoice_title_type = $bill_data['invoice_type'];
+            $bill_master->invoice_content_id = 0;
+        }
+
+        $trace = new BillTrace();
+        $trace->uuid = makeUuid();
+        $trace->timeStamp = $datetime;
+        $trace->creator = $operator;
+        $trace->createTime = $datetime;
+        $trace->bill_no = $bill_no;
+        $trace->bill_status = 1;
+        $trace->content = '您的外卖订单已创建并支付';
+
+        $wm_bill = new WmBill();
+        $wm_bill->creator = $operator;
+        $wm_bill->bill_no = $bill_no;
+        $wm_bill->wm_bill_no = $bill_data['order_id'];
+        $wm_bill->wm_id = $bill_data['wm_id'];
+        $wm_bill->wm_bill_json = json_encode($bill_data['wm_bill_json']);
+
+        $mall_user = MallUser::where('mallID', $mall_data->mallID)
+                                ->where('useFlg', 1)
+                                ->get();
+
+        try {
+
+            DB::beginTransaction();
+
+            if ( isset($cust_master) ) {
+                $cust_master->save();
+            }
+
+            if ( isset($cust_deliver) ) {
+                $cust_deliver->save();
+            }
+
+            foreach( $billGoodsData['list'] as $goods ) {
+                $goods->save();
+            }
+
+            foreach( $billPayData['list'] as $pay ) {
+                $pay->save();
+            }
+
+            $bill_master->save();
+            $wm_bill->save();
+            $trace->save();
+
+            DB::commit();
+            if ($mall_user->count() > 0) {
+                Wm::push_message($mall_user, '您有新订单，请注意查收', 1);
+            }
+
+            return response()->json(['code'=>200, 'message'=>'ok', 'data'=>$bill_no]);
+
+        } catch (Exception $e) {
+            DB::rollBack();
+            return $this->log_write('订单创建失败'.$e->getMessage());
+        }
+
+    }
+
+    /**
+     * 拉取分类
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function category(Request $request){
+
+        $wm_id = $request -> input('wm_id' ,'');
+        $mall_code = $request -> input('mall_code','');
+
+        Redis::hSet('PULL_CATEGORY' ,'PROCESS' , 0 );
+        Redis::hSet('PULL_CATEGORY' ,'LEVEL_ONE' , 0 );
+        Redis::hSet('PULL_CATEGORY' ,'LEVEL_TWO' , 0 );
+
+        if(empty($wm_id)){
+            return response()->json(['code' => 400 ,'message' => '缺少平台参数']);
+        }
+
+        $return_data = [
+            'level_one' => 0,
+            'level_two' => 0
+        ];
+
+        switch ( $wm_id ) {
+            case "1" :
+
+                if( empty($mall_code)){
+
+                    $wm_shop = WmShop::where('wm_id', $wm_id)->get();
+
+                    if( !$wm_shop -> isEmpty()){
+                        foreach ($wm_shop as $shop ){
+
+                            $args = ['mall_code' => $shop -> mall_code ];
+                            $result = Wm::send('bd.goods.get_shop_categories', $args );
+
+                            if( $result['code'] == 200 ){
+
+                                if( !empty($result['data']['categorys'])){
+
+                                    foreach ( $result['data']['categorys'] as $key => $item ){
+
+                                        $wm_goods_category_one = WmGoodsCategory::where([['wm_id', $wm_id], ['mall_code', $mall_code], ['name', $item['name']]])->first();
+
+                                        if (!$wm_goods_category_one) {
+
+                                            $wm_goods_category_one = new WmGoodsCategory();
+                                            $wm_goods_category_one->updated_at = date('Y-m-d h:i:s');
+                                            $wm_goods_category_one->creator = 'bd-api';
+                                            $wm_goods_category_one->created_at = date('Y-m-d h:i:s');
+                                            $wm_goods_category_one->name = $item['name'];
+                                            $wm_goods_category_one->parent_id = 0;
+                                            $wm_goods_category_one->level = 1;
+                                            $wm_goods_category_one->sort = $key + 1;
+                                            $wm_goods_category_one->wm_category_id = $item['category_id'];
+                                            $wm_goods_category_one->mall_code = $mall_code;
+                                            $wm_goods_category_one->wm_id = $wm_id;
+                                            $wm_goods_category_one->wm_shop_id = $shop->wm_shop_id;
+                                            $wm_goods_category_one->save();
+
+                                            $return_data['level_one']++;
+                                        }
+
+                                        if( !empty($item['children']) ){
+                                                foreach ( $item['children'] as $k => $child ){
+                                                    $wm_goods_category_two = WmGoodsCategory::where([['wm_id', $wm_id], ['mall_code', $mall_code], ['name', $child['name']]])->first();
+
+                                                    if( !$wm_goods_category_two ){
+                                                        $wm_goods_category_two = new WmGoodsCategory();
+                                                        $wm_goods_category_two->updated_at = date('Y-m-d h:i:s');
+                                                        $wm_goods_category_two->creator = 'bd-api';
+                                                        $wm_goods_category_two->created_at = date('Y-m-d h:i:s');
+                                                        $wm_goods_category_two->name = $child['name'];
+                                                        $wm_goods_category_two->parent_id = $wm_goods_category_one->id;
+                                                        $wm_goods_category_two->level = 2;
+                                                        $wm_goods_category_two->sort = $k + 1;
+                                                        $wm_goods_category_two->wm_category_id = $child['category_id'];
+                                                        $wm_goods_category_two->mall_code = $mall_code;
+                                                        $wm_goods_category_two->wm_id = $wm_id;
+                                                        $wm_goods_category_two->wm_shop_id = $shop->wm_shop_id;
+                                                        $wm_goods_category_two->save();
+
+                                                        $return_data['level_two'] ++ ;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                }else{
+
+                    $wm_shop = WmShop::where([['wm_id', $wm_id], ['mall_code', $mall_code]])->first();
+
+                    $args = ['mall_code' => $wm_shop -> mall_code ];
+                    $result = Wm::send('bd.goods.get_shop_categories', $args );
+
+                    if( $result['code'] == 200 ){
+
+                        if( !empty($result['data']['categorys'])){
+
+                            foreach ( $result['data']['categorys'] as $key => $item ){
+
+                                $wm_goods_category_one = WmGoodsCategory::where([['wm_id', $wm_id], ['mall_code', $mall_code], ['name', $item['name']]])->first();
+
+                                if (!$wm_goods_category_one) {
+
+                                    $wm_goods_category_one = new WmGoodsCategory();
+                                    $wm_goods_category_one->updated_at = date('Y-m-d h:i:s');
+                                    $wm_goods_category_one->creator = 'bd-api';
+                                    $wm_goods_category_one->created_at = date('Y-m-d h:i:s');
+                                    $wm_goods_category_one->name = $item['name'];
+                                    $wm_goods_category_one->parent_id = 0;
+                                    $wm_goods_category_one->level = 1;
+                                    $wm_goods_category_one->sort = $key + 1;
+                                    $wm_goods_category_one->wm_category_id = $item['category_id'];
+                                    $wm_goods_category_one->mall_code = $mall_code;
+                                    $wm_goods_category_one->wm_id = $wm_id;
+                                    $wm_goods_category_one->wm_shop_id = $wm_shop->wm_shop_id;
+                                    $wm_goods_category_one->save();
+
+                                    $return_data['level_one']++;
+                                }
+
+                                if( !empty($item['children']) ){
+                                    foreach ( $item['children'] as $k => $child ){
+                                        $wm_goods_category_two = WmGoodsCategory::where([['wm_id', $wm_id], ['mall_code', $mall_code], ['name', $child['name']]])->first();
+
+                                        if( !$wm_goods_category_two ){
+                                            $wm_goods_category_two = new WmGoodsCategory();
+                                            $wm_goods_category_two->updated_at = date('Y-m-d h:i:s');
+                                            $wm_goods_category_two->creator = 'bd-api';
+                                            $wm_goods_category_two->created_at = date('Y-m-d h:i:s');
+                                            $wm_goods_category_two->name = $child['name'];
+                                            $wm_goods_category_two->parent_id = $wm_goods_category_one->id;
+                                            $wm_goods_category_two->level = 2;
+                                            $wm_goods_category_two->sort = $k + 1;
+                                            $wm_goods_category_two->wm_category_id = $child['category_id'];
+                                            $wm_goods_category_two->mall_code = $mall_code;
+                                            $wm_goods_category_two->wm_id = $wm_id;
+                                            $wm_goods_category_two->wm_shop_id = $wm_shop->wm_shop_id;
+                                            $res = $wm_goods_category_two->save();
+
+                                            $return_data['level_two'] ++ ;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                break;
+            case "2" :
+
+                if( empty($mall_code)){
+
+                    $wm_shop = WmShop::where('wm_id', $wm_id)->get();
+
+                    if( !$wm_shop -> isEmpty()){
+                        foreach ($wm_shop as $shop ){
+
+                            $args = ['shop_id' => $shop -> wm_shop_id ];
+                            $result = Wm::send('ele.goods.get_shop_categories', $args );
+
+                            if( $result['code'] == 200 ){
+
+                                if( !empty($result['data'])){
+
+                                    foreach ( $result['data'] as $key => $item ){
+
+                                        $wm_goods_category_one = WmGoodsCategory::where([['wm_id', $wm_id], ['mall_code', $mall_code], ['name', $item['name']]])->first();
+
+                                        if (!$wm_goods_category_one) {
+
+                                            $wm_goods_category_one = new WmGoodsCategory();
+                                            $wm_goods_category_one->updated_at = date('Y-m-d h:i:s');
+                                            $wm_goods_category_one->creator = 'ele-api';
+                                            $wm_goods_category_one->created_at = date('Y-m-d h:i:s');
+                                            $wm_goods_category_one->name = $item['name'];
+                                            $wm_goods_category_one->parent_id = 0;
+                                            $wm_goods_category_one->level = 1;
+                                            $wm_goods_category_one->sort = $key + 1;
+                                            $wm_goods_category_one->wm_category_id = $item['id'];
+                                            $wm_goods_category_one->mall_code = $mall_code;
+                                            $wm_goods_category_one->wm_id = $wm_id;
+                                            $wm_goods_category_one->wm_shop_id = $shop->wm_shop_id;
+                                            $wm_goods_category_one->save();
+
+                                            $return_data['level_one']++;
+                                        }
+
+                                        if( !empty($item['children']) ){
+                                            foreach ( $item['children'] as $k => $child ){
+                                                $wm_goods_category_two = WmGoodsCategory::where([['wm_id', $wm_id], ['mall_code', $mall_code], ['name', $child['name']]])->first();
+
+                                                if( !$wm_goods_category_two ){
+                                                    $wm_goods_category_two = new WmGoodsCategory();
+                                                    $wm_goods_category_two->updated_at = date('Y-m-d h:i:s');
+                                                    $wm_goods_category_two->creator = 'ele-api';
+                                                    $wm_goods_category_two->created_at = date('Y-m-d h:i:s');
+                                                    $wm_goods_category_two->name = $child['name'];
+                                                    $wm_goods_category_two->parent_id = $wm_goods_category_one->id;
+                                                    $wm_goods_category_two->level = 2;
+                                                    $wm_goods_category_two->sort = $k + 1;
+                                                    $wm_goods_category_two->wm_category_id = $child['id'];
+                                                    $wm_goods_category_two->mall_code = $mall_code;
+                                                    $wm_goods_category_two->wm_id = $wm_id;
+                                                    $wm_goods_category_two->wm_shop_id = $shop->wm_shop_id;
+                                                    $wm_goods_category_two->save();
+
+                                                    $return_data['level_two'] ++ ;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }else{
+
+                    $wm_shop = WmShop::where([['wm_id', $wm_id], ['mall_code', $mall_code]])->first();
+
+                    $args = ['shop_id' => $wm_shop -> wm_shop_id ];
+                    $result = Wm::send('ele.goods.get_shop_categories', $args );
+
+                    if( $result['code'] == 200 ){
+
+                        if( !empty($result['data'])){
+
+                            foreach ( $result['data'] as $key => $item ){
+
+                                $wm_goods_category_one = WmGoodsCategory::where([['wm_id', $wm_id], ['mall_code', $mall_code], ['name', $item['name']]])->first();
+
+                                if (!$wm_goods_category_one) {
+
+                                    $wm_goods_category_one = new WmGoodsCategory();
+                                    $wm_goods_category_one->updated_at = date('Y-m-d h:i:s');
+                                    $wm_goods_category_one->creator = 'ele-api';
+                                    $wm_goods_category_one->created_at = date('Y-m-d h:i:s');
+                                    $wm_goods_category_one->name = $item['name'];
+                                    $wm_goods_category_one->parent_id = 0;
+                                    $wm_goods_category_one->level = 1;
+                                    $wm_goods_category_one->sort = $key + 1;
+                                    $wm_goods_category_one->wm_category_id = $item['id'];
+                                    $wm_goods_category_one->mall_code = $mall_code;
+                                    $wm_goods_category_one->wm_id = $wm_id;
+                                    $wm_goods_category_one->wm_shop_id = $wm_shop->wm_shop_id;
+                                    $wm_goods_category_one->save();
+
+                                    $return_data['level_one']++;
+                                }
+
+                                if( !empty($item['children']) ){
+
+                                    foreach ( $item['children'] as $k => $child ){
+                                        $wm_goods_category_two = WmGoodsCategory::where([['wm_id', $wm_id], ['mall_code', $mall_code], ['name', $child['name']]])->first();
+
+                                        if( !$wm_goods_category_two ){
+                                            $wm_goods_category_two = new WmGoodsCategory();
+                                            $wm_goods_category_two->updated_at = date('Y-m-d h:i:s');
+                                            $wm_goods_category_two->creator = 'ele-api';
+                                            $wm_goods_category_two->created_at = date('Y-m-d h:i:s');
+                                            $wm_goods_category_two->name = $child['name'];
+                                            $wm_goods_category_two->parent_id = $wm_goods_category_one -> id;
+                                            $wm_goods_category_two->level = 2;
+                                            $wm_goods_category_two->sort = $k + 1;
+                                            $wm_goods_category_two->wm_category_id = $child['id'];
+                                            $wm_goods_category_two->mall_code = $mall_code;
+                                            $wm_goods_category_two->wm_id = $wm_id;
+                                            $wm_goods_category_two->wm_shop_id = $wm_shop->wm_shop_id;
+                                            $wm_goods_category_two->save();
+
+                                            $return_data['level_two'] ++ ;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                break;
+            case "3" :
+
+                if (empty($mall_code)) {
+
+                    $wm_shop = WmShop::where('wm_id', $wm_id)->get();
+
+                    if (!$wm_shop->isEmpty()) {
+                        foreach ($wm_shop as $shop) {
+
+                            $args = ['mall_code' => $shop->mall_code];
+                            $result = Wm::send('mt.goods.get_shop_categories', $args);
+
+                            if ($result['code'] == 200) {
+
+                                if (!empty($result['data']['data'])) {
+
+                                    foreach ($result['data']['data'] as $item) {
+
+                                        $wm_goods_category_one = WmGoodsCategory::where([['wm_id', $wm_id], ['mall_code', $shop->mall_code], ['name', $item['name']]])->first();
+
+                                        if (!$wm_goods_category_one) {
+
+                                            $wm_goods_category_one = new WmGoodsCategory();
+                                            $wm_goods_category_one->updated_at = date('Y-m-d h:i:s');
+                                            $wm_goods_category_one->creator = 'mt-api';
+                                            $wm_goods_category_one->created_at = date('Y-m-d h:i:s');
+                                            $wm_goods_category_one->name = $item['name'];
+                                            $wm_goods_category_one->parent_id = 0;
+                                            $wm_goods_category_one->level = 1;
+                                            $wm_goods_category_one->sort = $item['sequence'];
+                                            $wm_goods_category_one->mall_code = $shop->mall_code;
+                                            $wm_goods_category_one->wm_id = $wm_id;
+                                            $wm_goods_category_one->wm_shop_id = $shop->wm_shop_id;
+                                            $wm_goods_category_one->save();
+
+                                            $return_data['level_one']++;
+                                        }
+
+                                        if (!empty($item['children'])) {
+
+                                            foreach ($item['children'] as $child) {
+
+                                                $wm_goods_category_two = WmGoodsCategory::where([['wm_id', $wm_id], ['mall_code', $shop->mall_code], ['name', $child['name']]])->first();
+
+                                                if (!$wm_goods_category_two) {
+                                                    $wm_goods_category_two = new WmGoodsCategory();
+                                                    $wm_goods_category_two->updated_at = date('Y-m-d h:i:s');
+                                                    $wm_goods_category_two->creator = 'mt-api';
+                                                    $wm_goods_category_two->created_at = date('Y-m-d h:i:s');
+                                                    $wm_goods_category_two->name = $child['name'];
+                                                    $wm_goods_category_two->parent_id = $wm_goods_category_one->id;
+                                                    $wm_goods_category_two->level = 1;
+                                                    $wm_goods_category_two->sort = $item['sequence'];
+                                                    $wm_goods_category_two->mall_code = $shop->mall_code;
+                                                    $wm_goods_category_two->wm_id = $wm_id;
+                                                    $wm_goods_category_two->wm_shop_id = $shop->wm_shop_id;
+                                                    $wm_goods_category_two->save();
+
+                                                    $return_data['level_two']++;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+
+                    $wm_shop = WmShop::where([['wm_id', $wm_id], ['mall_code', $mall_code]])->first();
+
+                    $args = ['mall_code' => $mall_code];
+                    $result = Wm::send('mt.goods.get_shop_categories', $args);
+
+                    if ($result['code'] == 200) {
+
+                        if (!empty($result['data']['data'])) {
+
+                            foreach ($result['data']['data'] as $item) {
+
+                                $wm_goods_category_one = WmGoodsCategory::where([['wm_id', $wm_id], ['mall_code', $mall_code], ['name', $item['name']]])->first();
+
+                                if (!$wm_goods_category_one) {
+
+                                    $wm_goods_category_one = new WmGoodsCategory();
+                                    $wm_goods_category_one->updated_at = date('Y-m-d h:i:s');
+                                    $wm_goods_category_one->creator = 'mt-api';
+                                    $wm_goods_category_one->created_at = date('Y-m-d h:i:s');
+                                    $wm_goods_category_one->name = $item['name'];
+                                    $wm_goods_category_one->parent_id = 0;
+                                    $wm_goods_category_one->level = 1;
+                                    $wm_goods_category_one->sort = $item['sequence'];
+                                    $wm_goods_category_one->mall_code = $mall_code;
+                                    $wm_goods_category_one->wm_id = $wm_id;
+                                    $wm_goods_category_one->wm_shop_id = $wm_shop->wm_shop_id;
+                                    $wm_goods_category_one->save();
+
+                                    $return_data['level_one']++;
+                                }
+
+                                if (!empty($item['children'])) {
+
+                                    foreach ($item['children'] as $child) {
+
+                                        $wm_goods_category_two = WmGoodsCategory::where([['wm_id', $wm_id], ['mall_code', $mall_code], ['name', $child['name']]])->first();
+
+                                        if (!$wm_goods_category_two) {
+                                            $wm_goods_category_two = new WmGoodsCategory();
+                                            $wm_goods_category_two->updated_at = date('Y-m-d h:i:s');
+                                            $wm_goods_category_two->creator = 'mt-api';
+                                            $wm_goods_category_two->created_at = date('Y-m-d h:i:s');
+                                            $wm_goods_category_two->name = $child['name'];
+                                            $wm_goods_category_two->parent_id = $wm_goods_category_one->id;
+                                            $wm_goods_category_two->level = 1;
+                                            $wm_goods_category_two->sort = $item['sequence'];
+                                            $wm_goods_category_two->mall_code = $mall_code;
+                                            $wm_goods_category_two->wm_id = $wm_id;
+                                            $wm_goods_category_two->wm_shop_id = $wm_shop->wm_shop_id;
+                                            $wm_goods_category_two->save();
+
+                                            $return_data['level_two']++;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                break;
+            case "4" :
+
+                if (empty($mall_code)) {
+
+                    $wm_shop = WmShop::where('wm_id', $wm_id)->get();
+
+                    if (!$wm_shop->isEmpty()) {
+                        foreach ($wm_shop as $shop) {
+
+                            $args = ['mall_code' => $shop->mall_code];
+                            $result = Wm::send('mt.goods.get_shop_categories', $args);
+
+                            if ($result['code'] == 200) {
+
+                                if (!empty($result['data']['data'])) {
+
+                                    foreach ($result['data']['data'] as $item) {
+
+                                        $wm_goods_category_one = WmGoodsCategory::where([['wm_id', $wm_id], ['mall_code', $shop->mall_code], ['name', $item['name']]])->first();
+
+                                        if (!$wm_goods_category_one) {
+
+                                            $wm_goods_category_one = new WmGoodsCategory();
+                                            $wm_goods_category_one->updated_at = date('Y-m-d h:i:s');
+                                            $wm_goods_category_one->creator = 'mt-api';
+                                            $wm_goods_category_one->created_at = date('Y-m-d h:i:s');
+                                            $wm_goods_category_one->name = $item['name'];
+                                            $wm_goods_category_one->parent_id = 0;
+                                            $wm_goods_category_one->level = 1;
+                                            $wm_goods_category_one->sort = $item['sequence'];
+                                            $wm_goods_category_one->mall_code = $shop->mall_code;
+                                            $wm_goods_category_one->wm_id = $wm_id;
+                                            $wm_goods_category_one->wm_shop_id = $shop->wm_shop_id;
+                                            $wm_goods_category_one->save();
+
+                                            $return_data['level_one']++;
+                                        }
+
+                                        if (!empty($item['children'])) {
+
+                                            foreach ($item['children'] as $child) {
+
+                                                $wm_goods_category_two = WmGoodsCategory::where([['wm_id', $wm_id], ['mall_code', $shop->mall_code], ['name', $child['name']]])->first();
+
+                                                if (!$wm_goods_category_two) {
+                                                    $wm_goods_category_two = new WmGoodsCategory();
+                                                    $wm_goods_category_two->updated_at = date('Y-m-d h:i:s');
+                                                    $wm_goods_category_two->creator = 'mt-api';
+                                                    $wm_goods_category_two->created_at = date('Y-m-d h:i:s');
+                                                    $wm_goods_category_two->name = $child['name'];
+                                                    $wm_goods_category_two->parent_id = $wm_goods_category_one->id;
+                                                    $wm_goods_category_two->level = 1;
+                                                    $wm_goods_category_two->sort = $item['sequence'];
+                                                    $wm_goods_category_two->mall_code = $shop->mall_code;
+                                                    $wm_goods_category_two->wm_id = $wm_id;
+                                                    $wm_goods_category_two->wm_shop_id = $shop->wm_shop_id;
+                                                    $wm_goods_category_two->save();
+
+                                                    $return_data['level_two']++;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+
+                    $wm_shop = WmShop::where([['wm_id', $wm_id], ['mall_code', $mall_code]])->first();
+
+                    $args = ['mall_code' => $mall_code];
+                    $result = Wm::send('mt.goods.get_shop_categories', $args);
+
+                    if ($result['code'] == 200) {
+
+                        if (!empty($result['data']['data'])) {
+
+                            foreach ($result['data']['data'] as $item) {
+
+                                $wm_goods_category_one = WmGoodsCategory::where([['wm_id', $wm_id], ['mall_code', $mall_code], ['name', $item['name']]])->first();
+
+                                if (!$wm_goods_category_one) {
+
+                                    $wm_goods_category_one = new WmGoodsCategory();
+                                    $wm_goods_category_one->updated_at = date('Y-m-d h:i:s');
+                                    $wm_goods_category_one->creator = 'mt-api';
+                                    $wm_goods_category_one->created_at = date('Y-m-d h:i:s');
+                                    $wm_goods_category_one->name = $item['name'];
+                                    $wm_goods_category_one->parent_id = 0;
+                                    $wm_goods_category_one->level = 1;
+                                    $wm_goods_category_one->sort = $item['sequence'];
+                                    $wm_goods_category_one->mall_code = $mall_code;
+                                    $wm_goods_category_one->wm_id = $wm_id;
+                                    $wm_goods_category_one->wm_shop_id = $wm_shop->wm_shop_id;
+                                    $wm_goods_category_one->save();
+
+                                    $return_data['level_one']++;
+                                }
+
+                                if (!empty($item['children'])) {
+
+                                    foreach ($item['children'] as $child) {
+
+                                        $wm_goods_category_two = WmGoodsCategory::where([['wm_id', $wm_id], ['mall_code', $mall_code], ['name', $child['name']]])->first();
+
+                                        if (!$wm_goods_category_two) {
+                                            $wm_goods_category_two = new WmGoodsCategory();
+                                            $wm_goods_category_two->updated_at = date('Y-m-d h:i:s');
+                                            $wm_goods_category_two->creator = 'mt-api';
+                                            $wm_goods_category_two->created_at = date('Y-m-d h:i:s');
+                                            $wm_goods_category_two->name = $child['name'];
+                                            $wm_goods_category_two->parent_id = $wm_goods_category_one->id;
+                                            $wm_goods_category_two->level = 1;
+                                            $wm_goods_category_two->sort = $item['sequence'];
+                                            $wm_goods_category_two->mall_code = $mall_code;
+                                            $wm_goods_category_two->wm_id = $wm_id;
+                                            $wm_goods_category_two->wm_shop_id = $wm_shop->wm_shop_id;
+                                            $wm_goods_category_two->save();
+
+                                            $return_data['level_two']++;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                break;
+        }
+
+        Redis::hSet('PULL_CATEGORY' ,'PROCESS' , 1 );
+        Redis::hSet('PULL_CATEGORY' ,'LEVEL_ONE' , $return_data['level_one'] );
+        Redis::hSet('PULL_CATEGORY' ,'LEVEL_TWO' , $return_data['level_two'] );
+
+        return response()->json(['code' => 200 ,'message' => 'ok']);
+    }
+
+    /**
+     * 拉取商品
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function goods( Request $request){
+
+        $wm_id = $request -> input('wm_id' ,'');
+        $mall_code = $request -> input('mall_code','');
+
+        if(empty($wm_id)){
+            return response()->json(['code' => 400 ,'message' => '缺少平台参数']);
+        }
+
+        Redis::set('PULL_GOODS_PROCESS_' . $wm_id , 0 );
+        Redis::set('PULL_GOODS_NUM_' . $wm_id , 0 );
+
+        $goods_num = 0 ;
+
+        switch( $wm_id ){
+            case "1" :   //百度外卖
+
+                for ( $page = 0 ; $page >= 0 ; $page ++ ){
+
+                    $args = [
+                        'mall_code' => $mall_code ,
+                        'page' => $page
+                    ];
+
+                    $result = Wm::send('bd.goods.get_shop_product' ,$args );
+
+                    if($result['code'] == 200){
+
+                        if( !empty($result['data']['list'])){
+
+                            foreach ($result['data']['list'] as $goods ){
+
+                                $wm_goods = WmGoods::where( 'name' , $goods['name'])->first();
+
+                                $wm_shop = WmShop::where([['wm_id', $wm_id], ['mall_code', $mall_code]])->first();
+
+                                $wm_goods_category = WmGoodsCategory::where([['wm_id',$wm_id],['mall_code',$mall_code]],['wm_category_id',$goods['custom_cat_ids']])->first();
+
+                                if( $wm_goods_category ){
+                                    $category_id = $wm_goods_category -> id ;
+                                    $category_name = $wm_goods_category -> name ;
+                                }
+
+                                if( !$wm_goods ) {
+
+                                    $wm_goods = new WmGoods();
+                                    $wm_goods->updated_at = date('Y-m-d h:i:s');
+                                    $wm_goods->creator = 'bd-api';
+                                    $wm_goods->created_at = date('Y-m-d h:i:s');
+                                    $wm_goods->main_goods_id = $goods['sku_id'];
+                                    $wm_goods->name = $goods['name'];
+                                    $wm_goods->status = 1;
+                                    $wm_goods->category_id = isset($category_id) ? $category_id : 0;
+                                    $wm_goods->category_name = isset($category_name) ? $category_name : '';
+                                    $wm_goods->mall_code = $mall_code;
+                                    $wm_goods->wm_goods_id = $goods['sku_id'];
+                                    $wm_goods->wm_id = $wm_id;
+                                    $wm_goods->wm_shop_id = $wm_shop->wm_shop_id;
+                                    $wm_goods->save();
+
+                                    $wm_goods_sale = new WmGoodsSale();
+                                    $wm_goods_sale -> updated_at = date('Y-m-d h:i:s');
+                                    $wm_goods_sale -> creator = 'bd-api';
+                                    $wm_goods_sale -> created_at = date('Y-m-d h:i:s');
+                                    $wm_goods_sale -> goods_id = $wm_goods -> id ;
+                                    $wm_goods_sale -> name = $goods['name'];
+                                    $wm_goods_sale -> spec_name = $goods['name'];
+                                    $wm_goods_sale -> price = $goods['sale_price'];
+                                    $wm_goods_sale -> main_goods_id = $wm_goods -> id ;
+                                    $wm_goods_sale -> product_code = $goods['custom_sku_id'] ;
+                                    $wm_goods_sale -> product_upc = $goods['upc'] ;
+                                    $wm_goods_sale -> category_id = isset($category_id) ? $category_id : 0;
+                                    $wm_goods_sale -> category_name = isset($category_name) ? $category_name : '';
+                                    $wm_goods_sale -> wm_spec_id = $goods['custom_sku_id'] ;
+                                    $wm_goods_sale -> mall_code = $mall_code ;
+                                    $wm_goods_sale -> wm_id = $wm_id ;
+                                    $wm_goods_sale -> wm_shop_id = $wm_shop -> wm_shop_id ;
+                                    $wm_goods_sale ->save();
+
+                                    $goods_num ++ ;
+                                }
+                            }
+                        }
+                        
+                        if( count($result['data']['list']) < 100 ){
+
+                            break;
+                        }
+                    }
+                }
+                break;
+            case "2" :   //饿了么
+
+                $wm_goods_category = WmGoodsCategory::where([ [ 'wm_id',$wm_id ] , ['mall_code',$mall_code] ,['level' , 1 ] ])->get();
+
+                if( !$wm_goods_category -> isEmpty()){
+
+                    foreach ( $wm_goods_category as $c ){
+
+                        $result = Wm::send('ele.goods.getByCategoryId',['category_id' => $c ->id ]);
+
+                        if( $result['code'] == 200 ){
+
+                            if( !empty($result['data']) ){
+
+                                foreach ( $result['data'] as $key => $goods ){
+
+                                    $wm_goods_category = WmGoodsCategory::where([['wm_id',$wm_id],['mall_code',$mall_code]],['wm_category_id',$goods['categoryId']])->first();
+                                    if( $wm_goods_category ){
+                                        $category_id = $wm_goods_category -> id ;
+                                        $category_name = $wm_goods_category -> name ;
+                                    }
+
+                                    $wm_shop = WmShop::where([['wm_id', $wm_id], ['mall_code', $mall_code]])->first();
+
+                                    $wm_goods = WmGoods::where( 'name' , $goods['name'] ) -> first();
+
+                                    if( !$wm_goods ){
+                                        $wm_goods = new WmGoods();
+                                        $wm_goods -> updated_at = date('Y-m-d h:i:s');
+                                        $wm_goods -> creator = 'ele-api';
+                                        $wm_goods -> created_at = date('Y-m-d h:i:s');
+                                        $wm_goods -> main_goods_id = $key ;
+                                        $wm_goods -> name = $goods['name'];
+                                        $wm_goods -> description = $goods['description'];
+                                        $wm_goods -> status = 1;
+                                        $wm_goods -> category_id = isset($category_id) ? $category_id : 0;
+                                        $wm_goods -> category_name = isset($category_name) ? $category_name : '';
+                                        $wm_goods -> mall_code = $mall_code ;
+                                        $wm_goods -> wm_goods_id = $key ;
+                                        $wm_goods -> wm_id = $wm_id ;
+                                        $wm_goods -> wm_shop_id = $wm_shop -> wm_shop_id ;
+                                        $wm_goods -> save();
+
+                                        if( !empty($goods['specs'])){
+
+                                            foreach( $goods['specs'] as  $spec ){
+
+                                                $wm_goods_sale = new WmGoodsSale();
+                                                $wm_goods_sale -> updated_at = date('Y-m-d h:i:s');
+                                                $wm_goods_sale -> creator = 'ele-api';
+                                                $wm_goods_sale -> created_at = date('Y-m-d h:i:s');
+                                                $wm_goods_sale -> goods_id = $wm_goods -> id ;
+                                                $wm_goods_sale -> name = $goods['name'];
+                                                $wm_goods_sale -> spec_name = $spec['name'];
+                                                $wm_goods_sale -> price = $spec['price'];
+                                                $wm_goods_sale -> main_goods_id = $wm_goods -> id ;
+                                                $wm_goods_sale -> product_code = $spec['extendCode'] ;
+                                                $wm_goods_sale -> product_upc = $spec['barCode'] ;
+                                                $wm_goods_sale -> category_id = isset($category_id) ? $category_id : 0;
+                                                $wm_goods_sale -> category_name = isset($category_name) ? $category_name : '';
+                                                $wm_goods_sale -> wm_spec_id = $spec['specId'] ;
+                                                $wm_goods_sale -> mall_code = $mall_code ;
+                                                $wm_goods_sale -> wm_id = $wm_id ;
+                                                $wm_goods_sale -> wm_shop_id = $wm_shop -> wm_shop_id ;
+                                                $wm_goods_sale ->save();
+                                            }
+                                        }
+
+                                        $goods_num ++ ;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                break;
+            case "3" :   //美团外卖
+
+                for ( $page = 0 ; $page >= 0 ; $page ++ ){
+
+                    $args = [
+                        'mall_code' => $mall_code ,
+                        'page' => $page
+                    ];
+
+                    $result = Wm::send('mt.goods.get_shop_product' ,$args );
+
+                    if($result['code'] == 200){
+
+                        if( !empty($result['data']['data'])){
+
+                            foreach ($result['data']['data'] as $goods ){
+
+                                $wm_goods = WmGoods::where( 'name' , $goods['name'])->first();
+
+                                $wm_goods_category = WmGoodsCategory::where([['wm_id',$wm_id],['mall_code',$mall_code]],['name',$goods['category_name']])->first();
+                                if( $wm_goods_category ){
+                                    $category_id = $wm_goods_category -> id ;
+                                }
+
+                                $wm_shop = WmShop::where([['wm_id', $wm_id], ['mall_code', $mall_code]])->first();
+
+                                $skus = json_decode($goods['skus'] ,true);
+
+                                if( !$wm_goods ) {
+
+                                    $wm_goods = new WmGoods();
+                                    $wm_goods->updated_at = date('Y-m-d h:i:s');
+                                    $wm_goods->creator = 'mt-api';
+                                    $wm_goods->created_at = date('Y-m-d h:i:s');
+                                    $wm_goods->main_goods_id = $goods['app_food_code'];
+                                    $wm_goods->name = $goods['name'];
+                                    $wm_goods->description = $goods['description'];
+                                    $wm_goods->status = 1;
+                                    $wm_goods->category_id = isset($category_id) ? $category_id : 0;
+                                    $wm_goods->category_name = $goods['category_name'];
+                                    $wm_goods->mall_code = $mall_code;
+                                    $wm_goods->wm_goods_id = $goods['app_food_code'];
+                                    $wm_goods->wm_id = $wm_id;
+                                    $wm_goods->wm_shop_id = $wm_shop->wm_shop_id;
+                                    $wm_goods->save();
+
+                                    foreach ($skus as $sku ){
+
+                                        $wm_goods_sale = new WmGoodsSale();
+                                        $wm_goods_sale -> updated_at = date('Y-m-d h:i:s');
+                                        $wm_goods_sale -> creator = 'mt-api';
+                                        $wm_goods_sale -> created_at = date('Y-m-d h:i:s');
+                                        $wm_goods_sale -> goods_id = $wm_goods -> id ;
+                                        $wm_goods_sale -> name = $goods['name'];
+                                        $wm_goods_sale -> spec_name = $sku['spec'];
+                                        $wm_goods_sale -> price = $sku['price'];
+                                        $wm_goods_sale -> main_goods_id = $wm_goods -> id ;
+                                        $wm_goods_sale -> product_code = $sku['sku_id'] ;
+                                        $wm_goods_sale -> product_upc = $sku['upc'] ;
+                                        $wm_goods_sale -> category_id = isset($category_id) ? $category_id : 0;
+                                        $wm_goods_sale -> category_name = $goods['category_name'];
+                                        $wm_goods_sale -> wm_spec_id = $sku['sku_id'] ;
+                                        $wm_goods_sale -> mall_code = $mall_code ;
+                                        $wm_goods_sale -> wm_id = $wm_id ;
+                                        $wm_goods_sale -> wm_shop_id = $wm_shop -> wm_shop_id ;
+                                        $wm_goods_sale ->save();
+
+                                    }
+
+                                    $goods_num ++ ;
+                                }
+
+                            }
+                        }
+
+                        if( count($result['data']['data']) < 200 ){
+                            break;
+                        }
+                    }
+                }
+
+                break;
+            case "4" :   //京东到家
+
+                break;
+        }
+
+        Redis::set('PULL_GOODS_PROCESS_' . $wm_id , 1 );
+        Redis::set('PULL_GOODS_NUM_' . $wm_id , $goods_num );
+
+        return response()->json(['code' => 200 ,'message' => 'ok']);
+    }
+    /**
+     * 根据区域名称查询区域Id
+     * @param $name
+     * @param $parentId
+     * @param int $level
+     * @return int
+     */
+    private function regionIdByName($name, $parentId, $level = 1) {
+
+        if (empty($name)) {
+            return 0;
+        }
+
+        if ($level == 1) {
+            if (mb_strrpos($name, '省')) {
+                $name = mb_substr($name, 0, mb_strrpos($name, '省')).'%';
+            }
+        } else if ($level == 2) {
+            if (mb_strrpos($name, '市')) {
+                $name = mb_substr($name, 0, mb_strrpos($name, '市')).'%';
+            }
+        } else {
+            if (mb_strrpos($name, '县')) {
+                $name = mb_substr($name, 0, mb_strrpos($name, '县')).'%';
+            } else if (mb_strrpos($name, '区')) {
+                $name = mb_substr($name, 0, mb_strrpos($name, '区')).'%';
+            }
+        }
+
+        if (ebsig_is_int($parentId)) {
+            $region = SysRegion::where(['region_level'=>$level, 'parentID'=>$parentId])
+                                ->where('name', 'like', $name)
+                                ->first();
+        } else {
+            $region = SysRegion::where('region_level', $level)
+                                ->where('name', 'like', $name)
+                                ->first();
+        }
+
+        return $region ? [$region->id, $region->name] : 0;
+
+    }
+
+
+    /**
+     * 错误处理
+     * @param $log_msg
+     * @return \Illuminate\Http\JsonResponse
+     */
+    private function log_write($log_msg) {
+        return response()->json(['code'=>400, 'message'=>$log_msg]);
+    }
+
+}

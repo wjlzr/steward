@@ -1,0 +1,773 @@
+@extends('admin.layoutList')
+
+@section('css')
+    <link rel="stylesheet" href="/libs/css/layui.css">
+    <link rel="stylesheet" type="text/css" href="/libs/jquery/jquery-ui.css"/>
+    <link rel="stylesheet" href="/css/admin/web/mall.css?v=2018011217">
+@endsection
+
+@section('title')
+    <li class="cur bill-detail"><span>门店列表</span></li>
+@endsection
+
+@section('title_btn')
+    <button class="btn btn-default layer-go-back" type="button" onclick="back()">导出</button>
+@endsection
+
+@section('head')
+    @if($count)
+    <div class="main">
+
+        <div class="has-mall">
+            <div>
+                <p class="total">全部门店（共<span class="orange">{{ $count }}</span>家）</p>
+                <div class="total-box">
+                    <ul class="order-flex-4">
+                        @foreach($return_data as $item)
+                            <li>
+                                <a href="javascript:;">
+                                    <div class="flex-img">
+                                        <span style="background-image: url({{ $item['logo'] }})"></span>
+                                    </div>
+                                    <div class="flex-num">
+                                        <p>营业中</p>
+                                        <p class="num">{{ $item['o_num'] }}</p>
+                                    </div>
+                                    <div class="flex-num">
+                                        <p>暂时关闭</p>
+                                        <p class="num">{{ $item['c_num'] }}</p>
+                                    </div>
+                                </a>
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+
+            </div>
+        </div>
+     @else
+        <!--无门店信息-->
+        <div class="no-content hide">
+            <div class="img-box">
+                <img src="/images/admin/icon/no-list.png" alt="">
+                <p>暂无门店信息</p>
+            </div>
+            <div class="btn-box">
+                <span>您可以</span>
+                <button class="btn btn-blue">拉取平台门店</button>
+                <span>或</span>
+                <button class="btn btn-blue">批量导入门店</button>
+            </div>
+        </div>
+    </div>
+    @endif
+@endsection
+
+@section('search')
+    <div class="form-group">
+        <label for="" class="fl control-label">平台：</label>
+        <div class="fl mr10">
+            <input type="text" class="form-control" id="app_name" name="app_name" placeholder="全部平台">
+        </div>
+    </div>
+    <div class="form-group">
+        <label for="" class="fl control-label" style="padding-left:0;padding-right: 0;">门店号：</label>
+        <div class="fl mr10">
+            <input type="text" class="form-control" id="mall_code" name="mall_code" placeholder="支持模糊匹配">
+        </div>
+    </div>
+    <div class="form-group">
+        <label for="" class="fl control-label" style="padding-left:0;padding-right: 0;">门店名：</label>
+        <div class="fl mr10">
+            <input type="text" class="form-control" id="mall_name" name="mall_name" placeholder="支持模糊匹配">
+        </div>
+    </div>
+    <div class="form-group">
+        <label for="" class="fl control-label" style="padding-left:0;padding-right: 0;">门店状态：</label>
+        <div class="fl mr10">
+            <select class="form-control" name="status">
+                <option value="">全部</option>
+                <option value="1">启用</option>
+                <option value="0">禁用</option>
+            </select>
+        </div>
+    </div>
+@endsection
+
+@section('button')
+    <div class="btn-list">
+        <button class="btn btn-blue add_mall">新增门店</button>
+        <button class="btn btn-blue import">导入门店</button>
+        <button class="btn btn-border-blue" readonly="">设置上线平台</button>
+        <button class="btn btn-border-blue" readonly>设置营业状态</button>
+        <button class="btn btn-border-blue set_business_time">设置营业时间</button>
+        <button class="btn btn-border-blue" readonly>设置库存共享率</button>
+        <button class="btn btn-border-blue" readonly>设置安全库存</button>
+    </div>
+@endsection
+
+@section('tb-head')
+    <div>
+
+    </div>
+@endsection
+
+@section('js')
+    <script src="/libs/layui-v2.1.5/layui.js"></script>
+    <script src="/libs/iCheck/icheck.js"></script>
+    <script src="/libs/jquery/jquery-ui.min.js"></script>
+    <script src="/libs/jquery/jquery-ui-timepicker-addon.js"></script>
+
+    <script>
+
+        //icheck插件
+        function add_check() {
+            $('.square-radio').iCheck({
+                checkboxClass: 'icheckbox_square-blue',
+                radioClass: 'iradio_square-blue',
+                increaseArea: '20%' // optional
+            });
+        }
+
+        //bootstrap数据列表
+        var bootstrap_table_ajax_url = '/admin/mall/search';
+        bootstrap_table({
+            sortName: 'id',
+            sortOrder: 'desc',
+            columns: [ //字段
+                {title: 'checkStatus', checkbox: true},
+                {title: '操作', field: 'operation', align: 'center', width: '400px'},
+                {title: '门店号', field: 'mall_code', align: 'left'},
+                {title: '门店名称', field: 'mall_name', align: 'left', width: '115px'},
+                {title: '城市', field: 'city', align: 'left', width: '65px'},
+                {title: '详细地址', field: 'address', align: 'left', width: '150px'},
+                {title: '营业时间', field: 'business_time', align: 'left', width: '50px'},
+                {title: '上线平台', field: 'app_platform', align: 'left', width: '120px'},
+                {title: '库存共享率(%)', field: 'stock_rate', align: 'left', width: '85px'},
+                {title: '安全库存(件)', field: 'stock_limit', align: 'left', width: '85px'},
+                {title: '创建时间', field: 'created_time', align: 'left', width: '100px'},
+                {title: '更新时间', field: 'update_time', align: 'left', width: '100px'}
+            ]
+        });
+
+        //设置营业状态
+        $(document).on('click', '.platstatus', function () {
+
+            var mall_id = $(this).attr('data_id');
+
+            E.ajax({
+                type: 'get',
+                url: '/admin/mall/search_status/' + mall_id,
+                dataType: 'json',
+                data: {},
+                success: function (obj) {
+                    if (obj.code == 200) {
+
+                        var html = '';
+                        html += '<div id="pop" style="margin-top:10px;" style="width: 100%">';
+                        html += '<div style="background: #ffffff">';
+                        html += '<form id="pop_form" onsubmit="return false;" class="form-horizontal" role="form">';
+
+                        $.each(obj.data, function (k, v) {
+
+                            html += '<div class="form-group" style="margin-right: 1px; margin-left: 1px;border-bottom: 1px solid #ccc;padding: 15px;">';
+
+                            html += '<div class="col-sm-3" style="text-align: center">';
+                            html += '<img src="' + v.image + '">';
+                            html += '<div>' + v.status_name + '</div>';
+
+                            html += '</div>';
+                            html += '<div class="col-sm-9">';
+
+                            if (v.status == 1) {
+                                html += '<input class="square-radio set-status" data-id="' + v.app_id + '" type="radio" name="status_' + v.app_id + '" checked value="1" >营业中 <span style="font-size: 10px;">按营业时间正常接单</span><br/><br/>';
+                                html += '<input class="square-radio set-status" data-id="' + v.app_id + '" type="radio" name="status_' + v.app_id + '" value="0">暂停营业 <span style="font-size: 10px;">门店歇业，期间客户无法下单</span>';
+                            } else {
+                                html += '<input class="square-radio set-status" data-id="' + v.app_id + '" type="radio" name="status_' + v.app_id + '" value="1"/>营业中 <span style="font-size: 10px;">按营业时间正常接单</span><br/><br/>';
+                                html += '<input class="square-radio set-status" data-id="' + v.app_id + '" type="radio" name="status_' + v.app_id + '" checked value="0" >暂停营业 <span style="font-size: 10px;">门店歇业，期间客户无法下单</span>';
+                            }
+
+                            html += '</div>';
+                            html += '</div>';
+                        });
+
+                        html += '</form>';
+                        html += '</div>';
+                        html += '</div>';
+
+
+                        layer.open({
+                            title: '设置营业状态',
+                            type: 1,
+                            area: ['400px', 'auto'],
+                            content: html,
+                            btnAlign: 'c',
+                            btn: ['保存', '关闭'],
+                            yes: function () {
+                                var dt = [];
+                                $('.set-status').each(function () {
+
+                                    if ($(this).is(':checked')) {
+                                        var app_id = $(this).attr('data-id');
+                                        var status = $(this).val();
+                                        dt.push({app_id: app_id, status: status});
+                                    }
+                                });
+
+                                E.ajax({
+                                    type: 'get',
+                                    url: '/admin/mall/set_status',
+                                    dataType: 'json',
+                                    data: {data: dt, mall_id: mall_id},
+                                    success: function (obj) {
+
+                                        if (obj.code == 200) {
+
+                                            layer.closeAll();
+                                            layer.msg('设置成功', {icon: 1, time: 1000});
+                                            window.location.reload();
+
+                                        } else {
+                                            layer.msg('操作失败', {icon: 2, time: 1000});
+                                        }
+                                    }
+                                });
+                            }
+                        });
+
+                        add_check();
+                    } else {
+                        layer.msg('操作失败', {icon: 2, time: 1000});
+                    }
+                }
+
+            });
+
+        });
+
+        //设置上线平台
+        $(document).on('click', '.platform', function () {
+            var mall_id = $(this).attr('data_id');
+
+            E.ajax({
+                type: 'get',
+                url: '/admin/mall/get_platform/' + mall_id,
+                dataType: 'json',
+                data: {},
+                success: function (obj) {
+
+                    if (obj.code == 200) {
+
+                        var html = '';
+                        html += '<div id="plat" style="margin-top:10px;" style="width: 100%">';
+                        html += '<div style="background: #ffffff">';
+                        html += '<form id="plat_form" onsubmit="return false;" class="form-horizontal" role="form">';
+                        if (obj.data.publish != '') {
+                            $.each(obj.data.publish, function (k, v) {
+                                html += '<div class="form-group" style="margin-right: 1px; margin-left: 1px;border-bottom: 1px solid #ccc;padding: 15px;">';
+                                html += '<div class="col-sm-3" style="text-align: center">';
+                                html += '<img src="' + v.image + '">';
+                                html += '<div>' + v.status_name + '</div>';
+                                html += '</div>';
+                                html += '<div class="col-sm-9">';
+                                html += '<span>渠道门店ID:&nbsp;&nbsp;<input style="width: 175px;display:inline" type="text" disabled="disabled" placeholder="请输入渠道门店ID" class="form-control" name="app_online[]" value="' + v.o_id + '"></span>';
+                                html += '</div>';
+                                html += '</div>';
+                            })
+                        }
+
+                        if (obj.data.nopublish != '') {
+                            $.each(obj.data.nopublish, function (k, v) {
+                                html += '<div class="form-group" style="margin-right: 1px; margin-left: 1px;border-bottom: 1px solid #ccc;padding: 15px;">';
+                                html += '<div class="col-sm-3" style="text-align: center">';
+                                html += '<img src="' + v.image + '">';
+                                html += '<div>' + v.status_name + '</div>';
+                                html += '</div>';
+                                html += '<div class="col-sm-9">';
+                                html += '<span>渠道门店ID:&nbsp;&nbsp;<input style="width: 175px;display:inline" type="text" placeholder="请输入渠道门店ID" class="form-control" name="app_noonline[]" value="' + v.o_id + '"></span>';
+                                html += '<input type="hidden" name="app_ids[]" value="' + v.app_id + '"></span>';
+                                html += '</div>';
+                                html += '</div>';
+                            })
+                        }
+                        html += '</form>';
+                        html += '</div>';
+                        html += '</div>';
+
+                        layer.open({
+                            title: '设置上线平台',
+                            type: 1,
+                            area: ['450px', 'auto'],
+                            content: html,
+                            closeBtn: 0,
+                            btnAlign: 'c',
+                            scrollbar: false,
+                            btn: ['保存', '关闭'],
+                            yes: function () {
+                                var dt = E.getFormValues('plat_form');
+                                var app_arr = [];
+                                var app_ids = [];
+                                var err_msg = '';
+//
+                                $.each(dt.app_noonline, function (k, v) {
+                                    var id = v;
+                                    if (v != '' && !E.isInt(v)) {
+                                        err_msg += '请输入正确的渠道门店';
+                                        return false;
+                                    }
+                                });
+
+                                if (err_msg != '') {
+                                    layer.msg(err_msg, {icon: 2, time: 1000});
+                                }
+
+                                E.ajax({
+                                    type: 'get',
+                                    url: '/admin/mall/set_online',
+                                    dataType: 'json',
+                                    data: {mall_id: mall_id, app_arr: dt.app_noonline, app_ids: dt.app_ids},
+                                    success: function (o) {
+                                        console.log(dt.app_noonline);
+                                        console.log(dt.app_ids);
+                                        layer.closeAll();
+                                        if (o.code == 200) {
+                                            layer.msg(o.message, {icon: 1, time: 1000});
+                                            bootstrap_table_init();
+                                        } else {
+                                            layer.msg('操作失败', {icon: 2, time: 1000});
+                                        }
+                                    }
+
+                                });
+                            }
+                        });
+                    } else {
+                        layer.msg('操作失败', {icon: 2, time: 1000});
+                    }
+                }
+            });
+
+        });
+
+        //编辑门店
+        $(document).on('click', '.edit_mall', function () {
+            var url = '';
+            var mall_id = $(this).attr('data_id');
+            if (mall_id) {
+                url = '/admin/mall/edit?mall_id=' + mall_id;
+            } else {
+                url = '/admin/mall/edit';
+            }
+
+            layer.open({
+                title: false,
+                type: 2,
+                area: ['100%', '100%'],
+                content: url,
+                closeBtn: 0,
+                scrollbar: false
+            });
+
+        }).on('click', '.add_mall', function () {
+            var url = '/admin/mall/edit';
+
+            layer.open({
+                title: false,
+                type: 2,
+                area: ['100%', '100%'],
+                content: url,
+                closeBtn: 0,
+                scrollbar: false
+            });
+        });
+
+        //启用&&禁用
+        $(document).on('click', '.change', function () {
+            var notice = '';
+            var err_msg = '';
+
+            var mall_id = $(this).attr('data_id');
+            var status = $(this).attr('data_type');
+            if (E.isInt(mall_id) && mall_id > 0) {
+                if (status == 1) {
+                    notice = '您确定将该门店禁用吗？';
+                } else {
+                    notice = '您确定将该门店启用吗？';
+                }
+            } else {
+                err_msg += '参数错误，请刷新页面';
+            }
+
+            if (err_msg) {
+                layer.msg(err_msg, {icon: 2, shade: [0.15, 'black'], offset: '120px', time: 1000});
+                return false;
+            }
+
+            layer.confirm(notice, {icon: 3, offset: '50px'}, function (index) {
+
+                layer.close(index);
+
+                E.ajax({
+                    type: 'get',
+                    url: '/admin/mall/status',
+                    data: {
+                        'data': mall_id + ',' + status
+                    },
+                    success: function (o) {
+                        if (o.code == 200) {
+                            layer.msg(o.message, {icon: 1, time: 1000});
+                            bootstrap_table_init();
+                        } else {
+                            layer.msg('操作失败', {icon: 2, time: 1000});
+                        }
+                    }
+                });
+            })
+        });
+
+        //修改库存
+        $(document).on('click', '.update', function () {
+            var _this = $(this);
+            var type = $(this).attr('data_type');
+            var stock = $(this).attr('data');
+            var mall_id = $(this).attr('data_id');
+            var name = '';
+            var html = '<div id="pop" style="margin-top:10px;" style="width: 100%"> ' +
+                    '<div style="background: #ffffff">' +
+                    ' <form id="pop_form" onsubmit="return false;" class="form-horizontal" role="form"> ' +
+                    '<div class="form-group" style="margin-right: 1px; margin-left: 1px;"> ' +
+                    '<label class="col-sm-3 control-label" for="stock_edit" >' +
+                    '<span style="color:red">* </span>' + name + '输入：</label>' +
+                    '<div class="col-sm-8">' +
+                    '<input class="form-control"  style="width: 200px;" type="text" id="stock_edit" name="stock_edit" maxlength="100" value="' + stock*100 + '" />' +
+                    '</div></div>' +
+                    '</form></div></div>';
+
+            if (type == 1) {
+                name = '设置库存共享率';
+            } else {
+                name = '设置安全库存';
+            }
+            if (type == 1 || type == 2) {
+                if (E.isInt(mall_id) && mall_id > 0) {
+                    layer.open({
+                        title: name,
+                        type: 1,
+                        area: ['400px', '200px'],
+                        content: html,
+                        btn: ['修改', '关闭'],
+                        yes: function (index, layero) {
+                            var stock_edit = $('#stock_edit').val();
+
+                            if (stock_edit == '') {
+                                if (type == 1) {
+                                    err_msg = '库存共享率不能为空';
+                                } else if (type == 2) {
+                                    err_msg = '安全库存不得为空';
+                                }
+                                layer.msg(err_msg, {icon: 2, shade: [0.15, 'black'], offset: '120px', time: 1000});
+                                return false;
+                            }
+
+                            if (type == 1 && stock_edit > 100) {
+                                err_msg = '库存共享率最大为100%';
+                                layer.msg(err_msg, {icon: 2, shade: [0.15, 'black'], offset: '120px', time: 1000});
+                                return false;
+                            }
+                            $.ajax({
+                                type: 'get',
+                                url: '/admin/mall/update',
+                                data: {
+                                    type: type,
+                                    mall_id: mall_id,
+                                    stock: stock_edit
+                                },
+                                success: function (msg) {
+                                    if (msg.code == 200) {
+                                        layer.closeAll();
+                                        layer.msg(msg.message, {
+                                            icon: 1,
+                                            shade: [0.15, 'black'],
+                                            offset: '120px',
+                                            time: 1000
+                                        });
+                                        bootstrap_table_init();
+                                    } else {
+                                        layer.msg(msg.message, {
+                                            icon: 2,
+                                            shade: [0.15, 'black'],
+                                            offset: '120px',
+                                            time: 1000
+                                        });
+                                    }
+                                }
+
+                            });
+                        }
+                    })
+                }
+            }
+        });
+
+        //设置营业时间
+        $(document).on('click', '.set_business_time', function () {
+
+
+            var html = '';
+
+            html += '<div class="time">';
+            html += '<form action="" id="set-time">';
+            html += '<div class="form-group" style="text-align: center;padding:15px;">';
+            html += '<div class="col-sm-5">';
+            html += '<input type="radio" class="square-radio set_time" name="statustime" value="1" checked> 指定时段';
+            html += '</div>';
+            html += '<div class="col-sm-2">';
+            html += '</div>';
+            html += '<div class="col-sm-5">';
+            html += '<input type="radio" class="square-radio set_time" name="statustime" value="0"> 24小时';
+            html += '</div>';
+            html += '</div>';
+            html += '<div class="time-list">';
+            html += '<div class="form-group" style="text-align: center;padding:15px">';
+            html += '<div class="col-sm-5">';
+            html += '<input type="text" class="form-control s_time layui-input" readonly placeholder="营业开始时间"  name="business_start_time_0" id="business_start_time_0" value="" />';
+            html += '</div>';
+            html += '<div class="col-sm-1" >';
+            html += '<span>至</span>';
+            html += '</div>';
+            html += '<div class="col-sm-5">';
+            html += '<input type="text" class="form-control e_time" readonly placeholder="营业结束时间"  name="business_end_time_0" id="business_end_time_0" value="" />';
+            html += '</div>';
+            html += '</div>';
+            html += '</div>';
+            html += '<div id="add_time" class="form-group" style="text-align: center;">';
+            html += '<div class="col-sm-12">';
+            html += '<span class="time-add"><img src="/images/admin/toggle-down.png" alt="">&nbsp; <a href="javascript:void(0)">添加时间段</a></span>';
+            html += '</div>';
+            html += '</div>';
+            html += '</form>';
+            html += '</div>';
+
+            layer.open({
+                title: '设置营业时间段',
+                type: 1,
+                area: ['450px', '400px'],
+                content: html,
+                closeBtn: 0,
+                btnAlign: 'c',
+                scrollbar: false,
+                btn: ['确认', '取消'],
+                yes: function () {
+                    var notice = '';
+                    var err_msg = '';
+                    var mall_arr = [];
+                    var status = '';
+                    var s_time_arr = [];
+                    var e_time_arr = [];
+
+                    //批量操作
+                    notice = '您确定将所选门店设置为此营业时间吗？';
+                    var num_selected = 0;
+                    $('.selected').each(function () {
+                        num_selected = 1;
+                        var mall_id = $(this).find('a').attr('data_id');
+                        if (E.isInt(mall_id) && mall_id > 0) {
+                            mall_arr.push(mall_id);
+                        } else {
+                            err_msg = '参数错误，请刷新页面';
+                        }
+                    });
+
+                    if (num_selected == 0) {
+                        layer.msg('请选择要操作的门店', {icon: 2, shade: [0.15, 'black'], offset: '120px', time: 2000});
+                        layer.close();
+                        return false;
+                    }
+
+                    status = $('input[name="statustime"]:checked').val();
+                    if (status == 1) {
+
+                        $('.s_time').each(function () {
+
+                            var s_time = $(this).val();
+
+                            if (s_time == '') {
+
+                                err_msg = '请设置所有的时间';
+                                return false;
+                            }
+
+                            s_time_arr.push(s_time);
+                        });
+
+                        $('.e_time').each(function () {
+
+                            var e_time = $(this).val();
+
+                            if (e_time == '') {
+
+                                err_msg = '请设置所有的时间';
+                                return false;
+                            }
+
+                            e_time_arr.push(e_time);
+                        });
+                    }
+
+                    if (err_msg) {
+                        layer.msg(err_msg, {icon: 2, shade: [0.15, 'black'], offset: '120px', time: 1000});
+                        return false;
+                    }
+
+                    layer.confirm(notice, {icon: 3, offset: '50px'}, function (index) {
+
+                        E.ajax({
+                            type: 'get',
+                            url: '/admin/mall/set_time',
+                            dataType: 'json',
+                            data: {
+                                'status': status,
+                                'mall_arr': mall_arr,
+                                'start_arr': s_time_arr,
+                                'end_arr': e_time_arr
+                            },
+                            success: function (o) {
+                                layer.closeAll();
+                                if (o.code == 200) {
+                                    layer.msg(o.message, {icon: 1, time: 1000});
+                                    bootstrap_table_init();
+                                } else {
+                                    layer.msg('操作失败', {icon: 2, time: 1000});
+                                }
+                            }
+                        });
+                    });
+
+                }
+
+            });
+            add_check();
+
+            layui.use('laydate', function(){
+                var laydate = layui.laydate;
+
+                //执行一个laydate实例
+                laydate.render({
+                    elem: '#business_start_time_0', //指定元素
+                    format : 'HH:mm',
+                    type : 'time'
+                });
+            });
+
+            layui.use('laydate', function(){
+                var laydate = layui.laydate;
+
+                //执行一个laydate实例
+                laydate.render({
+                    elem: '#business_end_time_0', //指定元素
+                    format : 'HH:mm',
+                    type : 'time'
+                });
+            });
+
+        });
+
+        var id = 0;
+
+        $(document).on('click', '.time-add', function () {
+
+            id++;
+            var timehtml = '';
+            timehtml += '<div class="form-group time_to" style="text-align: center;padding:15px">';
+            timehtml += '<div class="col-sm-5">';
+            timehtml += '<input type="text" class="form-control s_time" readonly placeholder="营业开始时间"  name="business_start_time_' + id + '" id="business_start_time_' + id + '" value="" />';
+            timehtml += '</div>';
+            timehtml += '<div class="col-sm-1" >';
+            timehtml += '<span>至</span>';
+            timehtml += '</div>';
+            timehtml += '<div class="col-sm-5">';
+            timehtml += '<input type="text" class="form-control e_time" readonly placeholder="营业结束时间"  name="business_end_time_' + id + '" id="business_end_time_' + id + '" value="" />';
+            timehtml += '</div>';
+            timehtml += '<div class="col-sm-1">';
+            timehtml += '<span class="time-del"><a href="javascript:void(0)"><img src="/images/admin/toggle-up.png" alt=""></a></span>';
+            timehtml += '</div>';
+            timehtml += '</div>';
+
+            $('.time-list').append(timehtml);
+
+            layui.use('laydate', function(){
+                var laydate = layui.laydate;
+
+                //执行一个laydate实例
+                laydate.render({
+                    elem: '#business_start_time_'+id, //指定元素
+                    format : 'HH:mm',
+                    type : 'time'
+                });
+            });
+
+            layui.use('laydate', function(){
+                var laydate = layui.laydate;
+
+                //执行一个laydate实例
+                laydate.render({
+                    elem: '#business_end_time_'+id, //指定元素
+                    format : 'HH:mm',
+                    type : 'time'
+                });
+            });
+
+            add_check();
+        }).on('click', '.time-del', function () {
+            $(this).parents('.time_to').remove();
+
+        }).on('ifChecked', 'input[name="statustime"]', function () {
+            var status = this.value;
+            if (status == 0) {
+                $('#add_time').hide();
+                $('.time-list').hide();
+            }
+            if (status == 1) {
+                $('#add_time').show();
+                $('.time-list').show();
+            }
+        });
+
+
+        //导入门店
+        $(document).on('click', '.import', function () {
+
+            var html = '';
+            html += '<div id="ImportPop">';
+            html += '<form id="import_data_form" name="upload_form" action="" method="post" enctype="multipart/form-data" target="hidden_frame">';
+            html += '<div class="form-group" style="margin: 15px;">';
+            html += '<span style="display: inline-block;">';
+            html += '<input type="file" id="upload_file" name="upload_file" style="width: 150px;" >';
+            html += '</span>';
+            html += '<span style="display: inline-block;margin-left: 20px">';
+            html += '<input value="上传文件" class="btn btn-primary btn-sm" type="button" onclick="Global.upload.execute();">';
+            html += '</span>';
+            html += '<span style="display: inline-block;margin-left: 20px">';
+            html += '<a href=""><input type="button" value="下载模板" class="btn btn-primary btn-sm" ></a>';
+            html += '</span>';
+            html += '</div>';
+            html += '<input type="hidden"  class="form-control" name="remark" id="remark" value="">';
+            html += '<input type="hidden"  class="form-control" name="importJson" id="remark" value="">';
+            html += '<iframe name="hidden_frame" id="hidden_frame" style="display: none;"></iframe>';
+            html += '</form>';
+            html += '</div>';
+
+
+            layer.open({
+                title: '导入商品',
+                type: 1,
+                closeBtn: 0,
+                move: false,
+                area: '600px',
+                content: html,
+                btn: ['关闭']
+            });
+        });
+
+    </script>
+@endsection

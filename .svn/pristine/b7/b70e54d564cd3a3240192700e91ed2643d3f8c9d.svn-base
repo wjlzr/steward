@@ -1,0 +1,233 @@
+<?php
+
+namespace App\Services\Analyse;
+
+use App\Models\Goods\StStatGoodsAnalyse;
+use DB;
+
+class GoodsService
+{
+
+
+    /**
+     * 商品分析
+     * @param $args = [
+     *      'mall_id' => int 门店ID
+     *      'app_id' => int 应用ID
+     *      'goods_name' => string 商品名称(模糊匹配)
+     *      'start_date' => string 开始日期
+     *      'end_date' => string 结束日期
+     *      'page' => int 当前页码【选填】(默认为1)
+     *      'page_size' => int 每页数量【选填】(默认为10)
+     * ]
+     * @return array = [
+     *      'total' => int 总条数
+     *      'list' => [
+     *          [
+     *              'code' => string 商家编码/条形码
+     *              'goods_name' => string 商品名称
+     *              'sales_number' => int 销量
+     *              'sales_fee' => string 销售额
+     *              'unit_price' => string 均单价
+     *          ]
+     *      ]
+     * ]
+     */
+    public function goods($args)
+    {
+
+        $page = !empty($args['page'])
+            ? $args['page']
+            : 0;
+
+        $page_size = !empty($args['page_size'])
+            ? $args['page_size']
+            : 10;
+
+        $where = [];
+
+        if (isset($args['app_id']) && !empty($args['app_id'])) {
+            $where[] = ['app_id', $args['app_id']];
+        }
+
+        if (isset($args['goods_name']) && !empty($args['goods_name'])) {
+            $where[] = ['goods_name', 'like', '%' . $args['app_id'] . '%'];
+        }
+
+        if (isset($args['start_date']) && !empty($args['start_date'])) {
+            $where[] = ['cal_date', '>=', $args['start_date']];
+        }
+
+        if (isset($args['end_date']) && !empty($args['end_date'])) {
+            $where[] = ['cal_date', '<=', $args['end_date']];
+        }
+
+        $sort_name = 'total_bill_money';
+        if ($args['sort_name'] == 'sales_number') {
+            $sort_name = 'total_num';
+        } elseif ($args['sort_name'] == ' sales_fee') {
+            $sort_name = 'total_bill_money';
+        }
+
+        DB::connection()->enableQueryLog();
+
+        $goods_data = StStatGoodsAnalyse::where($where)
+            ->orderBy($sort_name, $args['sort_order'])
+            ->groupBy('goods_id')
+            ->offset($page)
+            ->limit($page_size)
+            ->get()
+            ->toArray();
+
+        $log = DB::getQueryLog();
+
+        error_log('======商品分析data=====');
+        error_log(var_export($log,1));
+        error_log(var_export($goods_data,1));
+        return $goods_data;
+        $return_result = [
+            'total' => $goods_data['total'],
+            'list' => []
+        ];
+
+        if ($goods_data['data']) {
+
+            foreach ($goods_data['data'] as $row) {
+
+                $return_result['list'][] = [
+                    'sku' => app_to_string($row['sku']),
+                    'upc' => app_to_string($row['upc']),
+                    'goods_name' => app_to_int($row['goods_name']),
+                    'sales_number' => app_to_int($row['total_num']),
+                    'sales_fee' => app_to_decimal($row['total_bill_money']),
+                    'unit_price' => round($row['total_bill_money'] / $row['total_num'], 2)
+                ];
+
+            }
+        }
+
+        return $return_result;
+
+    }
+
+
+    /**
+     * 商品类别分析
+     * @param $args = [
+     *      'mall_id' => int 门店ID
+     *      'app_id' => int 应用ID
+     *      'one_category_id' => int 一级分类ID(默认为0)【必须】
+     *      'two_category_id' => int 二级分类ID(默认为0)【选填】
+     *      'three_category_id' => int 三级分类ID(默认为0)【选填】
+     *      'start_date' => string 开始日期
+     *      'end_date' => string 结束日期
+     *      'page' => int 当前页码【选填】(默认为1)
+     *      'page_size' => int 每页数量【选填】(默认为10)
+     * ]
+     * @return array = [
+     *      'total' => int 总条数
+     *      'list' => [
+     *          [
+     *              'one_category_name' => string 一级分类名称 【必须】
+     *              'two_category_name' => string  二级分类名称 【必须】(没有返回空字符串)
+     *              'three_category_name' => string 三级分类名称 【必须】(没有返回空字符串)
+     *              'sales_number' => int 销量【必须】
+     *              'sales_fee' => string 销售额【必须】
+     *              'app' => [
+     *                  [
+     *                      'app_name' => string 应用名称
+     *                      'sales_number' => int 应用销量
+     *                      'sales_fee' => string 应用销售额
+     *                  ]
+     *              ]
+     *          ]
+     *      ]
+     * ]
+     */
+    public function category($args)
+    {
+
+        $page = isset($args['page'])
+            ? $args['page']
+            : 0;
+
+        $page_size = isset($args['page_size'])
+            ? $args['page_size']
+            : 10;
+
+        $where = [];
+
+        if (isset($args['app_id']) && !empty($args['app_id'])) {
+            $where[] = ['app_id', $args['app_id']];
+        }
+
+        if (isset($args['mall_id']) && !empty($args['mall_id'])) {
+            $where[] = ['mall_id', $args['mall_id']];
+        }
+
+        if (isset($args['one_category_id']) && !empty($args['one_category_id'])) {
+            $where[] = ['first_level_id', $args['one_category_id']];
+        }
+
+        if (isset($args['two_category_id']) && !empty($args['two_category_id'])) {
+            $where[] = ['second_level_id', $args['two_category_id']];
+        }
+
+        if (isset($args['three_category_name']) && !empty($args['three_category_name'])) {
+            $where[] = ['third_level_id', $args['three_category_name']];
+        }
+
+        if (isset($args['start_date']) && !empty($args['start_date'])) {
+            $where[] = ['cal_date', '>=', $args['start_date']];
+        }
+
+        if (isset($args['end_date']) && !empty($args['end_date'])) {
+            $where[] = ['cal_date', '<=', $args['end_date']];
+        }
+
+        $sort_name = 'total_bill_money';
+        if ($args['sort_name'] == 'sales_number') {
+            $sort_name = 'total_num';
+        } elseif ($args['sort_name'] == ' sales_fee') {
+            $sort_name = 'total_bill_money';
+        }
+
+        DB::connection()->enableQueryLog();
+
+        $category_data = DB::table('st_stat_goods_category_analyse')
+            ->select(DB::raw('first_level_id,second_level_id,third_level_id,first_level_name,second_level_name,third_level_name,SUM(total_num) as total_num,SUM(total_bill_money) as total_bill_money'))
+            ->where($where)
+            ->groupBy('first_level_id', 'second_level_id', 'third_level_id')
+            ->orderBy($sort_name, $args['sort_order'])
+            ->offset($page)
+            ->limit($page_size)
+            ->get()
+            ->toArray();
+
+        $log = DB::getQueryLog();
+
+        error_log('======商品分类分析data=====');
+        error_log(var_export($log,1));
+        error_log(var_export($category_data,1));
+        return $category_data;
+
+        $return_result = [
+            'one_category_name' => '',
+            'two_category_name' => '',
+            'three_category_name' => '',
+            'sales_number' => 0,
+            'sales_fee' => '',
+            'app' => [
+                [
+                    'app_name' => '',
+                    'sales_number' => 0,
+                    'sales_fee' => '',
+                ]
+            ]
+        ];
+        return $return_result;
+
+    }
+
+
+}

@@ -1,0 +1,62 @@
+<?php
+
+use Illuminate\Http\Request;
+
+/*
+|--------------------------------------------------------------------------
+| API Routes
+|--------------------------------------------------------------------------
+|
+| Here is where you can register API routes for your application. These
+| routes are loaded by the RouteServiceProvider within a group which
+| is assigned the "api" middleware group. Enjoy building your API!
+|
+*/
+
+Route::middleware('auth:api')->get('/user', function (Request $request) {
+    return $request->user();
+});
+
+
+Route::any('/open/eleme/push', 'Receive\EleMeController@index');
+Route::get('/open/eleme/call', 'Receive\EleMeController@call');
+
+
+Route::get('/async/order/add', 'Api\Order\OrderController@add');
+
+
+Route::middleware(['api.service'])->group(function () {
+
+    Route::get('/user/login', 'Api\LoginController@login');
+
+    //首页数据接口
+    Route::get('index/sales_profile', 'Api\IndexController@salesProfile');
+    Route::get('index/app_orders_sales', 'Api\IndexController@appOrdersSales');
+    Route::get('index/goods_mall_act_sales', 'Api\IndexController@goodsMallActSales');
+    Route::get('index/hot_sell_goods_rank', 'Api\IndexController@hotSellGoodsRank');
+    Route::get('index/hot_sale_category_rank', 'Api\IndexController@hotSaleCategoryRank');
+    Route::get('index/mall_revenue_rank', 'Api\IndexController@mallRevenueRank');
+    Route::get('index/mall_order_efficiency_rank', 'Api\IndexController@mallOrderEfficiencyRank');
+    Route::get('index/sales_rank', 'Api\IndexController@salesRank');
+    Route::get('index/order_efficiency_rank', 'Api\IndexController@orderEfficiencyRank');
+    Route::get('index/order_status_count', 'Api\IndexController@orderStatusCount');
+    Route::get('index/mall_data', 'Api\IndexController@mallData');
+
+    Route::get('/order/index', 'Api\Order\OrderController@index');
+    Route::get('/order/search', 'Api\Order\OrderController@search');
+    Route::get('/order/detail', 'Api\Order\OrderController@detail');
+    Route::get('/order/receive', 'Api\Order\OrderController@receive');
+    Route::get('/order/agree_refund', 'Api\Order\OrderController@agreeRefund');
+    Route::get('/order/disagree_refund', 'Api\Order\OrderController@disagreeRefund');
+    Route::get('/order/delivery', 'Api\Order\OrderController@delivery');
+    Route::get('/order/cancel', 'Api\Order\OrderController@cancel');
+    Route::get('/order/complete', 'Api\Order\OrderController@complete');
+    Route::get('/order/reply_remind', 'Api\Order\OrderController@replyRemind');
+    Route::get('/order/hang_up', 'Api\Order\OrderController@hangUp');
+    Route::get('/order/cancel_hang_up', 'Api\Order\OrderController@cancelHangUp');
+    Route::get('/order/packs', 'Api\Order\OrderController@packs');
+    Route::get('/order/complete_packs', 'Api\Order\OrderController@completePacks');
+    Route::get('/order/prompts', 'Api\Order\OrderController@prompts');
+    Route::post('/order/prints', 'Api\Order\OrderController@prints');
+
+});

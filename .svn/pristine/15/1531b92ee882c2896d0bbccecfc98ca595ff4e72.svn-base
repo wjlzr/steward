@@ -1,0 +1,44 @@
+<?php
+
+namespace App\Models\Log;
+
+use Illuminate\Database\Eloquent\Model;
+
+class StAppLog extends Model
+{
+
+    protected $table = 'st_app_log';
+
+
+    /**
+     * 接口日志记录
+     * @param $request
+     * @param $return
+     * @param string $creator
+     * @param int $app_id
+     * @param string $start_time
+     */
+    public static function add($request, $return, $creator='', $app_id=0, $start_time='')
+    {
+
+        $creator = !empty($creator)
+            ? $creator
+            : 'api-request';
+
+        $end_time = !empty($start_time)
+            ? microtime(true)
+            : '';
+
+        $app_log = new self;
+        $app_log->creator = $creator;
+        $app_log->app_id = $app_id;
+        $app_log->request_data = json_encode($request);
+        $app_log->return_data = $return;
+        if (!empty($end_time)) {
+            $app_log->exec_time = ($end_time - $start_time) * 1000;
+        }
+        $app_log->save();
+
+    }
+
+}

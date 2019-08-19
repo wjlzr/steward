@@ -1,0 +1,498 @@
+<?php
+
+namespace App\Http\Controllers\Receive;
+
+use DB;
+use Wm;
+use Carbon\Carbon;
+use App\Models\Bill\Bill;
+use App\Models\Wm\WmBill;
+use App\Service\WdhService;
+use Illuminate\Http\Request;
+use App\Models\Bill\BillTrace;
+use App\Models\ConfigureFunction;
+use App\Http\Controllers\Controller;
+use Mockery\CountValidator\Exception;
+
+class BdFoodController extends Controller
+{
+
+    public $curl;
+    public $config;
+    public $parameters;
+
+    public function __construct()
+    {
+        $this->curl = Wm::curl_client('Bd');
+        $this->config = $this->curl->config;
+    }
+
+    /**
+     * 订单入口
+     * @param Request $request
+     */
+    public function index(Request $request)
+    {
+
+        $input_request = $request->input();
+
+        error_log('======//接受数据');
+
+        $input_request['body'] = json_decode($input_request['body'],true);
+
+        error_log(var_export($input_request,true));
+
+        $this->setParamsArray($input_request);
+
+        $cmd = $this->getParameter('cmd');
+
+        if (!$cmd) {
+            $this->returnJson(1, '参数失败');
+        }
+
+        $body = $this->getParameter('body');
+
+        switch ($cmd){
+
+            //订单创建
+            case 'order.create':
+                $res = $this->create($body['order_id']);
+                break;
+
+            case 'order.status.push':
+                $res = $this->statusPush($body, $body['status']);
+                break;
+
+            default:
+                $res = ['code'=>400, 'message'=>'参数错误'];
+
+        }
+
+        if ($res['code'] != 200) {
+            $this->returnJson(1, $res['message']);
+        }
+
+        $this->returnJson(0, 'success');
+
+    }
+
+    /**
+     * 创建订单【下行】
+     * @param string $order_id 平台订单Id
+     * @return array
+     */
+    public function create($order_id) {
+
+        error_log('创建订单');
+        error_log($order_id);
+
+        $wm_bill = WmBill::where(['wm_bill_no' => $order_id, 'wm_id' => 1])->first();
+
+        if( $wm_bill ){
+            return ['code'=>400, 'message'=>'此订单号已创建过订单'];
+        }
+
+        //接口查询订单详情
+        $detail = $this->detail($order_id);
+
+        if (!isset($detail['code']) || $detail['code'] != 200) {
+            return ['code'=>$detail['code'], 'message'=>$detail['message']];
+        }
+
+        $detail_array = $detail['data'];
+
+        //定义创建订单请求参数
+        if ($detail_array['order']['need_invoice'] == 1) {
+            if (!empty($detail_array['order']['taxer_id'])) {
+                $invoice_type=2;
+            }else{
+                $invoice_type=1;
+            }
+        }else{
+            $invoice_type = '';
+        }
+
+        $args_data = [
+            'wm_id' => $this->config['wmID'],
+            'order_id' => $detail_array['order']['order_id'],
+            'operator' => $this->config['operator'],
+            'user_fee' => $detail_array['order']['user_fee'] > 0 ? $detail_array['order']['user_fee'] / 100 : $detail_array['order']['user_fee'],       //订单应付金额(用户实际需要支付的金额)
+            'mall_code' => $detail_array['shop']['id'],
+            'send_time' => 0,
+            'deliver_lng' => $detail_array['user']['coord']['longitude'],
+            'deliver_lat' => $detail_array['user']['coord']['latitude'],
+            'deliver_name' => $detail_array['user']['name'],
+            'deliver_mobile' => $detail_array['user']['phone'],
+            'deliver_address' => $detail_array['user']['address'],
+            'deliver_fee' => $detail_array['order']['send_fee'] > 0 ? $detail_array['order']['send_fee'] / 100 : $detail_array['order']['send_fee'],
+            'lunch_box_fee' => $detail_array['order']['package_fee'],
+            'discount_fee' => $detail_array['order']['discount_fee'] > 0 ? $detail_array['order']['discount_fee'] / 100 : $detail_array['order']['discount_fee'],
+            'need_invoice' => $detail_array['order']['need_invoice'] == 2 ? 0 :$detail_array['order']['need_invoice'], //是否需要发票 1 是 2 否
+            'invoice_title' => $detail_array['order']['invoice_title'],
+            'invoice_type' => $invoice_type,
+            'taxer_id' => $detail_array['order']['taxer_id'],
+            'remark' => $detail_array['order']['remark'],
+            'goods' => [],
+            'wm_bill_json' => json_encode($detail)
+        ];
+
+        if( $detail_array['order']['send_time'] == 1 ){
+            $args_data['send_time'] = date('Y-m-d H:i' , time());
+        }else{
+            $args_data['send_time'] = date('Y-m-d H:i' , $detail_array['order']['send_time']);
+        }
+
+        //检查商品
+        if(!isset($detail_array['products']) || empty($detail_array['products'])) {
+            return array('code'=>404, 'message'=>'没有商品信息');
+        }
+
+        foreach($detail_array['products'] as $products) {
+
+            foreach($products as $goods) {
+
+                //商品规格
+                $spec = '';
+                if (isset($goods['product_attr']) && $goods['product_type'] != 2) {
+                    foreach($goods['product_attr'] as $spec) {
+                        $spec .= $spec['option'].',';
+                    }
+                }
+                $args_data['goods'][] = [
+                    'goods_name' => $goods['product_name'],  //商品名称
+                    'spec' => rtrim($spec, ','),
+                    'goods_number' => $goods['product_amount'], //商品份数
+                    'sale_price' => ($goods['product_price'] + ($goods['package_price'] * $goods['package_amount'])) / 100, //商品售价
+                    'price' => ($goods['product_price'] + ($goods['package_price'] * $goods['package_amount'])) / 100, //商品实售价
+                    'product_code' => $goods['upc'], //商品编号
+                ];
+            }
+
+        }
+
+        $result = Wm::create_order($args_data);
+
+        error_log('======测试创建订单//');
+        error_log(var_export($result,true));
+
+        return $result;
+
+    }
+
+    /**
+     * 订单状态更新【下行】
+     * @param $args_data
+     * @param $status
+     * @return array|mixed
+     * @throws Exception
+     */
+    public function statusPush($args_data, $status) {
+
+        error_log('1111111//');
+        error_log(var_export($args_data,true));
+
+        if (!isset($args_data['order_id']) || empty($args_data['order_id'])) {
+            return ['code'=>400, 'message'=>'参数错误：order_id'];
+        }
+
+        if (!in_array($status, [1,5, 7, 8, 9, 10])) {
+            return ['code'=>400, 'message'=>'参数错误：status'];
+        }
+
+        $WmBill = WmBill::where('wm_bill_no',$args_data['order_id'])->first();
+        if (!$WmBill) {
+            return ['code' => 400, 'message' => '没有此订单'];
+        }
+
+        $bill_no = $WmBill->bill_no;
+
+        $open_allot = ConfigureFunction::getConfigureField(21, 'open_allot');//是否开启配货环节
+
+        $bill_status = $open_allot == 1 ? 2 : 7; //订单状态：开启配货流程为2，不开启为7
+
+        $content_map = [
+            7 => [2, '骑士已接单开始取餐'],
+            8 => [4, '骑士已取餐正在配送'],
+        ];
+
+        if ($status == 5) {
+            $res = $this->confirm($args_data['order_id']);
+        }else if ($status == 9) {
+            $res = $this->finish($args_data['order_id']);
+        } else if ($status == 10) {
+            $res = $this->cancel($args_data['order_id']);
+        } else {
+            $distribution_data = [
+                'bill_no' => $bill_no,
+                'bill_status' => $bill_status,
+                'logistics_status' => $content_map[$status][0],
+                'content' => $content_map[$status][1],
+                'operator' => $this->config['operator']
+            ];
+            if ($status == 1) {
+                $distribution_data['name'] = '';
+                $distribution_data['phone'] = '';
+            }
+
+            //如果开启配货流程，平台配送触发发货流程
+            if ($status == 2 && $open_allot == 1) {
+                $deliver = WdhService::deliverGoods(['bill_no'=>$bill_no, $this->config['operator']]);
+                if ($deliver['code'] != 200) {
+                    return $deliver;
+                }
+            }
+
+            //记录订单轨迹并更新物流状态
+            $bill_trace_master = new BillTrace();
+            $bill_trace_master->uuid = make_uuid();
+            $bill_trace_master->timeStamp = Carbon::now();
+            $bill_trace_master->creator = $this->config['operator'];
+            $bill_trace_master->createTime = Carbon::now();
+            $bill_trace_master->bill_no = $bill_no;
+            $bill_trace_master->bill_status = $bill_status;
+            $bill_trace_master->content = $content_map[$status][1];
+            $bill_trace_master->save();
+
+            $res = ['code'=>200, 'message'=>'ok'];
+
+        }
+
+        return $res;
+
+    }
+
+    /**
+     * 确认接单回调
+     * @param $order_id
+     * @return array
+     */
+    public function confirm ($order_id)
+    {
+
+        error_log('======//小度掌柜接单啦');
+
+        if (!isset($order_id) || empty($order_id)) {
+            return ['code' => 400, 'message' => '参数错误：order_id'];
+        }
+
+        //检查查询wm_bill
+        $bill_takeout = WmBill::where('wm_bill_no',$order_id)->first();
+
+        if (!$bill_takeout) {
+            return ['code' => 400, 'message' => '外卖订单不存在'];
+        }
+
+        //查询bill_master
+        $bill_no = $bill_takeout->bill_no;
+
+        $bill_master = Bill::where('bill_no',$bill_no)->first();
+
+        if (!$bill_master) {
+            return ['code' => 400, 'message' => '订单不存在'];
+        }
+
+        if ($bill_master->order_receive == 1) {
+            return ['code' => 400, 'message' => '外卖订单已接单'];
+        }
+
+        if ($bill_master->pay_type == 2 && $bill_master->pay_status != 1) {
+            return ['code' => 400, 'message' => '外卖订单未全部付款'];
+        }
+
+        if ( $bill_master->bill_refund_status > 0 ) {
+            return ['code' => 400, 'message' => '此订单正在退款'];
+        }
+
+        try {
+
+            DB::beginTransaction();
+
+            $bill_trace_obj = new BillTrace();
+            $bill_trace_obj->timeStamp = Carbon::now();
+            $bill_trace_obj->createTime = Carbon::now();
+            $bill_trace_obj->creator = 'bd-api';
+            $bill_trace_obj->bill_no = $bill_no;
+            $bill_trace_obj->bill_status = 1;
+            $bill_trace_obj->content = '您的订单已接单';
+            $bill_trace_obj->save();
+
+            Bill::where('bill_no',$bill_no)->update(['order_receive'=>1]);
+
+            DB::commit();
+
+            return ['code' => 200, 'message' => 'ok'];
+
+        } catch (Exception $e) {
+
+            DB::rollBack();
+
+            return ['code' => $e->getCode(), 'message' => $e->getMessage()];
+        }
+
+    }
+
+    /**
+     * 已完成订单
+     * @param $order_id
+     * @return array
+     */
+    public function finish($order_id) {
+
+        if (!isset($order_id) || empty($order_id)) {
+            return ['code'=>400, 'message'=>'缺少必要的参数：order_id'];
+        }
+
+        $wm_bill = WmBill::where('wm_bill_no', $order_id)->first();
+        if (!$wm_bill) {
+            return ['code' => 404, 'message' => '外卖订单没有找到'];
+        }
+
+        $bill_master = Bill::find($wm_bill->bill_no);
+        if (!$bill_master) {
+            return ['code'=>404, 'message'=>'订单信息没有找到'];
+        } else if ($bill_master->bill_status != 1 || $bill_master->order_receive == 0) {
+            return ['code'=>400, 'message'=>'订单未接单'];
+        } else if ($bill_master->bill_status == 4) {
+            return ['code'=>400, 'message'=>'订单已完成'];
+        } else if ($bill_master->bill_status == 5) {
+            return ['code'=>400, 'message'=>'订单已取消'];
+        }
+
+        try {
+
+            DB::beginTransaction();
+
+            BillTrace::insert([
+                'uuid' => makeUuid(),
+                'createTime' => Carbon::now(),
+                'creator' => 'bd-push',
+                'timeStamp' => Carbon::now(),
+                'bill_no' => $bill_master->bill_no,
+                'bill_status' => 4,
+                'content'=>'您的订单已完成',
+            ]);
+
+            Bill::where('bill_no', $bill_master->bill_no)->update([
+                'bill_status' => 4,
+                'bill_logistics_status' => 5
+            ]);
+
+            DB::commit();
+            return ['code'=>200, 'message'=>'ok'];
+
+        } catch (Exception $e) {
+            DB::rollBack();
+            return ['code'=>$e->getCode(), 'message'=>$e->getMessage()];
+        }
+    }
+
+    /**
+     * 美团用户或客服取消
+     */
+    public function cancel($order_id) {
+
+        if (!isset($order_id) || empty($order_id)) {
+            return ['code' => 400, 'message' => '参数错误：order_id'];
+        }
+
+        $WmBill = WmBill::where('wm_bill_no',$order_id)->first();
+        if (!$WmBill) {
+            return ['code' => 400, 'message' => '外卖订单不存在'];
+        }
+
+        $bill_master = Bill::find($WmBill->bill_no);
+        if (!$bill_master) {
+            return ['code' => 400, 'message' => '订单信息没有找到'];
+        } else if ($bill_master->bill_status == 5) {
+            return ['code' => 400, 'message' => '订单已经被取消'];
+        }
+
+        try {
+
+            DB::beginTransaction();
+
+            Bill::where('bill_no', $bill_master->bill_no)->update(['bill_status'=>5]);
+
+            $bill_trace_obj = new BillTrace();
+            $bill_trace_obj->uuid = makeUuid();
+            $bill_trace_obj->timeStamp = Carbon::now();
+            $bill_trace_obj->creator = 'bd-push';
+            $bill_trace_obj->createTime = Carbon::now();
+            $bill_trace_obj->bill_no = $bill_master->bill_no;
+            $bill_trace_obj->bill_status = 5;
+            $bill_trace_obj->content = '您的订单已取消';
+            $bill_trace_obj->save();
+
+            DB::commit();
+            return ['code' => 200, 'message' => 'ok'];
+
+        } catch(Exception $e) {
+            DB::rollback();
+            return ['code' => $e->getCode(), 'message' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * 获取订单详情接口【上行】
+     * @param string $order_id 百度外卖订单Id
+     * @return array
+     */
+    public function detail($order_id) {
+        return  $this->curl->call(['order_id'=>$order_id], 'order.get');
+    }
+
+    /**
+     * 保存参数
+     * @param array $paramsArray
+     */
+    public function setParamsArray( $paramsArray ) {
+        foreach($paramsArray as $k => $v) {
+            $this->parameters[$k] = $v;
+        }
+    }
+
+    /**
+     * 根据key获得参数数值
+     * @param string $key
+     * @return mixed
+     */
+    public function getParameter( $key ) {
+        if (isset($this->parameters[$key])) {
+            return $this->parameters[$key];
+        } else {
+            return null;
+        }
+    }
+
+    /**
+     * 百度接口请求响应
+     * @param $erron
+     * @param $error
+     * @param array $data
+     * @return array
+     */
+    public function returnJson($erron, $error, $data =[]) {
+
+        $return_data = [
+            'body'=>[
+                'erron'=>$erron,
+                'error'=>$error,
+                'data'=>$data
+            ],
+            'cmd'=>'resp.' . $this->parameters['cmd'],
+            'source'=>$this->config['appKey'],
+            'ticket'=>$this->curl->ticket(),
+            'version'=>$this->config['version'],
+            'timestamp'=>time()
+        ];
+
+        $return_data['body'] = json_encode($return_data['body']);
+
+        $return_data['sign'] = $this->curl->sign($return_data);
+        $return_data = json_encode($return_data);
+
+        return $return_data;
+
+    }
+
+}

@@ -1,0 +1,53 @@
+var Pic = {
+    add: function (dt, flg) {
+        var html = '';
+        $.each(dt, function (k, v) {
+            html += '<li class="sort">';
+            if ( flg == 'eidt' ) {
+                html += '<img src="' + v.picSow + '_200x200.jpg" data-target="' + v.link + '">';
+            } else {
+                html += '<img src="' + v.link + '_200x200.jpg" data-target="' + v.link + '">';
+            }
+            html += '<span class="glyphicon glyphicon-remove" style="display: none;"></span>';
+            html += '</li>';
+        });
+        $('#js-pic-list').find('li.no-sort').before(html);
+    }
+};
+
+
+$(document).on('click', '#js-pic-list .glyphicon-remove', function () {
+    /**
+     * 删除商品图片
+     */
+    $(this).parent().remove();
+}).on('mouseenter', '#js-pic-list li.sort', function () {
+    /**
+     * 显示图片删除按钮
+     */
+    $(this).find('.glyphicon-remove').show();
+}).on('mouseleave', '#js-pic-list li.sort', function () {
+    /**
+     * 隐藏图片删除按钮
+     */
+    $(this).find('.glyphicon-remove').hide();
+}).on('click', '#js-pic-list li.sort', function () {
+    /**
+     * 放大图片
+     */
+    var img = $('#js-pic-list').find('img').attr('data-target');
+    if ( !img ) {
+        return true;
+    }
+    layer.open({
+        type: 1,
+        title: false,
+        closeBtn: 0,
+        area: ['500px', '500px'],
+        skin: 'layui-layer-nobg', //没有背景色
+        shadeClose: true,
+        content:  '<img src="' + img + '" width="100%" height="100%">'
+    });
+}).on('click', '#js-pic-list a', function () {
+
+});

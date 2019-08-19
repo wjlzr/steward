@@ -1,0 +1,60 @@
+<?php
+
+namespace App\Services\Storage;
+
+use App\Services\Storage\Src\TxCos;
+
+
+class StorageService
+{
+
+
+    public static function addFolder()
+    {
+
+
+
+    }
+
+
+    public static function listFolder()
+    {
+
+
+
+    }
+
+
+    public static function delFolder()
+    {
+
+
+
+    }
+
+
+    public static function upload()
+    {
+
+
+
+    }
+
+
+    public static function delFile()
+    {
+
+
+
+    }
+
+
+    public static function downloadFile()
+    {
+
+
+
+    }
+
+
+}

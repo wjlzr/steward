@@ -1,0 +1,129 @@
+<?php
+namespace App\Service\Wm;
+
+
+interface GoodsFactoryInterface
+{
+
+    /**
+     * 获取店铺商品分类
+     * @param $args = [
+     *      'shop_id' => string 外卖店铺id
+     * ]
+     * @return mixed
+     */
+    public function get_shop_categories($args);
+
+    /**
+     * 添加商品分类
+     * @param $args
+     * @return mixed
+     */
+    public function create_category($args);
+
+    /**
+     * 修改商品分类
+     * @param $args
+     * @return mixed
+     */
+    public function update_category($args);
+
+    /**
+     * 删除商品分类
+     * @param $args = [
+     *      'category_id' => int 商家外卖商品分类id
+     * ]
+     * @return mixed
+     */
+    public function delete_category($args);
+
+    /**
+     * 获取商品列表信息
+     * @param $args = [
+     *      'shop_id' => string 店铺id,
+     *      'page' => int 当前分页
+     *      'page_size' => int 分页条数（默认20）
+     * ]
+     * @return mixed
+     */
+    public function get_shop_product($args);
+
+    /**
+     * 添加商品
+     * @param array $args = [
+     *      'mall_code' => string 商家门店编号
+     *      'category_id' => int 商家外卖分类id
+     *      'goods_name' => string 商家外卖商品名称
+     *      'main_goods_id' => int 商家主商品id(大于等于0)
+     *      'spec' => [
+     *          [
+     *              'name' => string 商家商品规格商品名
+     *              'price' => string 商家商品规格商品价
+     *              'stock' => int 商家商品规格商品库存
+     *              'product_code' => string 商家商品编号
+     *          ]
+     *      ]
+     * ]
+     * @return mixed
+     */
+    public function create_product($args);
+
+    /**
+     * 编辑商品
+     * @param $args
+     * @return mixed
+     */
+    public function update_product($args);
+
+    /**
+     * 批量新增商品
+     * @param $args
+     * @return mixed
+     */
+    public function batch_create_product($args);
+
+    /**
+     * 批量编辑商品
+     * @param $args
+     * @return mixed
+     */
+    public function batch_update_product($args);
+
+    /**
+     * 批量上下架商品
+     * @param array $args = [
+     *      'is_shelf' => int 上下架：0、下架 1、上架
+     *      'goods' => [
+     *          $goods_id
+     *      ]
+     * ]
+     * @return mixed
+     */
+    public function batch_update_self($args);
+
+    /**
+     * 批量修改商品价格
+     * @param $args = [
+     *      'mall_code' => string 门店编号
+     *      'goods' => [
+     *          $goods_id => [
+     *              $spec_id => $price
+     *          ]
+     *      ]
+     * ]
+     * @return mixed
+     */
+    public function batch_update_price($args);
+
+    /**
+     * 批量修改商品库存
+     * @param $args = [
+     *      $goods_id => [
+     *          $spec_id => $stock
+     *      ]
+     * ]
+     * @return mixed
+     */
+    public function batch_update_stock($args);
+
+}

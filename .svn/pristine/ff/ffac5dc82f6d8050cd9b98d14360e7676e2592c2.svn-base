@@ -1,0 +1,94 @@
+<?php
+
+namespace App\Services\Msg\Logic;
+
+use GuzzleHttp\Client;
+use App\Services\EoaService;
+
+
+class DevelopService
+{
+
+    /**
+     * 应用消息推送
+     * @param $args_data
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function send($args_data)
+    {
+
+        $eoa = new EoaService();
+
+        $action = isset($args_data['action'])
+            ? $args_data['action'] : '';
+
+        $message = isset($args_data['message'])
+            ? $args_data['message'] : [];
+
+        $project_id = env('PROJECT_ID');
+
+        $eoa_result = $eoa->get('message/push/app', ['action' => $args_data['action'],'project_id' => $project_id]);
+
+        if ($eoa_result['code'] == 200) {
+
+            $client = new Client();
+
+            foreach($eoa_result['data'] as $app) {
+
+                $post_data = [
+                    'appId' => $app['app_id'],
+                    'timestamp' => time(),
+                    'action' => $action,
+                    'message' => json_encode($message)
+                ];
+                $post_data['sign'] = $this->autograph($post_data, $app['secret']);
+                $request = $client->request('POST', $app['push_url'], [
+                    'form_params' => $post_data
+                ]);
+
+                if ($request->getStatusCode() != 200) {
+                    error_log(json_encode(['code' => $request->getStatusCode(), 'message' => '推送失败']));
+                    continue;
+                }
+
+                $res_content = $request->getBody()->getContents();
+                $res = json_decode($res_content, true);
+                if (isset($res['data']) && $res['data'] == 'ok') {
+                    error_log('ok record!');
+                } else {
+                    error_log('error record!');
+                }
+
+            }
+
+        }
+
+        return response()->json(['code'=>200, 'message'=>'发送成功']);
+
+    }
+
+
+    /**
+     * 推送验证签名
+     * @param $data
+     * @param $secret
+     * @return string
+     */
+    private function autograph($data, $secret)
+    {
+
+        ksort($data);
+        $sign_str = '';
+
+        foreach ($data as $k => $v) {
+            if ($v != '')
+                continue;
+            $sign_str .= $k . '=' . $v;
+        }
+
+        $sign_str .= $secret;
+        return strtoupper(md5($sign_str));
+
+    }
+
+}

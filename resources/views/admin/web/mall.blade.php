@@ -1,0 +1,161 @@
+@extends('admin.layoutList')
+
+@section('css')
+    <link  rel="stylesheet" href="/css/admin/web/mall.css?v=2018011217">
+@endsection
+
+@section('title')
+    <li class="cur bill-detail"><span>门店列表</span></li>
+@endsection
+
+@section('title_btn')
+    <button class="btn btn-default layer-go-back" type="button" onclick="back()">导出</button>
+@endsection
+
+@section('head')
+    <div class="main">
+
+        <div class="has-mall">
+            <div>
+                <p class="total">全部门店（共<span class="orange">21</span>家）</p>
+                <div class="total-box">
+                    <ul class="order-flex-4">
+                        <li>
+                            <a href="javascript:;">
+                                <div class="flex-img">
+                                    <span style="background-image: url(/images/admin/icon/p-logo.png)"></span>
+                                </div>
+                                <div class="flex-num">
+                                    <p>营业中</p>
+                                    <p class="num">11</p>
+                                </div>
+                                <div class="flex-num">
+                                    <p>暂时关闭</p>
+                                    <p class="num">11</p>
+                                </div>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="javascript:;">
+                                <div class="flex-img">
+                                    <span style="background-image: url(/images/admin/icon/p-logo.png)"></span>
+                                </div>
+                                <div class="flex-num">
+                                    <p>营业中</p>
+                                    <p class="num">11</p>
+                                </div>
+                                <div class="flex-num">
+                                    <p>暂时关闭</p>
+                                    <p class="num">11</p>
+                                </div>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="javascript:;">
+                                <div class="flex-img">
+                                    <span style="background-image: url(/images/admin/icon/p-logo.png)"></span>
+                                </div>
+                                <div class="flex-num">
+                                    <p>营业中</p>
+                                    <p class="num">11</p>
+                                </div>
+                                <div class="flex-num">
+                                    <p>暂时关闭</p>
+                                    <p class="num">11</p>
+                                </div>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="javascript:;">
+                                <div class="flex-img">
+                                    <span style="background-image: url(/images/admin/icon/p-logo.png)"></span>
+                                </div>
+                                <div class="flex-num">
+                                    <p>营业中</p>
+                                    <p class="num">11</p>
+                                </div>
+                                <div class="flex-num">
+                                    <p>暂时关闭</p>
+                                    <p class="num">11</p>
+                                </div>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+
+            </div>
+        </div>
+
+        <!--无门店信息-->
+        <div class="no-content hide">
+            <div class="img-box">
+                <img src="/images/admin/icon/no-list.png" alt="">
+                <p>暂无门店信息</p>
+            </div>
+            <div class="btn-box">
+                <span>您可以</span>
+                <button class="btn btn-blue">拉取平台门店</button>
+                <span>或</span>
+                <button class="btn btn-blue">批量导入门店</button>
+            </div>
+        </div>
+    </div>
+@endsection
+
+@section('search')
+    <div class="form-group">
+        <label for="" class="fl control-label">平台：</label>
+        <div class="fl mr10">
+            <input type="text" class="form-control" id="" placeholder="全部平台">
+        </div>
+    </div>
+    <div class="form-group">
+        <label for="" class="fl control-label" style="padding-left:0;padding-right: 0;">门店号：</label>
+        <div class="fl mr10">
+            <input type="text" class="form-control" id="" placeholder="支持模糊匹配">
+        </div>
+    </div>
+    <div class="form-group">
+        <label for="" class="fl control-label" style="padding-left:0;padding-right: 0;">门店名：</label>
+        <div class="fl mr10">
+            <input type="text" class="form-control" id="" placeholder="支持模糊匹配">
+        </div>
+    </div>
+    <div class="form-group">
+        <label for="" class="fl control-label" style="padding-left:0;padding-right: 0;">门店状态：</label>
+        <div class="fl mr10">
+            <input type="radio" class="square-radio" value="0"><label class="control-label mr10"> 全部</label>
+            <input type="radio" class="square-radio" value="1"><label class="control-label mr10"> 启用</label>
+            <input type="radio" class="square-radio" value="0"><label class="control-label mr10"> 禁用</label>
+        </div>
+    </div>
+@endsection
+
+@section('button')
+    <div class="btn-list">
+        <button class="btn btn-blue">新增门店</button>
+        <button class="btn btn-blue">导入门店</button>
+        <button class="btn btn-border-blue">设置上线平台</button>
+        <button class="btn btn-border-blue">设置营业状态</button>
+        <button class="btn btn-border-blue">设置营业时间</button>
+        <button class="btn btn-border-blue">设置库存共享率</button>
+        <button class="btn btn-border-blue">设置安全库存</button>
+    </div>
+@endsection
+
+@section('tb-head')
+    <div>
+        表格
+    </div>
+@endsection
+
+@section('js')
+    <script>
+        //icheck插件
+        $('.square-radio').iCheck({
+            checkboxClass: 'icheckbox_square-blue',
+            radioClass: 'iradio_square-blue',
+            increaseArea: '20%' // optional
+        });
+    </script>
+@endsection

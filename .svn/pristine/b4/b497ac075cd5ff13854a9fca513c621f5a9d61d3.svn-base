@@ -1,0 +1,94 @@
+/*公共*/
+a {
+    text-decoration: none;
+    color: #000
+}
+* {
+    margin: 0;
+    padding: 0
+}
+body{
+    background:#fbfbfb;
+}
+.mr10 {
+    margin-right: 10px;
+}
+.orange {
+    color: #ff9709;
+}
+.blue {
+    color: #00a0e9;
+}
+
+.main {
+    margin: 0 auto 20px;
+    height: auto;
+    border: 1px solid #eee;
+    border-radius: 4px;
+    overflow: hidden;
+    padding: 20px 15px;
+}
+.setting-box .setting-title {
+    line-height: 40px;
+    border-bottom: 1px solid #eee;
+}
+.setting-box .setting-inner {
+    margin: 50px 0;
+    overflow: hidden;
+    color: #666;
+}
+.setting-inner .col-sm-3 {
+    text-align: right;
+    line-height: 34px;
+    padding-right: 0;
+}
+.setting-inner .col-sm-3 .control-label {
+    font-weight: normal;
+    color: #666;
+}
+.setting-inner .question {
+    padding: 0;
+    margin-top: 7px;
+    width: 20px;
+    height: 20px;
+    background: #ff9709;
+    border-radius: 50%;
+    line-height: 20px;
+    text-align: center;
+    color: #fff;
+    cursor: pointer;
+}
+.setting-inner .img-list {
+    float: left;
+    overflow: hidden;
+}
+.setting-inner .img-list li {
+    float: left;
+    width: 80px;
+    height: 80px;
+    overflow: hidden;
+    border-radius: 2px;
+    border: 1px solid #eee;
+    margin: 0 10px 10px 0;
+}
+.setting-inner .img-list li img {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+.setting-inner .add-img {
+    float: left;
+    width: 80px;
+    height: 80px;
+    border: 1px dashed #eee;
+    text-align: center;
+    padding: 19px 0;
+}
+.setting-inner .tips {
+    clear: both;
+    color: #999;
+}
+.btn-box {
+    text-align: center;
+    margin-bottom: 20px;
+}

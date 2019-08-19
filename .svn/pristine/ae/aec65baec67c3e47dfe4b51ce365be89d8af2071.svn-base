@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>商管云</title>
+    <link href="http://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">
+    <link href="http://cdn.bootcss.com/bootstrap-select/1.12.2/css/bootstrap-select.min.css" rel="stylesheet">
+    <link href="/libs/layui-v2.2.5/css/layui.css" rel="stylesheet">
+    <link rel="stylesheet" href="/css/admin/common.css?v=20180107000">
+    <link rel="stylesheet" href="http://cdn.bootcss.com/bootstrap/3.3.5/css/bootstrap.min.css">
+    <link href="/libs/iCheck/skins/square/blue.css" rel="stylesheet">
+    <script language="JavaScript" src="/js/charts/echarts.js" type="text/javascript"></script>
+    <script language="JavaScript" src="/js/charts/china.js" type="text/javascript"></script>
+    <script language="JavaScript" src="/js/charts/world.js" type="text/javascript"></script>
+    <script language="JavaScript" src="/js/charts/export.js" type="text/javascript"></script>
+
+    <style>
+
+        body {
+            background: #f2f2f2;
+        }
+        a,a:hover,a:focus,a:active {
+            text-decoration: none;
+            color: #0066ff;
+        }
+        .app-title {
+            height: 48px;
+            /*background: #fff;*/
+            overflow: hidden;
+            padding: 0 20px;
+        }
+        .app-title ul {
+            float: left;
+            -webkit-box-sizing: border-box;
+            -moz-box-sizing: border-box;
+            box-sizing: border-box;
+            /*overflow: hidden;*/
+        }
+        .app-title ul li {
+            float: left;
+            margin-right: 20px;
+            line-height: 48px;
+        }
+        .app-title ul li span {
+            padding-bottom: 10px;
+        }
+        .app-title ul li.cur span {
+            font-size:18px;
+            /*font-weight: 700;*/
+            /*color: #5f8af7;*/
+            /*border-bottom: 2px solid;*/
+        }
+        .app-title .right-btn {
+            float: right;
+            padding-top: 7px;
+        }
+
+        .app-content {
+            margin: 10px;
+            padding: 15px;
+            background:#ffffff;
+            min-height: 500px;
+            overflow: hidden;
+        }
+        .fl {
+            float: left;
+        }
+        .fr {
+            float: right;
+        }
+        .red {
+            color: #ff0000;
+        }
+
+        #wrapper {
+            margin: 0 15px 15px;
+            padding: 15px;
+            min-height: 500px;
+            border-radius: 5px;
+            background: #fff;
+        }
+
+        .btn-link {
+            font-size: 12px;
+        }
+        .ui-nav ul:after {
+            content: "";
+            display: table;
+            clear: both;
+        }
+        .app-third-sidebar {
+            width: 100%;
+            height: 60px;
+            -webkit-box-sizing: border-box;
+            -moz-box-sizing: border-box;
+            box-sizing: border-box;
+            -webkit-transition: padding-right 0.5s;
+            -moz-transition: padding-right 0.5s;
+            transition: padding-right 0.5s;
+        }
+        .ui-nav {
+            position: relative;
+            border-bottom: none;
+            margin-bottom: 0;
+            display: block;
+        }
+        .ui-nav ul {
+            zoom: 1;
+            margin-bottom: 0;
+            margin-left: 1px;
+            padding: 0;
+        }
+        .ui-nav li {
+            float: left;
+        }
+        .ui-nav li a {
+            height: 60px;
+            padding: 0 20px;
+            min-width: 0;
+            border: none;
+            background: transparent;
+            font-size: 18px;
+            color: #666666;
+            line-height: 60px;
+            text-align: center;
+            display: inline-block;
+            -webkit-box-sizing: border-box;
+            -moz-box-sizing: border-box;
+            box-sizing: border-box;
+        }
+        .ui-nav li span {
+            display: inline-block;
+        }
+
+        .ui-nav li.active span {
+            color: #01a2fd;
+        }
+
+
+        .top-back {
+            float: right;
+            position: absolute;
+            right: 15px;
+            top: 10px;
+        }
+
+        /* bootstrap */
+        .page-header {
+            margin: 0;
+        }
+        h4 {
+            margin-top: 0;
+        }
+        .col-md-10 {
+            text-align: right;
+        }
+        .form-horizontal {
+            margin-top: 20px;
+            padding-right: 15px;
+            padding-left: 15px;
+        }
+
+        /*无数据信息*/
+        .no-data {
+            width:  225px;
+            margin: 100px auto 0;
+            overflow: hidden;
+        }
+        .no-data span {
+            float: left;
+        }
+        .no-data p {
+            float: right;
+            margin-top: 65px;
+            color: #9a9a9a;
+        }
+
+        .btn-blue,.btn-blue:active,.btn-blue:focus  {
+            background-color: #01a2fd;
+            border-color: #01a2fd;
+            color: #fff;
+        }
+        .btn-blue:hover{
+            background-color: #00a2d4;
+            border-color: #00a2d4;
+            color: #fff;
+        }
+        .layui-laypage .layui-laypage-curr .layui-laypage-em{
+            background: #00a0e9;
+        }
+    </style>
+    @yield('css')
+
+</head>
+
+<body>
+
+@yield('content')
+
+</body>
+
+<script src="/libs/jquery/jquery-2.2.2.min.js"></script>
+<script src="/libs/layer-v3.0.3/layer.js"></script>
+<script src="/libs/layui-v2.2.5/layui.js"></script>
+<script src="/libs/bootstrap-table-master/dist/bootstrap-table.min.js?v=20161202"></script>
+<script src="/libs/bootstrap-table-master/dist/locale/bootstrap-table-zh-CN.js"></script>
+<script src="/libs/bootstrap-select/dist/js/bootstrap-select.js"></script>
+<script src="http://cdn.bootcss.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
+<script src="/libs/ebsig/base.js?v=20170206"></script>
+<script src="/libs/iCheck/icheck.js"> </script>
+<script>
+
+    var layers = {
+        msg : function (m , obj) {
+            layer.msg(m, {icon: obj.icon,shade: [0.15, 'black'],offset:'120px',time:1000});
+        },
+        alert : function (m, obj) {
+            layer.msg(m, {icon: obj.icon,shade: [0.15, 'black'],offset:'120px',time:1000});
+        }
+
+    };
+
+    //时间插件
+    layui.use(['laydate']);
+
+    (function() {
+
+        var A = {
+
+
+            /**
+             *冒泡排序
+             * @param sort_data  排序对象
+             * @param n 数量
+             * @param sort_val 排序字段
+             * @returns {*}
+             */
+            bubbleSort:function(sort_data,n,sort_val){
+
+                var i, j;
+
+                for(i = 0; i < n; i++){
+
+                    for(j = 0; i + j < n - 1; j++){
+                        if(sort_data[j][sort_val] > sort_data[j + 1][sort_val] ){
+                            var temp = sort_data[j];
+                            sort_data[j] = sort_data[j + 1];
+                            sort_data[j + 1] = temp;
+                        }
+                    }
+
+                }
+                return sort_data;
+
+            },
+
+            /**
+             * 统计分析操作对象
+             */
+            analyse:{
+
+                /**
+                 * 获取快捷搜索条件
+                 * @param timeFlg : 1.今天  2.昨天  3.本周  4.本月
+                 */
+                getQuickTime:function(start_id,end_id,timeFlg){
+
+                    if( !timeFlg ){
+                        timeFlg = 1;
+                    }
+
+                    switch ( timeFlg ){
+
+                        case 1:
+                            var start_date = A.currentDate();
+                            var end_date   = A.currentDate();
+                            break;
+
+                        case 2:
+                            var start_date = A.getSpecifyDate(-1);
+                            var end_date   = A.getSpecifyDate(-1);
+                            break;
+
+                        case 3:
+
+                            var start_date = A.getSpecifyDate(-7);
+                            var end_date   = A.getSpecifyDate(-1);
+                            break;
+
+                        case 4:
+
+                            var start_date = A.getSpecifyDate(-30);
+                            var end_date   = A.getSpecifyDate(-1);
+                            break;
+
+                    }
+
+                    $("#"+start_id).val(start_date);
+                    $("#"+end_id).val(end_date);
+
+                }
+
+            },
+
+            /**
+             * 获取据今天指定天数的日期
+             * day_num 天数（可以为负值）
+             * time_flg 是否需要时分秒的标志
+             * @returns {string}
+             */
+            getSpecifyDate:function(day_num,time_flg){
+
+                if( !time_flg ){
+                    time_flg = 0;
+                }
+
+                var dt = new Date();
+                dt.setDate(dt.getDate()+day_num);
+
+                var y = dt.getFullYear(),
+                    m = parseInt(dt.getMonth()) + 1 > 9 ? parseInt(dt.getMonth()) + 1 : '0' + (parseInt(dt.getMonth()) + 1),
+                    d = dt.getDate() > 9 ? dt.getDate() : '0' + dt.getDate();
+
+                var time = '';
+                if( time_flg == 1 ){
+                    var h = dt.getHours() > 9 ? dt.getHours() : '0' + dt.getHours(),
+                        i = dt.getMinutes() > 9 ? dt.getMinutes() : '0' + dt.getMinutes(),
+                        s = dt.getSeconds() > 9 ? dt.getSeconds() : '0' + dt.getSeconds();
+                    time += ' ' + h + ':' + i + ':' + s;
+                }
+
+                return y+"-"+m+"-"+d+time;
+
+            },
+
+            /**
+             * 获取当前日期
+             * @returns {string}
+             */
+            currentDate: function() {
+                var dt = new Date(),
+                    y = dt.getFullYear(),
+                    m = parseInt(dt.getMonth()) + 1 > 9 ? parseInt(dt.getMonth()) + 1 : '0' + (parseInt(dt.getMonth()) + 1),
+                    d = dt.getDate() > 9 ? dt.getDate() : '0' + dt.getDate();
+                return y + '-' + m + '-' + d;
+            },
+
+            /**
+             * 获取当前日期+事件
+             * @returns {string}
+             */
+            currentDatetime: function() {
+                var dt = new Date(),
+                    y = dt.getFullYear(),
+                    m = parseInt(dt.getMonth()) + 1 > 9 ? parseInt(dt.getMonth()) + 1 : '0' + (parseInt(dt.getMonth()) + 1),
+                    d = dt.getDate() > 9 ? dt.getDate() : '0' + dt.getDate(),
+                    h = dt.getHours() > 9 ? dt.getHours() : '0' + dt.getHours(),
+                    i = dt.getMinutes() > 9 ? dt.getMinutes() : '0' + dt.getMinutes(),
+                    s = dt.getSeconds() > 9 ? dt.getSeconds() : '0' + dt.getSeconds();
+
+                return y + '-' + m + '-' + d + ' ' + h + ':' + i + ':' + s;
+            }
+
+        };
+
+        window.A = A;
+
+    })();
+
+</script>
+@yield('js')
+
+</html>

@@ -1,0 +1,42 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class StAppLog extends Model
+{
+
+    protected $table = 'st_app_log';
+
+
+    /**
+     * @param $request
+     * @param $return
+     * @param $start_time
+     * @param $app_id
+     * @param string $format
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public static function responseLog($request, $return, $start_time, $app_id, $format = 'json')
+    {
+
+        $end_time = microtime(true);
+
+        $app_log = new self;
+        $app_log->app_id = $app_id;
+        $app_log->return_data = json_encode($return);
+        $app_log->request_data = json_encode($request);
+        $app_log->exec_time = ($end_time - $start_time) * 1000;
+        $app_log->save();
+
+        if ($format == 'json') {
+            return response()->json($return);
+        } else {
+            return $return;
+        }
+
+    }
+
+}
+

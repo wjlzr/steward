@@ -1,0 +1,32 @@
+<?php
+
+namespace App\Services\Order;
+
+use App\Models\Order\StOrder;
+use App\Models\Order\StOrderApply;
+use App\Models\Order\StOrderTrace;
+use App\Models\StApp;
+
+use DB;
+use Wm;
+
+class OrderSubmitService
+{
+
+    const BD_LBS_AK = 'mGi6xeiGPBvUmcVGuys1fhvO';
+
+    private $total_fee = 0;
+
+    private $goods_total_number = 0;
+
+    public function add($args)
+    {
+
+
+
+    }
+
+
+
+
+}

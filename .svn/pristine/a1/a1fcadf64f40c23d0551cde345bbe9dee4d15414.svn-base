@@ -1,0 +1,133 @@
+@extends('admin.layoutEdit')
+
+@section('css')
+    <link rel="stylesheet" href="/css/admin/setting/index.css?v=2018012315">
+@endsection
+
+@section('title')
+    <li class="cur"><span>基础设置</span></li>
+@endsection
+
+@section('content')
+
+    <!--企业LOGO-->
+    <div class="form-group">
+        <div class="col-sm-12">
+            <label class="col-sm-2 control-label" for=""><span class="orange">*</span>企业LOGO</label>
+            <div class="col-sm-10">
+                <div class="logo-img fl" style="background-image: url(/images/admin/setting/defalt.png)"></div>
+                <div class="add-img fl">
+                    <button class="btn btn-border-blue">上传图片</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!--门店LOGO-->
+    <div class="form-group">
+        <div class="col-sm-12">
+            <label class="col-sm-2 control-label" for=""><span class="orange">*</span>门店LOGO</label>
+            <div class="col-sm-10">
+                <div class="logo-img fl" style="background-image: url(/images/admin/setting/defalt.png)"></div>
+                <div class="add-img fl">
+                    <button class="btn btn-border-blue">上传图片</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!--线上平台-->
+    <div class="form-group pr0">
+        <div class="col-sm-12">
+            <label class="col-sm-2 control-label" for=""><span class="orange">*</span>线上平台</label>
+            <div class="col-sm-10 pr0">
+                <ul class="platf-list">
+                    <li>
+                        <div class="check-box">
+                            <input type="checkbox" class="square-radio" value="">
+                        </div>
+                        <div class="platform-infor">
+                            <div class="platf col-sm-3">
+                                <span class="platf-logo" style="background-image: url(/images/admin/setting/jd.png)"></span>
+                                <p class="platf-name">京东到家</p>
+                            </div>
+                            <div class="col-sm-4">
+                                <label for="" class="fl control-label">账号:</label>
+                                <div class="col-sm-9">
+                                    <input type="text" class="form-control" placeholder="合作平台账号">
+                                </div>
+                            </div>
+                            <div class="col-sm-4">
+                                <label for="" class="fl control-label">密码:</label>
+                                <div class="col-sm-9">
+                                    <input type="text" class="form-control" placeholder="合作平台密码">
+                                </div>
+                            </div>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="check-box">
+                            <input type="checkbox" class="square-radio" value="">
+                        </div>
+                        <div class="platform-infor">
+                            <div class="platf col-sm-3">
+                                <span class="platf-logo" style="background-image: url(/images/admin/setting/mt.png)"></span>
+                                <p class="platf-name">美团外卖</p>
+                            </div>
+                            <div class="col-sm-4">
+                                <label for="" class="fl control-label">账号:</label>
+                                <div class="col-sm-9">
+                                    <input type="text" class="form-control" placeholder="合作平台账号">
+                                </div>
+                            </div>
+                            <div class="col-sm-4">
+                                <label for="" class="fl control-label">密码:</label>
+                                <div class="col-sm-9">
+                                    <input type="text" class="form-control" placeholder="合作平台密码">
+                                </div>
+                            </div>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="check-box">
+                            <input type="checkbox" class="square-radio" value="">
+                        </div>
+                        <div class="platform-infor">
+                            <div class="platf col-sm-3">
+                                <span class="platf-logo" style="background-image: url(/images/admin/setting/elm.png)"></span>
+                                <p class="platf-name">饿了么</p>
+                            </div>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="check-box">
+                            <input type="checkbox" class="square-radio" value="">
+                        </div>
+                        <div class="platform-infor">
+                            <div class="platf col-sm-3">
+                                <span class="platf-logo" style="background-image: url(/images/admin/setting/bd.png)"></span>
+                                <p class="platf-name">百度外卖</p>
+                            </div>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="btn-box">
+        <button class="btn btn-blue">确定</button>
+    </div>
+
+@endsection
+
+@section('js')
+    <script>
+        //icheck插件
+        $('.square-radio').iCheck({
+            checkboxClass: 'icheckbox_square-blue',
+            radioClass: 'iradio_square-blue',
+            increaseArea: '20%' // optional
+        });
+    </script>
+@endsection

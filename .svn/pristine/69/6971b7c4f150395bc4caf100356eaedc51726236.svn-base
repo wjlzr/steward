@@ -1,0 +1,49 @@
+<?php
+
+namespace App\Http\Controllers\Admin\Mall;
+
+
+use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
+
+
+class MallController extends Controller
+{
+
+
+    //门店列表首页
+    public function index(Request $request)
+    {
+
+        return view('admin/mall/index', []);
+
+    }
+
+
+    //门店列表数据查询
+    public function search(Request $request)
+    {
+
+        return response()->json(['code'=>200, 'message'=>'ok', 'data'=>[]]);
+
+    }
+
+
+    //新增/编辑门店资料页
+    public function edit(Request $request)
+    {
+
+        return view('admin/mall/index', []);
+
+    }
+
+
+    //新增/编辑提交门店资料信息
+    public function submit(Request $request)
+    {
+
+        return response()->json(['code'=>200, 'message'=>'ok', 'data'=>[]]);
+
+    }
+
+}

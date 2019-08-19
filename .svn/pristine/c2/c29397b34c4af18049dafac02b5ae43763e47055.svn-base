@@ -1,0 +1,575 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+
+use App\Models\Goods\StAppCategory;
+use App\Models\Goods\StAppGoodsSale;
+use App\Models\Goods\StCategory;
+use App\Models\Goods\StGoods;
+use App\Models\Goods\StGoodsSale;
+use App\Models\Goods\StGoodsStock;
+use App\Models\Mall\StAppMall;
+use App\Models\Mall\StMall;
+use App\Models\StApp;
+use App\Models\StRegion;
+use App\Services\LbsMapService;
+use App\Services\Rpc\Goods\HgGoods;
+use Wm;
+
+
+class InitialController extends Controller
+{
+
+    //初始化门店数据
+    public function mall()
+    {
+
+        $st_app = StApp::where('enable',1)->get();
+
+        if( !$st_app -> isEmpty()){
+
+            foreach ( $st_app as $app ){
+
+                switch( $app -> id ){
+                    case '100001' :
+
+                        break;
+//                    case '100002' :  //饿了么
+//
+//                        $args_data = [
+//                            'page' => 0 ,
+//                            'page_size' => 20
+//                        ];
+//
+//                        $res = Wm::send('100002.shop.get_shop_list',$args_data);
+//
+//                        if( $res['code'] != 200 ){
+//                            return response()->json(['code' => 10001,'message' => $res['message']]);
+//                        }
+//
+//                        foreach ( $res['data']['authorizedShops'] as $shop ){
+//
+//                            $args = [
+//                                'shop_id' => $shop['id']
+//                            ];
+//
+//                            $mall_data = Wm::send('100002.shop.get_shop',$args);
+//
+//                            if( $res['code'] != 200 ){
+//                                return response()->json(['code' => 10002,'message' => $res['message']]);
+//                            }
+//
+//                            $st_mall = StMall::where('code',$mall_data['data']['openId'])->first();
+//
+//                            $province_id = '';
+//                            $city_id = '';
+//                            $county_id = '';
+//
+//                            $province_data = StRegion::where([['name','like',$mall_data['data']['provinceName'].'%'],['level',1]] )->first();
+//                            $city_data = StRegion::where([['name','like',$mall_data['data']['cityName'].'%'],['level',2]] )->first();
+//                            $county_data = StRegion::where([['name','like',$mall_data['data']['districtName'].'%'],['level',3]] )->first();
+//
+//                            if( $province_data ){
+//                                $province_id = $province_data ->id ;
+//                            }
+//
+//                            if( $city_data ){
+//                                $city_id = $city_data -> id ;
+//                            }
+//
+//                            if( $county_data ){
+//                                $county_id = $county_data -> id ;
+//                            }
+//
+//                            //营业时间
+//                            $business_time_type = 1;
+//
+//                            $business_time = implode(',',$mall_data['data']['servingTime']);
+//
+//                            if( strpos($business_time , '00:00:00-23:59:59')){
+//                                $business_time_type = 0 ;
+//                            }
+//
+//                            if( !$st_mall ){
+//
+//                                $st_mall = new StMall();
+//                                $st_mall -> creator = 'eleme-api';
+//                                $st_mall -> name = $mall_data['data']['name'];
+//                                $st_mall -> code = $mall_data['data']['openId'];
+//                                $st_mall -> province = $mall_data['data']['provinceName'];
+//                                $st_mall -> city = $mall_data['data']['cityName'];
+//                                $st_mall -> county = $mall_data['data']['districtName'];
+//                                $st_mall -> province_id = $province_id;
+//                                $st_mall -> city_id = $city_id;
+//                                $st_mall -> county_id = $county_id;
+//                                $st_mall -> address = $mall_data['data']['addressText'];
+//                                $st_mall -> latitude = $mall_data['data']['latitude'];
+//                                $st_mall -> longitude = $mall_data['data']['longitude'];
+//                                $st_mall -> phone = implode(',',$mall_data['data']['phones']);
+//                                $st_mall -> mobile = $mall_data['data']['mobile'];
+//                                $st_mall -> business_time_type = $business_time_type;
+//                                $st_mall -> business_time = $business_time;
+//                                $st_mall -> status = $mall_data['data']['isOpen'];
+//                                $st_mall -> logo = $mall_data['data']['imageUrl'];
+//                                $st_mall -> shar_rate = 1;
+//                                $st_mall ->save();
+//                            }
+//
+//                            $st_app_mall = StAppMall::where([['mall_code',$mall_data['data']['openId']],['app_id',100002]])->first();
+//
+//                            if( !$st_app_mall ){
+//
+//                                $st_app_mall = new StAppMall();
+//                                $st_app_mall -> creator = 'eleme-api';
+//                                $st_app_mall -> mall_id = $st_mall -> id;
+//                                $st_app_mall -> mall_name = $st_mall -> name;
+//                                $st_app_mall -> mall_code = $st_mall -> code ;
+//                                $st_app_mall -> status = $st_mall -> status ;
+//                                $st_app_mall -> online_status = 0 ;
+//                                $st_app_mall -> app_id = 100002 ;
+//                                $st_app_mall -> o_mall_id = $mall_data['data']['id'];
+//                                $st_app_mall ->save();
+//                            }
+//                        }
+//
+//                        break;
+                    case '100003' :  //美团
+
+                        $args_data = [
+                            'page' => 0 ,
+                            'page_size' => 20
+                        ];
+
+                        $res = Wm::send('100003.shop.get_shop_list',$args_data);
+
+                        if( $res['code'] != 200 ){
+                            return response()->json(['code' => 10001,'message' => $res['message']]);
+                        }
+
+
+                        foreach ( $res['data']['data'] as $shop ){
+
+                            $args = [
+                                'mall_code' =>  $shop
+                            ];
+
+                            $mall_data = Wm::send('100003.shop.get_shop',$args);
+
+
+                            if( $mall_data['code'] != 200 ){
+                                return response()->json(['code' => 10002,'message' => $mall_data['message']]);
+                            }
+
+                            $st_mall = StMall::where('code',$mall_data['data']['data'][0]['app_poi_code'])->first();
+
+                            $province_id = '';
+                            $city_id = '';
+                            $county_id = '';
+                            $province = '';
+                            $city = '';
+                            $country = '';
+
+                            $LbsMapService = new LbsMapService();
+
+                            $lbs = $LbsMapService -> reverseAddress($mall_data['data']['data'][0]['latitude'],$mall_data['data']['data'][0]['longitude']);
+
+                            if( $lbs['code'] == 200){
+
+                                $province_id = $lbs['data']['province_id'];
+                                $city_id = $lbs['data']['city_id'];
+                                $county_id = $lbs['data']['county_id'];
+                                $province = $lbs['data']['province'];
+                                $city = $lbs['data']['city'];
+                                $country = $lbs['data']['county'];
+
+                            }
+
+                            //营业时间
+                            $business_time_type = 1;
+
+                            $business_time = $mall_data['data']['data'][0]['shipping_time'];
+
+                            if( strpos($business_time , '00:00-23:59')){
+                                $business_time_type = 0 ;
+                            }
+
+                            if( !$st_mall ){
+
+                                $st_mall = new StMall();
+                                $st_mall -> creator = 'mt-api';
+                                $st_mall -> name = $mall_data['data']['data'][0]['name'];
+                                $st_mall -> code = $mall_data['data']['data'][0]['app_poi_code'];
+                                $st_mall -> province = $province;
+                                $st_mall -> city = $city;
+                                $st_mall -> county = $country;
+                                $st_mall -> province_id = $province_id;
+                                $st_mall -> city_id = $city_id;
+                                $st_mall -> county_id = $county_id;
+                                $st_mall -> address = $mall_data['data']['data'][0]['address'];
+                                $st_mall -> latitude = $mall_data['data']['data'][0]['latitude'];
+                                $st_mall -> longitude = $mall_data['data']['data'][0]['longitude'];
+                                $st_mall -> phone = $mall_data['data']['data'][0]['phone'];
+                                $st_mall -> mobile = $mall_data['data']['data'][0]['standby_tel'];
+                                $st_mall -> business_time_type = $business_time_type;
+                                $st_mall -> business_time = $business_time;
+                                $st_mall -> status = $mall_data['data']['data'][0]['is_online'];
+                                $st_mall -> logo = $mall_data['data']['data'][0]['pic_url'];
+                                $st_mall -> shar_rate = 1;
+                                $st_mall ->save();
+                            }
+
+                            $st_app_mall = StAppMall::where([['mall_code',$mall_data['data']['data'][0]['app_poi_code']],['app_id',100003]])->first();
+
+                            if( !$st_app_mall ){
+
+                                $st_app_mall = new StAppMall();
+                                $st_app_mall -> creator = 'mt-api';
+                                $st_app_mall -> mall_id = $st_mall -> id;
+                                $st_app_mall -> mall_name = $st_mall -> name;
+                                $st_app_mall -> mall_code = $st_mall -> code ;
+                                $st_app_mall -> status = $st_mall -> status ;
+                                $st_app_mall -> online_status = 0 ;
+                                $st_app_mall -> app_id = 100003 ;
+                                $st_app_mall -> o_mall_id = $st_mall -> code;
+                                $st_app_mall ->save();
+                            }
+                        }
+
+                        break;
+
+                        break;
+                    case '100004' :
+
+                        break;
+                }
+            }
+        }
+
+        return response()->json(['code'=>200, 'message'=>'ok']);
+    }
+
+
+    //初始化商品分类数据
+    public function category()
+    {
+
+        $st_app_mall = StAppMall::where('online_status',0)->get();
+
+        if( !$st_app_mall ->isEmpty()){
+
+            foreach ( $st_app_mall as $mall){
+
+                switch( $mall -> app_id ){
+                    case '100001' :
+
+                        break;
+                    case '100002' :
+
+                        $args_data = [
+                            'mall_id' => $mall -> mall_id
+                        ];
+
+                        $res = Wm::send('100002.goods.get_shop_categories',$args_data);
+
+                        if( $res['code'] != 200){
+                            return response()->json(['code' => 10001 ,'message' => $res['message']]);
+                        }
+
+                        $sort = 0 ;
+                        foreach ( $res['data'] as $re){
+
+                            $sort ++ ;
+                            $st_category = StCategory::where([['name',$re['name']],['level',1 ]])->first();
+
+                            if( !$st_category ){
+
+                                $st_category = new StCategory();
+                                $st_category -> creator = 'eleme-api';
+                                $st_category -> name = $re['name'];
+                                $st_category -> status = $re['isValid'];
+                                $st_category -> level = 1;
+                                $st_category -> sort = $sort;
+                                $st_category -> p_id = 0;
+                                $st_category -> describe = $re['description'];
+                                $st_category -> save();
+                            }
+
+                            $st_app_category = StAppCategory::where([['category_id',$st_category -> id ],['app_id',100002]])->first();
+
+                            if( !$st_app_category ){
+
+                                $st_app_category = new StAppCategory();
+                                $st_app_category -> creator = 'eleme-api';
+                                $st_app_category -> category_id = $st_category -> id ;
+                                $st_app_category -> category_name = $st_category -> name ;
+                                $st_app_category -> status = $re['isValid'];
+                                $st_app_category -> level = 1;
+                                $st_app_category -> p_id = 0;
+                                $st_app_category -> mall_id = $mall -> mall_id;
+                                $st_app_category -> app_id = 100002;
+                                $st_app_category -> o_category_id = $re['id'];
+                                $st_app_category -> save();
+                            }
+
+                            if( !empty($re['children'])){
+
+                                $sort_mid = 0 ;
+                                foreach ( $re['children'] as $child ){
+
+                                    $sort_mid ++ ;
+                                    $st_mid_category = StCategory::where([['name',$child['name']],['p_id',$st_category ->id ]])->first();
+
+                                    if( !$st_mid_category ) {
+
+                                        $st_mid_category = new StCategory();
+                                        $st_mid_category->creator = 'eleme-api';
+                                        $st_mid_category->name = $child['name'];
+                                        $st_mid_category->status = $child['isValid'];
+                                        $st_mid_category->level = 2;
+                                        $st_mid_category->sort = $sort_mid;
+                                        $st_mid_category->p_id = $st_category -> id ;
+                                        $st_mid_category->describe = $child['description'];
+                                        $st_mid_category->save();
+                                    }
+                                    $st_mid_app_category = StAppCategory::where([['category_id',$st_mid_category -> id],['app_id',100002]])->first();
+                                    if( !$st_mid_app_category ){
+
+                                        $st_mid_app_category = new StAppCategory();
+                                        $st_mid_app_category -> creator = 'eleme-api';
+                                        $st_mid_app_category -> category_id = $st_category -> id ;
+                                        $st_mid_app_category -> category_name = $st_category -> name ;
+                                        $st_mid_app_category -> status = $re['isValid'];
+                                        $st_mid_app_category -> level = 2;
+                                        $st_mid_app_category -> p_id = $st_category -> id ;
+                                        $st_mid_app_category -> mall_id = $mall -> mall_id;
+                                        $st_mid_app_category -> app_id = 100002;
+                                        $st_mid_app_category -> o_category_id = $re['id'];
+                                        $st_mid_app_category -> save();
+                                    }
+                                }
+                            }
+                        }
+
+                        break;
+                    case '100003' :
+
+                        break;
+                    case '100004' :
+
+                        break;
+
+                }
+
+            }
+        }
+
+        return response()->json(['code'=>200, 'message'=>'ok']);
+    }
+
+
+    //初始化商品数据
+    public function goods()
+    {
+
+        $st_app_mall = StAppMall::where('online_status',0)->get();
+
+        if( !$st_app_mall ->isEmpty()){
+            foreach ( $st_app_mall as $mall ){
+
+                switch ( $mall -> app_id ){
+                    case '100001' :
+
+                        break;
+
+                    case '100002' :
+
+                        $page_size = 300 ;
+
+                        for( $page = 0 ; $page >= 0 ; $page = $page*$page_size + 1 ){
+
+                            $args_data = [
+                                'mall_id' => $mall -> mall_id,
+                                'page' =>  $page,
+                                'page_size' => $page_size,
+                            ];
+
+                            $res = Wm::send('100002.goods.get_shop_product',$args_data);
+
+                            if( $res['code'] != 200){
+                                return response()->json(['code' => 10001,'message' => $res['message']]);
+                            }
+
+                            if( !empty($res['data'])){
+
+                                foreach( $res['data'] as $goods){
+
+                                    $st_goods = StGoods::where('name',$goods['name'])->first();
+
+                                    //分类
+                                    $st_app_category = StAppCategory::where([['app_id',100002],['o_category_id',$goods['categoryId']]])->first();
+
+                                    if(!$st_app_category){
+                                        return response()->json(['code' => 10002,'message' => '分类信息不存在']);
+                                    }
+
+                                    if( $st_app_category -> level == 1){
+
+                                        $big_category_id = $st_app_category -> category_id ;
+                                        $big_category_name = $st_app_category -> category_name;
+                                        $mid_category_id = NULL;
+                                        $mid_category_name = NULL;
+                                    }elseif( $st_app_category -> level == 2 ){
+
+                                        $big_category = StAppCategory::where([['app_id',100002],['category_id',$st_app_category -> p_id ]])->first();
+
+                                        $big_category_id = $big_category -> category_id;
+                                        $big_category_name = $big_category -> category_name;
+                                        $mid_category_id = $st_app_category -> category_id ;
+                                        $mid_category_name = $st_app_category -> category_name;
+                                    }
+
+                                    if( !$st_goods ){
+
+                                        //主商品
+                                        $st_goods = new StGoods();
+                                        $st_goods -> creator = 'system';
+                                        $st_goods -> name = $goods['name'];
+                                        $st_goods -> price = $goods['specs'][0]['price'];
+                                        $st_goods -> spec_type = count($goods['specs']) > 1 ? 1 : 0 ;
+                                        $st_goods -> describe = $goods['description'];
+                                        $st_goods -> status = $goods['isValid'];
+                                        $st_goods -> big_category_id = $big_category_id ;
+                                        $st_goods -> big_category_name = $big_category_name ;
+                                        $st_goods -> mid_category_id = $mid_category_id;
+                                        $st_goods -> mid_category_name = $mid_category_name ;
+                                        $st_goods -> image = $goods['imageUrl'];
+                                        $st_goods -> unit = $goods['unit'];
+                                        $st_goods -> save();
+                                    }
+
+                                    //规格商品
+                                    if( !empty($goods['specs'])){
+
+                                        foreach ( $goods['specs'] as $spec ){
+
+                                            $st_goods_sale = StGoodsSale::where([['goods_id',$st_goods -> id ],['sku',$spec['extendCode']]])->first();
+
+                                            if( !$st_goods_sale ){
+                                                $st_goods_sale = new StGoodsSale();
+                                                $st_goods_sale -> creator = 'system';
+                                                $st_goods_sale -> goods_id = $st_goods -> id;
+                                                $st_goods_sale -> name = $st_goods -> name;
+                                                $st_goods_sale -> price = $spec['price'];
+                                                $st_goods_sale -> spec = $spec['name'];
+                                                $st_goods_sale -> status = $spec['onShelf'] == 1 ? 1 : 2;
+                                                $st_goods_sale -> sku = $spec['extendCode'];
+                                                $st_goods_sale -> upc = $spec['barCode'];
+                                                $st_goods_sale -> sku_spec = 1;
+                                                $st_goods_sale -> big_category_id = $big_category_id ;
+                                                $st_goods_sale -> big_category_name = $big_category_name ;
+                                                $st_goods_sale -> mid_category_id = $mid_category_id;
+                                                $st_goods_sale -> mid_category_name = $mid_category_name ;
+                                                $st_goods_sale -> images = $goods['imageUrl'];
+                                                $st_goods_sale -> package_price = $spec['packingFee'];
+                                                $st_goods_sale -> unit = $goods['unit'];
+                                                $st_goods_sale -> weight = $spec['weight'];
+                                                $st_goods_sale -> save();
+                                            }
+
+                                            //平台商品表
+                                            $st_app_goods_sale = StAppGoodsSale::where([['spec_id',$st_goods_sale->id],['app_id',100002]])->first();
+
+                                            if( !$st_app_goods_sale ){
+
+                                                $st_app_goods_sale = new StAppGoodsSale();
+                                                $st_app_goods_sale -> creator = 'eleme-api';
+                                                $st_app_goods_sale -> goods_id = $st_goods -> id ;
+                                                $st_app_goods_sale -> spec_id = $st_goods_sale -> id ;
+                                                $st_app_goods_sale -> name = $goods['name'];
+                                                $st_app_goods_sale -> spec = $spec['name'];
+                                                $st_app_goods_sale -> price = $spec['price'];
+                                                $st_app_goods_sale -> status = $spec['onShelf'] == 1 ? 1 : 2;
+                                                $st_app_goods_sale -> sku = $spec['extendCode'];
+                                                $st_app_goods_sale -> upc = $spec['barCode'];
+                                                $st_app_goods_sale -> images = $goods['imageUrl'];
+                                                $st_app_goods_sale -> mall_id = $mall -> mall_id;
+                                                $st_app_goods_sale -> app_id = 100002;
+                                                $st_app_goods_sale -> o_goods_id = $goods['id'];
+                                                $st_app_goods_sale -> o_sku_id = $spec['specId'];
+                                                $st_app_goods_sale -> save();
+                                            }
+                                        }
+                                    }
+
+                                    //库存初始化
+
+                                    if( !empty($goods['specs'])){
+
+                                        foreach ( $goods['specs'] as $spec ) {
+
+                                            $st_goods_stock = StGoodsStock::where([['mall_id', $mall->mall_id], ['sku',$spec['extendCode']]])->first();
+
+                                            if( !$st_goods_stock ){
+                                                $st_goods_stock = new StGoodsStock();
+                                                $st_goods_stock -> creator = 'system';
+                                                $st_goods_stock -> mall_id = $mall -> mall_id;
+                                                $st_goods_stock -> mall_name = $mall -> mall_name;
+                                                $st_goods_stock -> sku = $spec['extendCode'];
+                                                $st_goods_stock -> enable_number = $spec['stock'];
+                                                $st_goods_stock -> lock_number = 0;
+                                                $st_goods_stock -> status = 1;
+                                                $st_goods_stock -> save();
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            if( count($res['data']) < $page_size ){
+                                break;
+                            }
+                        }
+
+                        break;
+                    case '100003' :
+
+                        break;
+                    case '100004' :
+
+                        break;
+                }
+            }
+        }
+
+        return response()->json(['code'=>200, 'message'=>'ok']);
+    }
+
+
+    //初始化商品价格
+    public function price()
+    {
+
+        $hg_goods = new HgGoods();
+
+        $res = $hg_goods -> price();
+
+        return response()->json(['code'=>200, 'message'=>'ok']);
+
+    }
+
+
+    //初始化商品库存
+    public function store()
+    {
+
+        $hg_goods = new HgGoods();
+        $hg_goods -> store();
+
+        return response()->json(['code'=>200, 'message'=>'ok']);
+
+    }
+
+
+}

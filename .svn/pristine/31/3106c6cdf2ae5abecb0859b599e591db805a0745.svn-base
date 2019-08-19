@@ -1,0 +1,285 @@
+<?php
+namespace App\Http\Controllers\Admin\Task;
+
+use Carbon\Carbon;
+use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
+use App\Http\Controllers\Admin\Task\TaskManageController;
+use DB;
+use Illuminate\Support\Facades\Redis as Redis;
+
+class StatMallController extends Controller
+{
+
+    public function stat(Request $request)
+    {
+
+        error_log(111111);
+
+        if (empty($request->input('task_log_id'))) {
+            die('参数错误');
+        }
+
+        $TaskManageController = new TaskManageController();
+
+        ini_set('memory_limit', '2048M');
+
+        set_time_limit(0);
+
+        //删除Redis
+        $redis_del = Redis::keys('StatMallController_*');
+        if ( $redis_del ) {
+            foreach ( $redis_del as $del ) {
+                Redis::del($del);
+            }
+        }
+
+        //获取统计日期数据
+        $this->get_data();
+
+        //获取完成和取消订单数据
+        $this->get_finish_cancel();
+
+        //保存门店营业分析数据
+        $this->st_stat_mall_analyse();
+
+        //删除Redis
+        $redis_del = Redis::keys('StatMallController_*');
+        if ( $redis_del ) {
+            foreach ( $redis_del as $del ) {
+                Redis::del($del);
+            }
+        }
+
+        ini_restore('memory_limit');
+        echo '执行结束';
+
+        $TaskManageController->updateTaskLog( $request->input('task_log_id'), 'SUCCESS' );
+
+    }
+
+    public function get_data() {
+
+        //分页
+        $take = 1;
+
+        $calDate = date('Y-m-d', strtotime('-1 day'));
+        $s_time = $calDate . ' 00:00:00';
+        $e_time = $calDate . ' 23:59:59';
+
+        while ($take >= 1) {
+
+            $order = DB::table('st_order')
+                ->select(DB::raw('mall_id, app_id, COUNT(*) AS total'))
+                ->whereBetween('created_at', [$s_time, $e_time])
+                ->groupBy('mall_id','app_id')
+                ->offset(($take-1)*5000)
+                ->limit(5000)
+                ->get()->toArray();
+
+            if (empty($order)) {
+                break;
+            }
+
+            foreach ( $order as $d ) {
+
+                $index_redis = 'StatMallController_'. $calDate . '_' . $d->mall_id . '_' . $d->app_id;
+
+                $redis_data = array(
+                    'total_bill_num' => $d->total,
+                    'total_sale_bill_num' => 0,
+                    'total_cancel_bill_num' => 0,
+                    'total_goods_num' => 0,
+                    'total_user_fee' => 0,
+                    'total_mall_fee' => 0,
+                    'total_goods_money' => 0,
+                    'package_income' => 0,
+                    'delivery_income' => 0,
+                    'activity_expense' => 0,
+                    'service_expense' => 0,
+                    'app_expense' => 0,
+                    'total_cancel_user_fee' => 0,
+                    'total_cancel_mall_fee' => 0
+                );
+
+                Redis::set($index_redis,json_encode($redis_data));
+
+            }
+
+            ++$take;
+
+        }
+
+    }
+
+    public function get_finish_cancel() {
+
+        //分页
+        $page = 1;
+        $calDate = date('Y-m-d', strtotime('-1 day'));
+        $s_time = $calDate . ' 00:00:00';
+        $e_time = $calDate . ' 23:59:59';
+
+        while($page >= 1) {
+
+            $orders = DB::table('st_order_trace')
+                ->select('order_id','order_status')
+                ->whereIn('order_status', [4, 5])
+                ->whereBetween('created_at', [$s_time, $e_time])
+                ->offset(($page-1)*5000)
+                ->limit(5000)
+                ->get()->toArray();
+
+            if ( empty($orders) ) {
+                break;
+            }
+
+            foreach ( $orders as $d ) {
+
+                $order_data = DB::table('st_order')
+                    ->select(DB::raw('DATE_FORMAT(created_at,\'%Y-%m-%d\') AS days, app_id, mall_id, total_goods_number,user_fee,
+                        balance_fee,order_fee,total_fee,package_fee,freight_fee,discount_fee,service_fee,app_act_fee'))
+                    ->where('id', $d->order_id)->get()->toArray();
+
+                if (empty($order_data)) {
+                    continue;
+                }
+
+                $index_redis = 'StatMallController_'.$order_data[0]->days . '_' . $order_data[0]->mall_id . '_' . $order_data[0]->app_id;
+                $redis_data = Redis::get($index_redis);
+
+                if( empty($redis_data) ){
+
+                    $redis_data = array(
+                        'total_bill_num' => 0,
+                        'total_sale_bill_num' => 0,
+                        'total_cancel_bill_num' => 0,
+                        'total_goods_num' => 0,
+                        'total_user_fee' => 0,
+                        'total_mall_fee' => 0,
+                        'total_goods_money' => 0,
+                        'package_income' => 0,
+                        'delivery_income' => 0,
+                        'activity_expense' => 0,
+                        'service_expense' => 0,
+                        'app_expense' => 0,
+                        'total_cancel_user_fee' => 0,
+                        'total_cancel_mall_fee' => 0
+                    );
+
+                } else {
+                    $redis_data = json_decode($redis_data,true);
+                }
+
+                if( $d->order_status == 4 ){
+                    $redis_data['total_sale_bill_num']++;
+                    $redis_data['total_goods_num'] += $order_data[0]->total_goods_number;
+                    $redis_data['total_user_fee'] += $order_data[0]->user_fee + $order_data[0]->balance_fee;
+                    $redis_data['total_mall_fee'] += $order_data[0]->order_fee;
+                    $redis_data['total_goods_money'] += $order_data[0]->total_fee;
+                    $redis_data['package_income'] += $order_data[0]->package_fee;
+                    $redis_data['delivery_income'] += $order_data[0]->freight_fee;
+                    $redis_data['activity_expense'] += $order_data[0]->discount_fee;
+                    $redis_data['service_expense'] += $order_data[0]->service_fee;
+                    $redis_data['app_expense'] += $order_data[0]->app_act_fee;
+                } else {
+                    $redis_data['total_cancel_bill_num']++;
+                    $redis_data['total_cancel_user_fee'] += $order_data[0]->user_fee + $order_data[0]->balance_fee;
+                    $redis_data['total_cancel_mall_fee'] += $order_data[0]->order_fee;
+                }
+
+                Redis::set($index_redis,json_encode($redis_data));
+
+            }
+
+            ++$page;
+
+        }
+
+    }
+
+    public function st_stat_mall_analyse() {
+
+        $redis_array = Redis::keys('StatMallController_*');
+
+        if ( empty($redis_array) ) {
+            return 0;
+        }
+
+        foreach ( $redis_array as $r ) {
+
+            $data = Redis::get($r);
+            $data = json_decode($data,true);
+
+            $r = str_replace('StatMallController_','',$r);
+            $index = explode('_',$r);
+
+            $check = DB::table('st_stat_mall_analyse')
+                ->where([
+                    ['cal_date', $index[0]],
+                    ['mall_id', $index[1]],
+                    ['app_id', $index[2]]
+                ])->get()->toArray();
+
+            $insert_sql = array();
+
+            $total_bill_num = empty($data['total_bill_num']) ? $data['total_sale_bill_num']+$data['total_cancel_bill_num'] : $data['total_bill_num'];
+
+            if ( empty($check) ) {
+
+                $insert_sql[] = array(
+                    'updated_at' => Carbon::now(),
+                    'creator' => 'system',
+                    'created_at' => Carbon::now(),
+                    'cal_date' => $index[0],
+                    'mall_id' => $index[1],
+                    'app_id' => $index[2],
+                    'total_bill_num' => $total_bill_num,
+                    'total_sale_bill_num' => $data['total_sale_bill_num'],
+                    'total_cancel_bill_num' => $data['total_cancel_bill_num'],
+                    'total_goods_num' => $data['total_goods_num'],
+                    'total_user_fee' => $data['total_user_fee'],
+                    'total_mall_fee' => $data['total_mall_fee'],
+                    'total_goods_money' => $data['total_goods_money'],
+                    'package_income' => $data['package_income'],
+                    'delivery_income' => $data['delivery_income'],
+                    'activity_expense' => $data['activity_expense'],
+                    'service_expense' => $data['service_expense'],
+                    'app_expense' => $data['app_expense'],
+                    'total_cancel_user_fee' => $data['total_cancel_user_fee'],
+                    'total_cancel_mall_fee' => $data['total_cancel_mall_fee']
+                );
+
+            } else {
+                DB::table('st_stat_mall_analyse')
+                    ->where([
+                        ['cal_date', $index[0]],
+                        ['mall_id', $index[1]],
+                        ['app_id', $index[2]]
+                    ])->update([
+                        'total_sale_bill_num' => $check[0]->total_sale_bill_num + $total_bill_num,
+                        'total_cancel_bill_num' => $check[0]->total_cancel_bill_num + $data['total_cancel_bill_num'],
+                        'total_goods_num' => $check[0]->total_goods_num + $data['total_goods_num'],
+                        'total_user_fee' => $check[0]->total_user_fee + $data['total_user_fee'],
+                        'total_mall_fee' => $check[0]->total_mall_fee + $data['total_mall_fee'],
+                        'total_goods_money' => $check[0]->total_goods_money + $data['total_goods_money'],
+                        'package_income' => $check[0]->package_income + $data['package_income'],
+                        'delivery_income' => $check[0]->delivery_income + $data['delivery_income'],
+                        'activity_expense' => $check[0]->activity_expense + $data['activity_expense'],
+                        'service_expense' => $check[0]->service_expense + $data['service_expense'],
+                        'app_expense' => $check[0]->app_expense + $data['app_expense'],
+                        'total_cancel_user_fee' => $check[0]->total_cancel_user_fee + $data['total_cancel_user_fee'],
+                        'total_cancel_mall_fee' => $check[0]->total_cancel_mall_fee + $data['total_cancel_mall_fee'],
+                    ]);
+            }
+
+            if ( $insert_sql ) {
+                DB::table('st_stat_mall_analyse')->insert($insert_sql);
+            }
+
+        }
+
+    }
+
+}
+

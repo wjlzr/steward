@@ -1,0 +1,39 @@
+<?php
+
+namespace App\Services\Analyse;
+
+
+
+class SellAnalyseService
+{
+
+
+    public function goods($args)
+    {
+
+        return ['code'=>200, 'message'=>'ok', 'data'=>[]];
+
+    }
+
+
+    /**
+     * 商品类别分析
+     * @param $args
+     * @return array
+     */
+    public function category($args)
+    {
+
+        return ['code'=>200, 'message'=>'ok', 'data'=>[]];
+
+    }
+
+
+    public function
+
+
+
+
+
+
+}

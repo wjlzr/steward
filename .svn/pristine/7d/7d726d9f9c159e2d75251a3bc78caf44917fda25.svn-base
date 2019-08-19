@@ -1,0 +1,28 @@
+<?php
+
+namespace App\Http\Controllers\Ajax\Ajax;
+
+use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
+
+use App\Services\Mall\MallSearchService;
+
+
+class MallController extends Controller
+{
+
+
+    public function search(Request $request)
+    {
+
+        $app_client = $request->input('app_client', 0);
+
+        $mall_search = new MallSearchService();
+        $mall_result = $mall_search->search($request->input());
+
+
+
+    }
+
+
+}

@@ -1,0 +1,258 @@
+@extends('admin.layoutEdit')
+@section('css')
+    <link href="http://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/libs/bootstrap-table-master/dist/bootstrap-table.min.css">
+    <link href="/libs/layui/css/layui.css" rel="stylesheet">
+    <link href="/css/admin/online.css?v=20171214" rel="stylesheet">
+    <link href="/libs/iCheck/skins/square/blue.css" rel="stylesheet">
+    <style>
+        .form-inline {
+            display: inline-block;
+            width:auto
+        }
+        .good-logo{
+            width:170px;
+            text-align:left
+        }
+
+    </style>
+
+@endsection
+
+@section('title')
+    <li class="cur bill-detail">
+        <span>订单详情</span>
+    </li>
+@endsection
+
+@section('go-back-btn')
+    <button class="btn btn-default layer-go-back" type="button" onclick="back()">返回</button>
+@endsection
+@section('content')
+    <div class="goods-cont">
+        <div class="good-info">
+            <div class="good-img"><img src="{{ $goods_data['image'] or ''}}" style="width: 50px;"></div>
+            <div class="good-spec">
+                <div class="spec-info">{{ $goods_data['name']  or ''}}</div>
+                <div class="spec-check">
+
+                    <span>{{ $goods_data['spec'] or '' }}<em class="red-color">￥{{ $goods_data['price'] or ''}}</em></span>
+
+                </div>
+            </div>
+        </div>
+        <div class="good-info-spec">
+            <div class="spec-nav">
+                <span><em class="red-color">*</em>平台</span>
+                <span class="platcategory"><em class="red-color">*</em>平台分类</span>
+                <span class="Specifications">规格</span>
+                <span class="price">价格（元）</span>
+            </div>
+            <div id="nopublish-list">
+            </div>
+            <div id="publish-list">
+            </div>
+            <div class="btn-color btn btn-word-color confirm" id="confirm">确定</div>
+        </div>
+    </div>
+@endsection
+
+@section('js')
+    <script src="/libs/iCheck/icheck.js"></script>
+    <script>
+
+        var spec_id = '{!! $spec_id or '' !!}';
+        E.ajax({
+            type :'get',
+            url : '/admin/mallgoods/search_online',
+            data : { spec_id : spec_id },
+            dataType : 'json',
+            success : function ( obj){
+                if( obj.code == 200 ){
+                    if( obj.data.publish != ''){
+
+                        var html = '';
+                            html += '<div class="notice">';
+                            html += '<div class="notice-left">已发布</div>';
+                            html += '</div>';
+
+                        $.each( obj.data.publish ,function ( k ,v ){
+
+                            html += '<form id="nopublish_form_'+ v.wm_id+'" data-wm="'+ v.wm_id+'">';
+                            html += '<div class="spec-cont">';
+                            html += '<div class="platform" style="width: 20%;">';
+                            html += '<div class="table-cell">';
+                            html += '<div class="good-logo">';
+                            html += '<input type="checkbox" class="square-radio publish-wm" style="display: inline-block" checked disabled data-wm="'+ v.wm_id +'">';
+                            html += '&nbsp;&nbsp;<img src="'+ v.platform_pic +'">';
+                            html += '&nbsp;&nbsp;<span>'+ v.platform_name +'</span>';
+                            html += '</div>';
+                            html += '</div>';
+                            html += '</div>';
+                            html += '<div class="platform" style="width: 40%;">';
+                            html += '<div class="table-cell">';
+
+                            if(v.bigCategoryName != '') {
+                                html += '<select class="form-control form-inline bigCategoryID" name="bigCategoryID" data-wm="' + v.wm_id + '" style="width: auto;display: inline-block;" disabled>';
+                                html += '<option >' + v.bigCategoryName + '</option>';
+                                html += '</select>';
+                            }
+
+                            if(v.midCategoryName != '' ) {
+
+                                html += '<select class="form-control form-inline midCategoryID"  style="width: auto;display: none;"  data-wm="' + v.wm_id + '"  name="midCategoryID" disabled>';
+                                html += '<option>' + v.midCategoryName + '</option>';
+                                html += '</select>';
+                            }
+
+                            if(v.smallCategoryName != ''){
+                                html += '<select class="form-control form-inline smallCategoryID" style="width: auto;display: none;"  data-wm="'+ v.wm_id+'" name="smallCategoryID">';
+                                html += '<option>'+ v.smallCategoryName+'</option>';
+                                html += '</select>&nbsp;&nbsp;';
+                            }
+
+                            html += '</div>';
+                            html += '</div>';
+                            html += '<div class="platform Specifications" style="width:25%">';
+                            html += '<div class="table-cell">';
+
+                            $.each( goods_data ,function( k , v ){
+                                html += '<div class="typeModel">'+ v.spec+'</div>';
+                            });
+
+                            html += '</div>';
+                            html += '</div>';
+                            html += '<div class="platform price">';
+                            html += '<div class="table-cell">';
+                            html += '<div class="input-box">';
+
+                            $.each( goods_data ,function( k , val ){
+                                html += '<input type="text" disabled name="salePrice[]" data-pcode="+val.product_code+" class="form-control form-inline tab-input" value="'+ val.salePrice +'">';
+                            });
+
+                            html += '</div>';
+                            html += '</div>';
+                            html += '</div>';
+                            html += '</div>';
+                            html += '<input type="hidden" name="mainPostID" value="'+ mainPostID+'">';
+                            html += '</form>';
+                        });
+
+                        $('#publish-list').html(html);
+                        addIcheck();
+                    }
+
+                    if( obj.code.nopublish != ''){
+
+                        var html = '';
+                            html += '<div class="notice">';
+                            html += '<div class="notice-left">未发布</div>';
+                            html += '</div>';
+
+                        $.each( obj.data.nopublish ,function ( k ,v ){
+
+                            html += '<form id="nopublish_form_'+ v.wm_id+'" class="form-list" data-wm="'+ v.wm_id+'">';
+                            html += '<div class="spec-cont">';
+                            html += '<div class="platform" style="width: 20%;">';
+                            html += '<div class="table-cell">';
+                            html += '<div class="good-logo">';
+                            html += '<input type="checkbox" class="square-radio nopublish-wm" style="display: inline-block" data-wm="'+ v.wm_id +'">';
+                            html += '&nbsp;&nbsp;<img src="'+ v.platform_pic +'">';
+                            html += '&nbsp;&nbsp;<span>'+ v.platform_name +'</span>';
+                            html += '</div>';
+                            html += '</div>';
+                            html += '</div>';
+                            html += '<div class="platform" style="width: 40%;">';
+                            html += '<div class="table-cell">';
+                            if(v.wm_id == 0 ){
+                                if(v.bigCategoryName != '') {
+                                    html += '<select class="form-control form-inline bigCategoryID" name="bigCategoryID" data-wm="' + v.wm_id + '" style="width: auto;display: inline-block;" disabled>';
+                                    html += '<option >' + v.bigCategoryName + '</option>';
+                                    html += '</select>';
+                                }
+
+                                if(v.midCategoryName != '' ) {
+
+                                    html += '<select class="form-control form-inline midCategoryID"  style="width: auto;display: none;"  data-wm="' + v.wm_id + '"  name="midCategoryID" disabled>';
+                                    html += '<option>' + v.midCategoryName + '</option>';
+                                    html += '</select>';
+                                }
+
+                                if(v.smallCategoryName != ''){
+                                    html += '<select class="form-control form-inline smallCategoryID" style="width: auto;display: none;"  data-wm="'+ v.wm_id+'" name="smallCategoryID">';
+                                    html += '<option>'+ v.smallCategoryName+'</option>';
+                                    html += '</select>&nbsp;&nbsp;';
+                                }
+                            }else{
+                                html += '<select class="form-control form-inline bigCategoryID" name="bigCategoryID" data-wm="'+ v.wm_id+'" style="width: auto;display: inline-block;">';
+                                html += '<option value="">请选择</option>';
+
+                                if( wm_category != ''){
+                                    $.each(wm_category ,function (k ,val ){
+                                        if (val.wm_id == v.wm_id && val.level == 1){
+                                            html += '<option value="' + val.id + '" data-name="'+ val.name+'" >' + val.name + '</option>';
+                                        }
+                                    })
+                                }
+
+                                html += '</select>';
+                                html += '<input type="hidden" name="bigCategoryName" value="">';
+                                html += '<select class="form-control form-inline midCategoryID"  style="width: auto;display: none;"  data-wm="'+ v.wm_id+'"  name="midCategoryID"></select>';
+                                html += '<input type="hidden" name="midCategoryName" value="">';
+                                html += '<select class="form-control form-inline smallCategoryID" style="width: auto;display: none;"  data-wm="'+ v.wm_id+'" name="smallCategoryID"></select>&nbsp;&nbsp;';
+                                html += '<input type="hidden" name="smallCategoryName" value="">';
+                            }
+
+                            html += '</div>';
+                            html += '</div>';
+                            html += '<div class="platform Specifications" style="width:25%">';
+                            html += '<div class="table-cell">';
+
+                            $.each( goods_data ,function( k , v ){
+                                html += '<div class="typeModel">'+ v.spec+'</div>';
+                            });
+
+                            html += '</div>';
+                            html += '</div>';
+                            html += '<div class="platform price">';
+                            html += '<div class="table-cell">';
+                            html += '<div class="input-box">';
+
+                            if( v.wm_id == 0){
+                                $.each( goods_data ,function( k , val ){
+                                    html += '<input type="text" name="salePrice[]" data-pcode="+val.product_code+" class="form-control form-inline tab-input" value="'+ val.salePrice +'" disabled>';
+                                });
+                            }else{
+                                $.each( goods_data ,function( k , val ){
+                                    html += '<input type="text" name="salePrice[]" data-pcode="+val.product_code+" class="form-control form-inline tab-input" value="'+ val.salePrice +'">';
+                                });
+                            }
+
+                            html += '</div>';
+                            html += '</div>';
+                            html += '</div>';
+                            html += '</div>';
+                            html += '<input type="hidden" name="mainPostID" value="'+ mainPostID+'">';
+                            html += '</form>';
+
+                        });
+
+                        $('#nopublish-list').html(html);
+                        addIcheck();
+
+                    }
+                }
+            }
+        });
+
+        function addIcheck(){   //icheck 初始化
+            $('.square-radio').iCheck({
+                checkboxClass: 'icheckbox_square-blue',
+                radioClass: 'iradio_square-blue',
+                increaseArea: '20%' // optional
+            });
+        }
+
+
+    </script>
+@endsection

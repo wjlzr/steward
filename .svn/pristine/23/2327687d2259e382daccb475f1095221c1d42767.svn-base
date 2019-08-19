@@ -1,0 +1,82 @@
+<?php
+
+namespace App\Http\Controllers\Admin\Analyse;
+
+use DB;
+
+use Illuminate\Http\Request;
+
+use App\Models\Goods\StStatGoodsAnalyse;
+
+use App\Models\StApp;
+
+use App\Http\Controllers\Controller;
+
+class goodsController extends Controller
+{
+
+    public function goodsList( Request $request )
+    {
+
+        $startDate = $request->input('startDate');
+        $endDate = $request->input('endDate');
+        $app_id = $request->input('app_id');
+        $goods_name = $request->input('goods_name');
+
+        $where = [];
+
+        if ( !empty( $app_id ) ) {
+            $where[] = ['app_id' , '=' , $app_id] ;
+        }
+
+        if ( !empty( $startDate ) ) {
+            $where[] = ['cal_date','>=',$startDate];
+        }
+
+        if ( !empty( $endDate ) ) {
+            $where[] = ['cal_date','<=',$endDate];
+        }
+
+        if ( !empty( $goods_name ) ) {
+            $where[] = ['goods_name' , 'LIKE' , '%'.$goods_name.'%'] ;
+        }
+
+        $goods_data = StStatGoodsAnalyse::where($where)
+            ->orderBy($request->input('sort'), $request->input('order'))
+            ->groupBy('goods_id')
+            ->paginate($request->input('limit'))
+            ->toArray();
+
+        //返回数组
+        $return = [
+            'total' => $goods_data['total'],
+            'rows' => []
+        ];
+
+        if ( $goods_data['data'] ) {
+
+            foreach( $goods_data['data'] as $row ) {
+
+                if (  empty( $row['sku'] ) || empty( $row['upc'] ) ) {
+                    $sku = '';
+                } else {
+                    $sku = $row['sku'].'/'.$row['upc'];
+                }
+
+                $return['rows'][] = [
+                    'sku' => $sku,
+                    'goods_name' => $row['goods_name'],
+                    'total_num' => $row['total_num'],
+                    'total_bill_money' => $row['total_bill_money'],
+                    'bill_money' => round( $row['total_bill_money']/$row['total_num'] ,2)
+                ];
+
+            }
+        }
+
+
+        return response()->json($return);
+
+    }
+
+}

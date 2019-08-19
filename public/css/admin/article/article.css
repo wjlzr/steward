@@ -1,0 +1,127 @@
+*{
+    margin:0;
+    padding:0;
+}
+.title-nav{
+    height:74px;
+    position: relative;
+    background:#eeeeee;
+    line-height: 74px;
+    padding:0 24px;
+}
+.title-nav .title-left{
+    position: absolute;
+    left:24px;
+    top:0;
+    color:#555;
+    font-size: 22px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    width:30%;
+}
+.title-center{
+    text-align: center;
+    color:#888;
+    font-size: 22px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    width:60%;
+    margin:0 auto;
+}
+.btn-right{
+    position: absolute;
+    right:24px;
+    top:0;
+}
+.returnBack{
+    background:#ff9666;
+    border-radius:5px;
+    width:132px;
+    height:36px;
+    border: none;
+    line-height:36px;
+    color:#fff;
+}
+.message-list{
+    background:#fff;
+}
+.message-list ul li{
+    padding:25px 20px;
+    border-bottom:1px solid #dcdcdc;
+    height: 176px;
+    overflow: hidden;
+    transition: all 0.5s;
+}
+.message-list ul li div{
+    float: left;
+}
+.message-list ul li:hover{
+    background:#f8f8f8;
+    transition: all 0.5s;
+}
+.mes-img{
+    width:166px;
+    height:126px;
+    overflow: hidden;
+    line-height:126px;
+}
+.mes-img img{
+    width:100%;
+}
+.article-txt{
+    width:55%;
+    margin-left:20px;
+    height:126px;
+}
+.article-txt .art-tit{
+    width: 100%;
+    font-size:22px;
+    height:60px;
+    line-height: 60px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    color:#555;
+}
+.article-txt .pragray {
+    font-size: 16px;
+    line-height: 30px;
+    height: 60px;
+    color:#555;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+}
+.timer{
+    font-size: 16px;
+    line-height: 126px;
+    color:#888;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    width:14%;
+    text-align: center;
+    padding:0 2%;
+}
+.more{
+    width:12%;
+    padding:0 1%;
+}
+.more a{
+    font-size: 18px;
+    color:#45c0dd;
+    line-height: 126px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    width:100%;
+    text-align: center;
+    margin:0 auto;
+}
+.small-title{
+    color:#888;
+    font-size:16px;
+}

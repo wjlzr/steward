@@ -1,0 +1,144 @@
+<?php
+namespace App\Http\Controllers\Admin\Task;
+
+use Carbon\Carbon;
+use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
+use App\Http\Controllers\Admin\Task\TaskManageController;
+use DB;
+use Illuminate\Support\Facades\Redis as Redis;
+
+class StatSettleController extends Controller
+{
+
+    public function stat(Request $request)
+    {
+
+        if (empty($request->input('task_log_id'))) {
+            die('参数错误');
+        }
+
+        $TaskManageController = new TaskManageController();
+
+        $calDate = date('Y-m-d', strtotime('-1 day'));
+        $s_time = $calDate . ' 00:00:00';
+        $e_time = $calDate . ' 23:59:59';
+
+        ini_set('memory_limit', '2048M');
+
+        set_time_limit(0);
+
+        $orders_data = DB::table('st_order_trace')
+            ->select('order_id')
+            ->where('order_status', 4)
+            ->whereBetween('created_at', [$s_time, $e_time])
+            ->get();
+
+        if (empty($orders_data)) {
+            $TaskManageController->updateTaskLog($request->input('task_log_id'), '没有找到数据'.$calDate);
+            die('没有找到数据' . $calDate);
+        }
+
+        //门店结算统计数组
+        $mall_settle = array();
+
+        $orders_array = array_chunk($orders_data,5000);
+
+        foreach ( $orders_array as $orders ) {
+            foreach ( $orders as $d ) {
+
+                $settle_data = DB::table('st_order')
+                    ->select(DB::raw('DATE_FORMAT(created_at,\'%Y-%m-%d\') AS days, app_id, mall_id, total_fee, mall_act_fee, app_act_fee, mall_fee, package_fee'))
+                    ->where('id', $d['order_id'])->get();
+
+                if (empty($settle_data)) {
+                    continue;
+                }
+
+                foreach ( $settle_data as $s ) {
+
+                    $index = $s['days'] . '_' . $s['mall_id'] . '_' . $s['app_id'];
+
+                    if ( !isset( $mall_settle[$index] ) ) {
+                        $mall_settle[$index] = array(
+                            'cal_date' => $s['days'],
+                            'mall_id' => $s['mall_id'],
+                            'app_id' => $s['app_id'],
+                            'toal_goods_money' => 0,
+                            'toal_mall_discount_money' => 0,
+                            'toal_app_discount_money' => 0,
+                            'total_income' => 0,
+                            'total_return_money' => 0,
+                            'total_package_money' => 0
+                        );
+                    }
+
+                    $mall_settle[$index]['toal_goods_money'] += $s['total_fee'];
+                    $mall_settle[$index]['toal_mall_discount_money'] += $s['mall_act_fee'];
+                    $mall_settle[$index]['toal_app_discount_money'] += $s['app_act_fee'];
+                    $mall_settle[$index]['total_income'] += $s['mall_fee'];
+                    $mall_settle[$index]['total_package_money'] += $s['package_fee'];
+
+                }
+
+            }
+        }
+
+        //保存门店结算统计数据
+        if ( $mall_settle ) {
+            st_stat_mall_settle_accounts($mall_settle);
+        }
+
+        ini_restore('memory_limit');
+
+        $TaskManageController->updateTaskLog( $request->input('task_log_id'), 'SUCCESS' );
+    }
+
+}
+
+function st_stat_mall_settle_accounts( $mall_settle ) {
+
+    foreach ( $mall_settle as $m ) {
+
+        $check = DB::table('st_stat_mall_settle_accounts')
+            ->where([
+                ['cal_date',$m['cal_date']],
+                ['mall_id',$m['mall_id']],
+                ['app_id',$m['app_id']]
+            ])->get();
+
+        if ( empty($check) ) {
+            $insert_sql[] = array(
+                'updated_at' => Carbon::now(),
+                'creator' => 'system',
+                'created_at' => Carbon::now(),
+                'cal_date' => $m['cal_date'],
+                'mall_id' => $m['mall_id'],
+                'app_id' => $m['app_id'],
+                'toal_goods_money' => $m['toal_goods_money'],
+                'toal_mall_discount_money' => $m['toal_mall_discount_money'],
+                'toal_app_discount_money' => $m['toal_app_discount_money'],
+                'total_income' => $m['total_income'],
+                'total_return_money' => $m['total_return_money'],
+                'total_package_money' => $m['total_package_money']
+            );
+        } else {
+
+            DB::table('st_stat_goods_analyse')
+                ->where([
+                    ['cal_date',$m['cal_date']],
+                    ['mall_id',$m['mall_id']],
+                    ['app_id',$m['app_id']]
+                ])->update([
+                    'toal_goods_money' => $check[0]['toal_goods_money'] + $m['toal_goods_money'],
+                    'toal_mall_discount_money' => $check[0]['toal_mall_discount_money'] + $m['toal_mall_discount_money'],
+                    'toal_app_discount_money' => $check[0]['toal_app_discount_money'] + $m['toal_app_discount_money'],
+                    'total_income' => $check[0]['total_income'] + $m['total_income'],
+                    'total_package_money' => $check[0]['total_package_money'] + $m['total_package_money']
+                ]);
+
+        }
+
+    }
+
+}

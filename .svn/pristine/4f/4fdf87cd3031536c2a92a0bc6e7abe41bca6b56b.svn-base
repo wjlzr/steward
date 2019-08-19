@@ -1,0 +1,143 @@
+<?php
+
+namespace App\Http\Middleware;
+
+use Closure;
+
+class ApiService
+{
+    
+    /**
+     * Handle an incoming request.
+     * @param  \Illuminate\Http\Request  $request
+     * @param  \Closure  $next
+     * @return mixed
+     */
+    public function handle($request, Closure $next)
+    {
+
+        $request_data = $request->all();
+        $sign = $request->input('sign');
+        $body = $request->input('body');
+        $appId = $request->input('appId');
+        $api_data = [
+            'dcf7da0be34211e4882200163e00313a' => 'ede3256766f611e784a100163e0033b6',
+        ];
+
+        if (empty($appId)) {
+            $return_data = ['code' => 100000 , 'message' => '缺少参数：appId'];
+            return response()->json($return_data);
+        }
+
+        if (empty($sign)) {
+            $return_data = ['code' => 100000 , 'message' => '缺少参数：sign'];
+            return response()->json($return_data);
+        }
+
+        if (!isset($api_data[$appId])) {
+            $return_data = ['code' => 100000 , 'message' => 'appId参数错误'];
+            return response()->json($return_data);
+        }
+
+        $e_secret_key = isset($request_data['e_secret_key'])
+            ? $request_data['e_secret_key']
+            : '';
+
+        $sign = $this->createSign($request_data, $api_data[$appId]);
+        if ($sign != $request_data['sign'] && $e_secret_key != 'ec48d4004f4b02eadaf24af32a281979') {
+            $return_data = ['code' => 100001 , 'message' => '数据加密验签失败，服务器签名：' . $sign];
+            return response()->json($return_data);
+        }
+
+        if ($body) {
+            $body_arr = json_decode($body, true);
+            if (is_array($body_arr)) {
+                foreach ($body_arr as $key => $value) {
+                    $request->offsetSet($key, $value);
+                }
+            }
+        }
+
+        error_log('===api service');
+        error_log(var_export($request_data,1));
+
+        if (isset($return_data['cal_date_type'])) {
+            $date_result = $this->calDate($return_data['cal_date_type']);
+            if ( $date_result ) {
+
+                error_log('===api $date_result');
+                error_log(var_export($date_result,1));
+                $request->offsetSet('start_date', $date_result['start']);
+                $request->offsetSet('end_date', $date_result['end']);
+                $request->offsetUnset('cal_date_type');
+            }
+        }
+
+        $request->offsetSet('app_client', 2);
+        return $next($request);
+
+    }
+
+
+    /**
+     * 验证签名
+     * @param $data
+     * @param $key
+     * @return string
+     */
+    private function createSign($data, $key) {
+
+        ksort($data);
+        $sign_str = '';
+
+        foreach ($data as $k => $v) {
+            if ($v == '' || in_array($k, ['sign', '_url'])) {
+                continue;
+            }
+            if ($sign_str == '') {
+                $sign_str .= $k . '=' . $v;
+            } else {
+                $sign_str .= '&' . $k . '=' . $v;
+            }
+        }
+
+        $sign_str .= '&key=' . $key;
+        return strtoupper(md5($sign_str));
+
+    }
+
+
+    /**
+     * 日期类型转化为日期时间
+     * @param $date_type
+     * @return array|null
+     */
+    private function calDate($date_type)
+    {
+
+        if (!ebsig_is_int($date_type) || !in_array($date_type, [1, 2, 3])) {
+            return null;
+        }
+
+        $diff_time = [
+            1 => '0',
+            2 => '-1 day',
+            3 => '-7 day',
+            4 => '-30 day'
+        ];
+
+        $now_time = $date_type != 1
+            ? strtotime($diff_time[$date_type])
+            : time();
+
+        $date_result = [
+            'start' => date('Y-m-d', $now_time),
+            'end' => date('Y-m-d')
+        ];
+
+        return $date_result;
+
+    }
+
+    
+}

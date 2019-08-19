@@ -1,0 +1,284 @@
+@extends('admin.layoutData')
+
+@section('css')
+    <style type="text/css">
+        .checkDate { background-color: #EEEEEE;text-decoration: none;}
+        #dateMenu{background: none repeat scroll 0 0 rgb(250, 250, 250);border: 1px solid rgb(229, 229, 229);border-radius: 5px;height: 40px;padding-left: 20px;}
+        .date_divs {float:left;height:45px;line-height:45px;margin-left:15px;}
+        .comm_content,.items{width:99%;margin:0 auto;}
+
+        .navbar-custom,.menu {
+            border: 1px solid #e7e7e7;line-height: 45px;margin:0 10px 10px 10px;border-radius:2px;
+            background: none repeat scroll 0 0 #f8f8f8;overflow:auto; zoom:1;text-align:center;font-size:13px;
+        }
+        .navbar-custom div,.menu li{cursor: pointer;float: left;padding: 0 10px;}
+
+        .navbar-custom div:hover, .navbar-custom div.selected,.menu li:hover,.menu li.curMenu{background: #e7e7e7;}
+
+        .analysis-table {
+            width: 100%;
+        }
+        .analysis-table table {
+            width: 100%;
+        }
+        .analysis-table table tr {
+            border-top: 1px solid #f1f4f9;
+            font-size: 14px;
+            color: #2f2f2f;
+            height: 50px;
+        }
+        .analysis-table table thead tr{
+            border-top: none;
+            color: #999;
+            height: 60px;
+            line-height: 60px;
+        }
+        .analysis-table table tr td:first-child {
+            text-align: left;
+            padding-left: 20px;
+        }
+        .analysis-table table tr td:first-child p {
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        table td.width10 {
+            width: 10%;
+        }
+        .width12 {
+            width: 12%;
+        }
+        table td.width35 {
+            width: 28%;
+            padding: 0 20px;
+        }
+        .width35.table-title {
+            overflow: hidden;
+        }
+        .width35.table-title .fr label {
+            font-weight: normal;
+            margin-left: 15px;
+            color: #2f2f2f;
+        }
+        .width35.table-title .fr label span {
+            margin-right: 5px;
+        }
+        .width35 .crm-progress-box {
+            width: 50%;
+        }
+        .crm-progress-box .crm-progress {
+            display: inline-block;
+            width: 70%;
+            height: 8px;
+            border-radius: 4px;
+            position: relative;
+            margin: 35px 0 0 5px;
+            background: #f1f4f9;
+        }
+        .crm-progress-box .crm-progress .crm-progress-bar {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 50%;
+            height: 8px;
+            border-radius: 4px;
+        }
+        .add-member .crm-progress .crm-progress-bar {
+            background: #fd9501;
+            box-shadow: 1px 1px 2px 2px rgba(253,149,1,.25);
+        }
+        .total-sales {
+            text-align: right;
+        }
+        .total-sales .crm-progress .crm-progress-bar {
+            background: #01a2fd;
+            box-shadow: 1px 1px 2px 2px rgba(1,162,253,.25);
+        }
+
+    </style>
+@endsection
+
+@section('content')
+
+    <div class="app-title">
+        <ul>
+            <li class="cur">
+                <span>销售分析</span>
+            </li>
+        </ul>
+        <div class="right-btn">
+        </div>
+    </div>
+
+    <div class="app-content">
+
+        <div class="comm_content" style="padding: 0px;">
+            <div class="items clearfix" style="border:none;">
+                <div class="navbar-custom" style="margin:10px 0 ;">
+                    <div class="date_divs" style="background: none;">
+                        <form id="search_form" onsubmit="return false;" method="post" class="form-inline">
+                            {{csrf_field()}}
+                            <span>渠道：<input type="text" class="form-control" style="width: 120px;margin-right: 10px;" id="mall_id" name="mall_id" placeholder="请输入渠道"/></span>
+                            <span>商品：<input type="text" class="form-control" style="width: 120px;margin-right: 10px;" id="goods_name" name="goods_name" placeholder="请输入商品"/></span>
+                            起止日期：
+                            <input id="startDate" name="startDate" class="form-control" readonly="readonly" onclick="layui.laydate({elem: this, istime: false, format: 'YYYY-MM-DD'})" type="text" maxlength="20" style="width: 110px;margin-left: 10px;"  /> ～
+                            <input id="endDate" name="endDate" class="form-control" readonly="readonly" onclick="layui.laydate({elem: this, istime: false, format: 'YYYY-MM-DD'})" type="text" maxlength="20" style="width: 110px;" />
+                            <input id="source" name="source" type="hidden" value="2">&nbsp;
+                            <input  id ="channel_type" name="channel_type" value="1" type="hidden">
+                            <input type="button" class="btn btn-primary"  onclick="stat.timeclick(6);" onfocus="this.blur();" value="查询">
+                        </form>
+                    </div>
+                    <div id="change_2" onclick="stat.timeclick(2);" data="2">&nbsp;&nbsp;昨天&nbsp;&nbsp;</div>
+                    <div id="change_3" class="selected" onclick="stat.timeclick(3);" data="3">&nbsp;&nbsp;最近7天&nbsp;&nbsp;</div>
+                    <div id="change_4"  onclick="stat.timeclick(4);" data="4">&nbsp;&nbsp;最近30天&nbsp;&nbsp;</div>
+
+                </div>
+            </div>
+
+            <div class="comm_content" style="padding: 0px;">
+                <div class="analysis-table">
+                    <table cellpadding="0" cellspacing="0">
+                        <thead style="background: #f8f8f8;">
+                        <tr>
+                            <th class="width10" style="text-align: center;">一级分类</th>
+                            <th class="width35 table-title" style="text-align: center;">二级分类</th>
+                            <th class="width10" style="text-align: center;">销售额（元）</th>
+                            <th class="width10" style="text-align: center;">京东到家（元）</th>
+                            <th class="width10" style="text-align: center;">美团外卖（元）</th>
+                            <th class="width10" style="text-align: center;">饿了吗（元）</th>
+                            <th class="width10" style="text-align: center;">百度外卖（元）</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+@endsection
+
+@section('js')
+    <script type="text/javascript">
+
+        var stat = {
+
+            //时间切换
+            timeclick: function (source) {
+
+                switch (source){
+
+                    case 2:
+                    case 3:
+                    case 4:
+                    case 5:
+                        $("#change_"+source).addClass('selected').siblings().removeClass("selected");
+                        A.analyse.getQuickTime('startDate','endDate',source);
+                        break;
+
+                    case 6:
+                        $('#change_2,#change_3,#change_4').removeClass("selected");
+                        break;
+
+                }
+
+//                this.refreshTable();
+                this.getdata();
+
+            },
+
+            //刷新列表数据
+            refreshTable:function () {
+            },
+
+
+            //查询数据
+            getdata:function(){
+
+                var dt = E.getFormValues('search_form');
+
+                if (dt.startDate == '') {
+                    layer.alert('开始时间不能为空，请选择', {icon: 2, offset: '70px'});
+                    return false;
+                }
+
+                if (dt.endDate == '') {
+                    layer.alert('结束时间不能为空，请选择', {icon: 2, offset: '70px'});
+                    return false;
+                }
+
+                if(dt.endDate < dt.startDate) {
+                    layer.alert('开始时间不能大于结束时间', {icon: 2, offset: '70px'});
+                    return false;
+                }
+
+                var index = layer.load();
+
+                //获取数据
+                E.ajax({
+                    type: 'get',
+                    url: "/admin/goods/category/list",
+                    headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
+                    data: dt,
+                    success: function (o) {
+
+                        layer.close(index);
+                        if ( o.code == 200 ) {
+
+                            $(".analysis-table table tbody").empty();
+
+                            var html = '';
+                            if ( o.data ) {
+
+                                $.each(o.data,function (k,c) {
+
+                                    html += '<tr>';
+                                    html += '<td class="width10" style="text-align: center;"><p>'+ c.num_1 +'</p></td>';
+                                    html += '<td class="width35 table-title" style="text-align: center;"><p>'+ c.num_2 +'</p></td>';
+                                    html += '<td class="width10" style="text-align: center;"><p>'+ c.num_3 +'</p></td>';
+                                    html += '<td class="width10" style="text-align: center;"><p>'+ c.num_4 +'</p></td>';
+                                    html += '<td class="width12" style="text-align: center;"><p>'+ c.num_5 +'</p></td>';
+                                    html += '</tr>';
+
+                                })
+
+                            }
+
+                            $(".analysis-table table tbody").append(html);
+
+                        } else {
+                            layer.alert(o.message,{icon:2,offset:'50px'});
+                        }
+
+                    }
+                });
+            }
+
+        };
+
+        /*获取对象、数组的长度、元素个数
+         *obj 要计算长度的元素，可以为object、array、string
+         */
+        function count(obj){
+            var objType = typeof obj;
+            if(objType == "string"){
+                return obj.length;
+            }else if(objType == "object"){
+                var objLen = 0;
+                for(var i in obj){
+                    objLen++;
+                }
+                return objLen;
+            }
+            return false;
+        }
+
+        //初始化
+        stat.timeclick(3);
+
+    </script>
+@endsection

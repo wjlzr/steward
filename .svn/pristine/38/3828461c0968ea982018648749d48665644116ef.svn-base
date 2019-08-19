@@ -1,0 +1,65 @@
+<?php
+
+namespace App\Services\Analyse;
+
+
+class SellService
+{
+
+
+    /**
+     * 销售分析
+     * @param $args = [
+     *      'mall_id' => int 门店ID
+     *      'app_id' => int 应用ID
+     *      'start_date' => string 开始日期
+     *      'end_date' => string 结束日期
+     * ]
+     * @return array = [
+     *      'total_turnover' => string 总营业额
+     *      'expected_income' => string 预计收入
+     *      'valid_orders' => int 有效订单数
+     *      'unit_price' => string 客单价
+     *      'detail' => [
+     *          'cal_date' => string 日期
+     *          'sub' => [
+     *              [
+     *                  'app_id' => int 应用ID
+     *                  'app_name' => string '应用名称'
+     *                  'total_turnover' => string 总营业额
+     *                  'expected_income' => string 预计收入
+     *                  'valid_orders' => int 有效订单数
+     *                  'unit_price' => string 客单价
+     *              ]
+     *          ]
+     *      ]
+     * ]
+     */
+    public function sell($args)
+    {
+
+        $return_result = [
+            'total_turnover' => '',
+            'expected_income' => '',
+            'valid_orders' => '',
+            'unit_price' => '',
+            'detail' => [
+                'cal_date' => '',
+                'sub' => [
+                    [
+                        'app_id' => 0,
+                        'app_name' => '',
+                        'total_turnover' => '',
+                        'expected_income' => '',
+                        'valid_orders' => 0,
+                        'unit_price' => '',
+                    ]
+                ]
+            ]
+        ];
+        return $return_result;
+
+    }
+
+
+}

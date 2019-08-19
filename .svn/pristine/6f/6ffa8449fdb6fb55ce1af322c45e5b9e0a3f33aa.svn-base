@@ -1,0 +1,28 @@
+<?php
+
+namespace App\Services\User;
+
+use App\Models\User\StUser;
+use Illuminate\Support\Facades\DB;
+
+class SearchService
+{
+
+
+    /**
+     * 用户列表搜索
+     * @param $args
+     * @return mixed
+     */
+    public function search() {
+
+        $result=DB::table('st_user as su')
+            ->select('*')
+            ->leftjoin('st_mall as sm','su.mall_id','=','sm.id')
+            ->get();
+        return $result;
+
+    }
+
+
+}

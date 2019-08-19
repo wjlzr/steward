@@ -1,0 +1,327 @@
+@extends('admin.layoutData')
+
+@section('css')
+    <style type="text/css">
+        .checkDate { background-color: #EEEEEE;text-decoration: none;}
+        #dateMenu{background: none repeat scroll 0 0 rgb(250, 250, 250);border: 1px solid rgb(229, 229, 229);border-radius: 5px;height: 40px;padding-left: 20px;}
+        .date_divs {float:left;height:45px;line-height:45px;margin-left:15px;}
+        .comm_content,.items{width:99%;margin:0 auto;}
+
+        .navbar-custom,.menu {
+            border: 1px solid #e7e7e7;line-height: 45px;margin:0 10px 10px 10px;border-radius:2px;
+            background: none repeat scroll 0 0 #f8f8f8;overflow:auto; zoom:1;text-align:center;font-size:13px;
+        }
+        .navbar-custom div,.menu li{cursor: pointer;float: left;padding: 0 10px;}
+
+        .navbar-custom div:hover, .navbar-custom div.selected,.menu li:hover,.menu li.curMenu{background: #e7e7e7;}
+
+        .analysis-table {
+            width: 100%;
+        }
+        .analysis-table table {
+            width: 100%;
+        }
+        .analysis-table table tr {
+            border-top: 1px solid #f1f4f9;
+            font-size: 14px;
+            color: #2f2f2f;
+            height: 50px;
+        }
+        .analysis-table table thead tr{
+            border-top: none;
+            color: #999;
+            height: 60px;
+            line-height: 60px;
+        }
+        .analysis-table table tr td:first-child {
+            text-align: left;
+            padding-left: 20px;
+        }
+        .analysis-table table tr td:first-child p {
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .crm-progress-box .crm-progress {
+            display: inline-block;
+            width: 70%;
+            height: 8px;
+            border-radius: 4px;
+            position: relative;
+            margin: 35px 0 0 5px;
+            background: #f1f4f9;
+        }
+        .crm-progress-box .crm-progress .crm-progress-bar {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 50%;
+            height: 8px;
+            border-radius: 4px;
+        }
+        .add-member .crm-progress .crm-progress-bar {
+            background: #fd9501;
+            box-shadow: 1px 1px 2px 2px rgba(253,149,1,.25);
+        }
+        .total-sales {
+            text-align: right;
+        }
+        .total-sales .crm-progress .crm-progress-bar {
+            background: #01a2fd;
+            box-shadow: 1px 1px 2px 2px rgba(1,162,253,.25);
+        }
+        .fixed-table-loading{
+            display: none !important;
+            text-align: center;
+            top: 38px;
+        }
+        .table > tbody > tr > td, .table > tbody > tr > th, .table > tfoot > tr > td, .table > tfoot > tr > th, .table > thead > tr > td, .table > thead > tr > th {
+            padding: 8px;
+            line-height: 1.42857143;
+            vertical-align: top;
+            border-top: 1px solid #ddd;
+            text-align: center;
+        }
+        .fixed-table-container thead th .both {
+            background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABMAAAATCAQAAADYWf5HAAAAkElEQVQoz7X QMQ5AQBCF4dWQSJxC5wwax1Cq1e7BAdxD5SL+Tq/QCM1oNiJidwox0355mXnG/DrEtIQ6azioNZQxI0ykPhTQIwhCR+BmBYtlK7kLJYwWCcJA9M4qdrZrd8pPjZWPtOqdRQy320YSV17OatFC4euts6z39GYMKRPCTKY9UnPQ6P+GtMRfGtPnBCiqhAeJPmkqAAAAAElFTkSuQmCC');
+            background-size: 35px;
+            background-repeat:no-repeat;
+        }
+        .fixed-table-container thead th .sortable {
+            cursor: pointer;
+            background-position: right;
+            background-repeat: no-repeat;
+            padding-right: 30px;
+        }
+        .fixed-table-container tbody td .th-inner, .fixed-table-container thead th .th-inner {
+            padding: 8px;
+            padding-right: 8px;
+            line-height: 24px;
+            vertical-align: top;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .pagination {
+            display: inline-block;
+            padding-left: 0;
+            margin: 0 0;
+            border-radius: 4px;
+        }
+    </style>
+@endsection
+
+@section('content')
+
+    <div class="app-title">
+        <ul>
+            <li class="cur">
+                <span>门店分析</span>
+            </li>
+        </ul>
+        <div class="right-btn">
+            <button class="btn btn-blue top-right-btn" type="button" onclick="stat.statExport();">导出</button>
+        </div>
+    </div>
+
+    <div class="app-content">
+
+        <div class="comm_content" style="padding: 0px;">
+            <div class="items clearfix" style="border:none;">
+                <div class="navbar-custom" style="margin:10px 0 ;">
+                    <div class="date_divs" style="background: none;">
+                        <form id="search_form" onsubmit="return false;" method="post" class="form-inline">
+                            {{csrf_field()}}
+                            <select id="app_id" name="app_id" class="form-control">
+                                <option value="">请选择平台</option>
+                                @if( isset( $app_data ) && !empty( $app_data ) )
+                                    @foreach( $app_data as $k=>$v )
+                                        <option value="{{$v['id']}}">{{$v['name']}}</option>
+                                    @endforeach
+                                @endif
+                            </select>
+                            <span>&nbsp;&nbsp;门店：<input type="text" class="form-control" style="width: 120px;margin-right: 10px;" id="mall_id" name="mall_id" placeholder="请输入门店"/></span>
+                            起止日期：
+                            <input id="startDate" name="startDate" class="form-control" readonly="readonly" type="text" maxlength="20" style="width: 110px;margin-left: 10px;"  /> ～
+                            <input id="endDate" name="endDate" class="form-control" readonly="readonly" type="text" maxlength="20" style="width: 110px;" />
+                            <input type="button" class="btn btn-blue search"  onclick="stat.timeclick(6);" onfocus="this.blur();" value="查询">
+                            <input type="button" class="btn btn-default" id="re-set" onfocus="this.blur();" value="重置">
+                        </form>
+                    </div>
+                    <div id="change_2" class="search" onclick="stat.timeclick(2);" data="2">&nbsp;&nbsp;昨天&nbsp;&nbsp;</div>
+                    <div id="change_3" class="selected search" onclick="stat.timeclick(3);" data="3">&nbsp;&nbsp;最近7天&nbsp;&nbsp;</div>
+                    <div id="change_4" class="search" onclick="stat.timeclick(4);" data="4">&nbsp;&nbsp;最近30天&nbsp;&nbsp;</div>
+
+                </div>
+            </div>
+
+            <div class="comm_content" style="padding: 0px;width: 99%;margin-left: 5px">
+                <table id="table" lay-filter="table-filter"></table>
+            </div>
+        </div>
+
+    </div>
+@endsection
+
+@section('js')
+    <script type="text/javascript">
+
+        var stat = {
+
+            //时间切换
+            timeclick: function (source) {
+
+                switch (source){
+
+                    case 2:
+                    case 3:
+                    case 4:
+                    case 5:
+                        $("#change_"+source).addClass('selected').siblings().removeClass("selected");
+                        A.analyse.getQuickTime('startDate','endDate',source);
+                        break;
+
+                    case 6:
+                        $('#change_2,#change_3,#change_4').removeClass("selected");
+                        break;
+
+                }
+
+            },
+
+            statExport:function () {
+
+                var exportIndex = 1125;
+
+                layer.confirm( '您确定导出门店分析信息吗?' ,{icon:3,offset:'50px'}, function( index ) {
+                    layer.close(index);
+                    com_export.download('search_form', '/admin/mall/analyse/export',exportIndex );
+                });
+            },
+
+            reset:function () {
+                $('#app_id').val('');
+                $('#mall_id').val('');
+                stat.timeclick(3);
+            }
+
+        };
+
+        //初始化
+        stat.timeclick(3);
+
+    </script>
+    <script>
+
+        layui.use('laydate',function () {
+            var laydate = layui.laydate;
+
+            laydate.render({
+                elem:'#startDate'
+            });
+
+            laydate.render({
+                elem:'#endDate'
+            });
+        });
+
+        var table;
+
+        $(document).on('click', '.search', function () {
+            layui_table_reload();
+        }).on('click', '#re-set', function () {
+            stat.reset();
+            layui_table_reload();
+        }).on('click', '.layer-go-back', function () {
+            E.layerClose();
+        });
+
+        function layui_table(params) {
+
+            layui.use('table', function () {
+
+                table = layui.table;
+                var dt = E.getFormValues('search_form');
+                //服务端获取不到插件传值，将排序信息赋值给where条件
+                dt.sort = params.sort_name;
+                dt.order = params.sort_order;
+
+                var render = {
+                    elem: '#table',
+                    id:'layui-table',
+//                    height: 400,
+                    limit: 10,
+                    url: layui_table_ajax_url,
+                    page: true,
+                    initSort:{
+                        field:params.sort_name,
+                        type:params.sort_order
+                    },
+                    where:dt,
+                    cols: params.cols,
+                    done: function() {
+                    }
+                };
+                for(var key in params) {
+                    if (key != 'initSort') {
+                        render[key] = params[key];
+                    }
+                }
+
+                table.render(render);
+
+                table.on('sort(operatingTable)', function(obj){ //注：tool是工具条事件名，test是table原始容器的属性 lay-filter="对应的值"
+
+                    dt.sort = obj.field;
+                    dt.order = obj.type;
+
+                    //尽管我们的 table 自带排序功能，但并没有请求服务端。
+                    //有些时候，你可能需要根据当前排序的字段，重新向服务端发送请求，从而实现服务端排序，如：
+                    table.reload('layui-table', {
+                        initSort: obj //记录初始排序，如果不设的话，将无法标记表头的排序状态。 layui 2.1.1 新增参数
+                        ,where:dt//请求参数（注意：这里面的参数可任意定义，并非下面固定的格式
+                        ,   page:{
+                            curr:1
+                        }
+                    });
+                });
+
+            });
+
+        }
+
+        function layui_table_reload() {
+
+            var dt = E.getFormValues('search_form');
+
+            table.reload('layui-table', {
+                where:dt,
+                page:{
+                    curr:1
+                }
+            });
+        }
+
+        var layui_table_ajax_url = '/admin/mall/analyse/list';
+
+        layui_table({
+            sort_name : 'total_user_fee',
+            sort_order : 'desc',
+            method : 'get',
+            cols: [[
+                {title: "序号", field : "Number", width: '9%', align: "center", templet:function (d) {
+                    return d.LAY_INDEX; //序号：d.LAY_INDEX
+                }},
+                {title: "门店", field : "mall_name", width: '23%', align: "center"},
+                {title: "营业额(元)", field : "total_user_fee", width: '14%', align: "center",sort:true},
+                {title: "支出(元)", field : "expense", width: '13%',align:"center",sort:true},
+                {title: "预计收入(元)", field : "total_mall_fee", width: '15%',align:"center",sort:true},
+                {title: "订单数", field : "total_sale_bill_num", width: '12%',align:"center",sort:true},
+                {title: "客单价(元)", field : "bill_money", width: '14%',align:"center",sort:true}
+            ]]
+        });
+
+    </script>
+
+@endsection

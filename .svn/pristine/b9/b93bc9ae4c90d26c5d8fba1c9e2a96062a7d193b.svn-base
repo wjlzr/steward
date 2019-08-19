@@ -1,0 +1,74 @@
+<?php
+
+namespace App\Services\User;
+
+use App\Models\User\StUser;
+use Illuminate\Support\Facades\DB;
+
+class SearchService
+{
+
+
+    /**
+     * 用户列表搜索
+     * @param $args
+     * @return mixed
+     */
+    public function search($where,$rp,$offset,$sort,$order) {
+
+        $user_data=StUser::where($where)
+            ->orderBy($sort, $order)
+            ->offset($offset)->limit($rp)
+            ->get()
+            ->toArray();
+
+        $return_data = [];
+
+        if($user_data){
+            $total = count($user_data);
+            foreach($user_data as $user){
+                $type = $user['type'] == 2 ? '绑定门店' : '';
+                $status=$user['status'] == 1 ? '启用' : '禁用';
+                $roles=$user['type'] == 2 ? '门店' : '总店';
+                $return_data[] = array(
+                    'operation' => '<a href="javascript:void(0)" class="edit"  data_id="' . $user['id'] . '">修改</a>&nbsp;&nbsp;<a href="javascript:void(0)" class="mall_type" data_id="' . $user['id'] . '">' . $type . '</a>',
+                    'mobile' => $user['mobile'],
+                    'name' => $user['creator'],
+                    'type' => $roles,
+                    'mall' => $user['name'],
+                    'created_at' => $user['created_at'],
+                    'updated_at' => $user['updated_at'],
+                    'editor' => $user['editor'],
+                    'status' =>  '<a href="javascript:void(0)" class="status_type" data_type="' . $user['status'] . '"  data_id="' . $user['id'] . '">' . $status . '</a>',
+                );
+            }
+            $result_data = [
+                'total' => $total,
+                'rows' => $return_data
+            ];
+
+            return $result_data;
+        }
+
+    }
+
+    public function add_user($user_data)
+    {
+
+        $num = StUser::insert(['mobile' => $user_data['mobile'],'creator' => $user_data['creator'],'pwd' => $user_data['pwd'],'type' => $user_data['type'],'created_at'=>$user_data['created_at'],'updated_at'=>$user_data['updated_at']]);
+        return $num;
+    }
+
+    public function edit_user($id)
+    {
+        $data = StUser::where('id',$id)
+            ->get()
+            ->toArray();
+        return $data;
+    }
+
+    public function update_user($user_data){
+        $res = StUser::where('id', $user_data['id'])->update(['mobile' => $user_data['mobile'],'creator' => $user_data['creator'],'pwd' => $user_data['pwd'],'type' => $user_data['type'],'updated_at'=>$user_data['updated_at']]);
+        return $res;
+    }
+}

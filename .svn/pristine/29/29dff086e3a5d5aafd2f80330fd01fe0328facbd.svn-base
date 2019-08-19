@@ -1,0 +1,237 @@
+@extends('admin.layoutData')
+
+@section('css')
+    <style type="text/css">
+        .checkDate { background-color: #EEEEEE;text-decoration: none;}
+        #dateMenu{background: none repeat scroll 0 0 rgb(250, 250, 250);border: 1px solid rgb(229, 229, 229);border-radius: 5px;height: 40px;padding-left: 20px;}
+        .date_divs {float:left;height:45px;line-height:45px;margin-left:15px;}
+        .comm_content,.items{width:99%;margin:0 auto;}
+
+        .navbar-custom,.menu {
+            border: 1px solid #e7e7e7;line-height: 45px;margin:0 10px 10px 10px;border-radius:2px;
+            background: none repeat scroll 0 0 #f8f8f8;overflow:auto; zoom:1;text-align:center;font-size:13px;
+        }
+        .navbar-custom div,.menu li{cursor: pointer;float: left;padding: 0 10px;}
+
+        .navbar-custom div:hover, .navbar-custom div.selected,.menu li:hover,.menu li.curMenu{background: #e7e7e7;}
+
+        .analysis-table {
+            width: 100%;
+        }
+        .analysis-table table {
+            width: 100%;
+        }
+        .analysis-table table tr {
+            border-top: 1px solid #f1f4f9;
+            font-size: 14px;
+            color: #2f2f2f;
+            height: 50px;
+        }
+        .analysis-table table thead tr{
+            border-top: none;
+            color: #999;
+            height: 60px;
+            line-height: 60px;
+        }
+        .analysis-table table tr td:first-child {
+            text-align: left;
+            padding-left: 20px;
+        }
+        .analysis-table table tr td:first-child p {
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        table td.width10 {
+            width: 10%;
+        }
+        .width12 {
+            width: 12%;
+        }
+        table td.width35 {
+            width: 28%;
+            padding: 0 20px;
+        }
+        .width35.table-title {
+            overflow: hidden;
+        }
+        .width35.table-title .fr label {
+            font-weight: normal;
+            margin-left: 15px;
+            color: #2f2f2f;
+        }
+        .width35.table-title .fr label span {
+            margin-right: 5px;
+        }
+        .width35 .crm-progress-box {
+            width: 50%;
+        }
+        .crm-progress-box .crm-progress {
+            display: inline-block;
+            width: 70%;
+            height: 8px;
+            border-radius: 4px;
+            position: relative;
+            margin: 35px 0 0 5px;
+            background: #f1f4f9;
+        }
+        .crm-progress-box .crm-progress .crm-progress-bar {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 50%;
+            height: 8px;
+            border-radius: 4px;
+        }
+        .add-member .crm-progress .crm-progress-bar {
+            background: #fd9501;
+            box-shadow: 1px 1px 2px 2px rgba(253,149,1,.25);
+        }
+        .total-sales {
+            text-align: right;
+        }
+        .total-sales .crm-progress .crm-progress-bar {
+            background: #01a2fd;
+            box-shadow: 1px 1px 2px 2px rgba(1,162,253,.25);
+        }
+        .fixed-table-loading{
+            display: none;
+            text-align: center;
+            top: 38px;
+        }
+        .table > tbody > tr > td, .table > tbody > tr > th, .table > tfoot > tr > td, .table > tfoot > tr > th, .table > thead > tr > td, .table > thead > tr > th {
+            padding: 8px;
+            line-height: 1.42857143;
+            vertical-align: top;
+            border-top: 1px solid #ddd;
+            text-align: center;
+        }
+    </style>
+@endsection
+
+@section('content')
+
+    <div class="app-title">
+        <ul>
+            <li class="cur">
+                <span>商品分析</span>
+            </li>
+        </ul>
+        <div class="right-btn">
+        </div>
+    </div>
+
+    <div class="app-content">
+
+        <div class="comm_content" style="padding: 0px;">
+            <div class="items clearfix" style="border:none;">
+                <div class="navbar-custom" style="margin:10px 0 ;">
+                    <div class="date_divs" style="background: none;">
+                        <form id="search_form" onsubmit="return false;" method="post" class="form-inline">
+                            {{csrf_field()}}
+                            <span>平台：<input type="text" class="form-control" style="width: 120px;margin-right: 10px;" id="app_id" name="app_id" placeholder="请输入平台"/></span>
+                            <span>商品：<input type="text" class="form-control" style="width: 120px;margin-right: 10px;" id="goods_name" name="goods_name" placeholder="请输入商品"/></span>
+                            起止日期：
+                            <input id="startDate" name="startDate" class="form-control" readonly="readonly" onclick="layui.laydate({elem: this, istime: false, format: 'YYYY-MM-DD'})" type="text" maxlength="20" style="width: 110px;margin-left: 10px;"  /> ～
+                            <input id="endDate" name="endDate" class="form-control" readonly="readonly" onclick="layui.laydate({elem: this, istime: false, format: 'YYYY-MM-DD'})" type="text" maxlength="20" style="width: 110px;" />
+                            <input type="button" class="btn btn-primary"  onclick="stat.timeclick(6);" onfocus="this.blur();" value="查询">
+                            <input type="button" class="btn btn-warning"  onclick="stat.reset();" onfocus="this.blur();" value="重置">
+                        </form>
+                    </div>
+                    <div id="change_2" onclick="stat.timeclick(2);" data="2">&nbsp;&nbsp;昨天&nbsp;&nbsp;</div>
+                    <div id="change_3" class="selected" onclick="stat.timeclick(3);" data="3">&nbsp;&nbsp;最近7天&nbsp;&nbsp;</div>
+                    <div id="change_4"  onclick="stat.timeclick(4);" data="4">&nbsp;&nbsp;最近30天&nbsp;&nbsp;</div>
+
+                </div>
+            </div>
+
+            <div class="comm_content" style="padding: 0px;width: 99%;margin-left: 5px">
+                <div class=" panel panel-default">
+                    <div class="panel-body">
+                        <table id="tableList"></table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+@endsection
+
+@section('js')
+    <script type="text/javascript">
+
+        var stat = {
+
+            //时间切换
+            timeclick: function (source) {
+
+                switch (source){
+
+                    case 2:
+                    case 3:
+                    case 4:
+                    case 5:
+                        $("#change_"+source).addClass('selected').siblings().removeClass("selected");
+                        A.analyse.getQuickTime('startDate','endDate',source);
+                        break;
+
+                    case 6:
+                        $('#change_2,#change_3,#change_4').removeClass("selected");
+                        break;
+
+                }
+
+                this.refreshTable();
+
+            },
+
+            //刷新列表数据
+            refreshTable:function () {
+                $('#tableList').bootstrapTable('refresh');
+            },
+
+            reset:function () {
+                $('#app_id').val('');
+                $('#mall_id').val('');
+                this.refreshTable();
+            }
+
+        };
+
+        $('#tableList').bootstrapTable({
+            classes: 'table table-hover', //bootstrap的表格样式
+            sidePagination: 'server', //获取数据方式【从服务器获取数据】
+            pagination: true, //分页
+            dataTypeber: 1, //页码【第X页】
+            pageSize: 10, //每页显示多少条数据
+            queryParamsType: 'limit',
+            sortable: true,
+            queryParams: function (params) {
+                var dt = E.getFormValues('search_form');
+                $.extend(params, dt);
+                return params;
+            },
+            url: '/admin/goods/analyse/list' ,//ajax链接
+            sortName: 'total_num', //排序字段
+            sortOrder: 'DESC',//排序方式
+            columns: [ //字段
+                {title: "序号", field : "Number", width: '100px', align: "center", formatter : function(value, row, index) {
+                    //return index + 1;
+                    var pageSize=$('#tableList').bootstrapTable('getOptions').pageSize;//通过表的#id 可以得到每页多少条
+                    var pageNumber=$('#tableList').bootstrapTable('getOptions').pageNumber;//通过表的#id 可以得到当前第几页
+                    return pageSize * (pageNumber - 1) + index + 1;//返回每条的序号： 每页条数 * （当前页 - 1 ）+ 序号
+                }},
+                {title: "商家编码/条形码", field : "sku", width: '250px', align: "center"},
+                {title: "商品名", field : "goods_name", width: '350px', align: "center"},
+                {title: "销量", field : "total_num", width: '150px',align:"center"},
+                {title: "销售额(元)", field : "total_bill_money", width: '150px',align:"center"},
+                {title: "均单价(元)", field : "bill_money", width: '150px',align:"center"}
+            ]
+        });
+
+        //初始化
+        stat.timeclick(3);
+
+    </script>
+@endsection

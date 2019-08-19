@@ -1,0 +1,237 @@
+@extends('admin.layout')
+@section('css')
+    <link rel="stylesheet" href="/css/admin/main.css?v=201801121356">
+@endsection
+
+@section('content')
+    <div class="container" id="main-content">
+        <div class="app-sidebar">
+            <div class="app-first-slider">
+                <ul class="nav_list">
+                    @foreach($left_menus as $l_k=>$l_m)
+                        <li data-index="{{$l_k}}">
+                            <a href="javascript:;">
+                                <span><img src="{{$l_m['icon']}}"></span>
+                                <span class="text">{{$l_m['name']}}</span>
+                            </a>
+                        </li>
+                    @endforeach
+                </ul>
+            </div>
+            <!--子菜单栏-->
+            <div class="app-second-silder" >
+                <ul class="second_list">
+                    @foreach($left_menus as $l_k => $l_m)
+                        @foreach($l_m['sub'] as $m_m)
+                            <li class="sub-nav-{{$l_k}}" style="display: none;">
+                                <a href="{{$m_m['link']}}" target="main-frame">
+                                    <span>{{$m_m['name']}}</span>
+                                </a>
+                            </li>
+                        @endforeach
+                    @endforeach
+                </ul>
+            </div>
+        </div>
+        <div class="main-container">
+            <div class="logo-wrap">
+                <div><img class="logo" src="/images/admin/icon/logo.png"></div>
+            </div>
+            <div class="app-top-box">
+                <div class="mall-infor">
+                    @if(isset($select_name))
+                    <div>
+                        <span class="select-mall-cls pop-selected">{{$select_name}}</span>
+                        <i class="d-arrow"><img src="/images/admin/icon/d-arr.png" alt=""></i>
+                    </div>
+                    @endif
+                    @if(isset($mall) && !empty($mall))
+                    <div class="mall-list pop-selected">
+                        <ul>
+                            @if('全部门店' == $select_name)
+                                <li class="active"><a href="javascript:;">全部门店</a></li>
+                            @else
+                                <li><a href="{{url('/admin/index/selected/0')}}">全部门店</a></li>
+                            @endif
+                            @foreach($mall as $m)
+                                @if($m['mall_name'] == $select_name)
+                                    <li class="active"><a href="javascript:;">{{$m['mall_name']}}</a></li>
+                                @else
+                                    <li><a href="{{url('/admin/index/selected/'.$m['mall_id'])}}">{{$m['mall_name']}}</a></li>
+                                @endif
+                            @endforeach
+                        </ul>
+                    </div>
+                    @endif
+                </div>
+
+                <div class="left-notice">
+                    <a href="javascript:;">
+                        <span class="img-notice"><img src="/images/admin/icon/notice-n.png"> </span>
+                        <span class="order-notice">您有一条新订单</span>
+                    </a>
+                </div>
+                <div class="right-nav">
+                    <ul class="right_list">
+                        <li>
+                            <a href="javascript:;" class="num-notice hide">
+                                <span><img src="/images/admin/icon/tongzhi.png"></span>
+                                <span class="num">0</span>
+                            </a>
+                            <a href="javascript:;">
+                                <span class="curn-blue">欢迎你！{{$user_name}}</span></a> | <a href="javascript:;" id="logout">注销
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://iview.github.io/iview-admin/#/home"><span>个人设置</span></a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="right-sidebar">
+            <div class="main-cont">
+                <iframe frameborder="0" id="main-frame" name="main-frame" width="100%" height="100%" ></iframe>
+            </div>
+        </div>
+
+    </div>
+@endsection
+
+@section('js')
+
+    <script>
+
+        $(function(){
+
+            var main_content_obj = $('#main-content');
+
+            //调整iframe高度
+            var wh = $(window).height();
+            main_content_obj.css('height', (wh-61) + 'px');
+
+            main_content_obj.find('div.app-second-silder').find('li').click(function () {
+                main_content_obj.find('div.app-second-silder').find('li').removeClass('active').eq($(this).index()).addClass('active');
+            });
+
+            main_content_obj.find('ul.nav_list').find('li').click(function() {
+
+                main_content_obj.find('ul.nav_list')
+                        .find('li').removeClass('active')
+                        .eq($(this).index()).addClass('active');
+                main_content_obj.find('div.app-second-silder')
+                        .find('li').hide();
+
+                var sub_nav = $('li.sub-nav-' + $(this).attr('data-index'));
+                sub_nav.show();
+                sub_nav.eq(0).trigger('click');
+                $('#main-frame').attr('src', sub_nav.eq(0).find('a').attr('href'));
+
+                if (sub_nav.length > 1) {
+                    main_content_obj.find('div.app-second-silder').show();
+                    main_content_obj.find('div.right-sidebar').css('margin-left', '240px');
+                } else {
+                    main_content_obj.find('div.app-second-silder').hide();
+                    main_content_obj.find('div.right-sidebar').css('margin-left', '120px');
+                }
+
+                $('.mall-list').hide();
+
+            });
+
+            main_content_obj.find('ul.nav_list').find('li').eq(0).trigger('click');
+
+            $('.select-mall-cls').click(function(event) {
+                event.stopPropagation();//阻止mousedown 事件冒泡（注意只阻止了mousedown事件）
+                event.preventDefault();
+                var m_l_cls = $('.mall-list');
+                if (m_l_cls.is(':hidden')) {
+                    m_l_cls.show();
+                } else {
+                    m_l_cls.hide();
+                }
+            });
+
+            $('#logout').click(function() {
+                $.ajax({
+                    type: 'GET',
+                    url:'/ajax/logout',
+                    data:{ },
+                    dataType: 'json',
+                    success: function(obj) {
+                        if (obj.code == 200) {
+                            self.location = '/admin/login';
+                        }
+                    }
+                });
+            });
+
+            order_prompts();
+            setInterval('order_prompts()',15000);
+
+        });
+
+
+        /**
+         * 刷新订单提醒通知(供PC客户端调取)
+         * @param new_count int 新订单数量
+         * @param remind_count int 催单数量
+         * @param return_count int 退单数量
+         */
+        function count_fresh(new_count, remind_count, return_count) {
+
+            var n_str = '';
+
+            if (new_count > 0) {
+                alert(new_count);
+                n_str += '<a href="javascript:void(0)" onclick="jump_notice(1)" class="order-notice-s">您有'+ new_count +'条新订单</a>';
+            }
+
+            if (remind_count > 0) {
+                n_str += '<a href="javascript:void(0)" onclick="jump_notice(5)" class="order-notice-s">您有'+ remind_count +'条催单</a>';
+            }
+
+            if (return_count > 0) {
+                n_str += '<a href="javascript:void(0)" onclick="jump_notice(6)" class="order-notice-s">您有'+ return_count +'条退单</a>';
+            }
+
+            $('.order-notice').html(n_str);
+
+            if (n_str == '') {
+                $('.left-notice').hide();
+                $('.num-notice').hide().find('.num').html(0);
+            } else {
+                $('.num-notice').show().find('.num').html(parseInt(new_count + remind_count + return_count));
+                $('.left-notice').show();
+            }
+        }
+
+
+        //获取订单提醒数量
+        function order_prompts() {
+
+            $.ajax({
+                type:'get',
+                url: '/ajax/order/prompts',
+                dataType:'json',
+                success : function(obj){
+                    count_fresh(obj.new_number, obj.remind_number, obj.refund_number);
+                }
+            });
+
+        }
+
+
+        /**
+         * 提醒订单跳转
+         * @param type
+         */
+        function jump_notice(type) {
+            $('#main-frame').attr('src', '/admin/order/list/1?anchor=' + type);
+        }
+
+    </script>
+
+@endsection

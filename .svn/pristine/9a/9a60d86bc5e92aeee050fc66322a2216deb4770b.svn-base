@@ -1,0 +1,115 @@
+<?php
+
+namespace App\Services\Goods;
+
+use App\Models\Goods\StGoodsStock;
+
+
+class GoodsStockService
+{
+
+
+    /**
+     * 商品库存数据查询
+     * @param $args
+     * @return array
+     */
+    public function search($args)
+    {
+
+        $page_size = isset($args['page_size'])
+            ? $args['page_size']
+            : 10;
+
+        $where = [];
+
+        if (isset($args['mall_name']) && !empty($args['mall_name'])) {
+            $where[] = ['st_goods_stock.mall_name', 'like', '%' . $args['mall_name'] . '%'];
+        }
+
+        if (isset($args['name']) && !empty($args['name'])) {
+            $where[]= ['st_goods_sale.name', 'like',  '%' . $args['name'] . '%'];
+        }
+
+        if (isset($args['mall_id']) && ebsig_is_int($args['mall_id'])) {
+            $where[] = ['st_goods_stock.mall_id', $args['mall_id']];
+        }
+
+        if (isset($args['sku']) && !empty($args['sku'])) {
+            $where[] = ['st_goods_stock.sku', $args['sku']];
+        }
+
+        if (isset($args['upc']) && !empty($args['upc'])) {
+            $where[] = ['st_goods_sale.upc', $args['upc']];
+        }
+
+        if (isset($args['big_category_id']) && ebsig_is_int($args['big_category_id'])) {
+            $where[]= ['st_goods_sale.big_category_id', $args['big_category_id']];
+        }
+
+        if (isset($args['mid_category_id']) && ebsig_is_int($args['mid_category_id'])) {
+            $where[]= ['st_goods_sale.mid_category_id', $args['mid_category_id']];
+        }
+
+        if (isset($args['small_category_id']) && ebsig_is_int($args['small_category_id'])) {
+            $where[]= ['st_goods_sale.small_category_id', $args['small_category_id']];
+        }
+
+        $stock_list = StGoodsStock::select(
+                            'st_goods_sale.name', 'st_goods_sale.sku', 'st_goods_sale.upc', 'st_goods_sale.big_category_name',
+                            'st_goods_sale.mid_category_name', 'st_goods_sale.small_category_name', 'st_goods_sale.id',
+                            'st_goods_stock.mall_id', 'st_goods_stock.mall_name', 'st_goods_stock.enable_number',
+                            'st_goods_stock.lock_number', 'st_goods_stock.updated_at', 'st_goods_sale.goods_id'
+                        )
+                        ->leftJoin('st_goods_sale', 'st_goods_sale.sku', '=', 'st_goods_stock.sku')
+                        ->where($where)
+                        ->orderBy('st_goods_stock.updated_at', 'desc')
+                        ->orderBy('st_goods_sale.goods_id', 'desc')
+                        ->paginate($page_size)
+                        ->toArray();
+
+        $current_page = isset($order_list['current_page'])
+            ? $order_list['current_page']
+            : 1;
+
+        $stock_result = [
+            'total' => $stock_list['total'],
+            'page' => $current_page,
+            'list' => []
+        ];
+
+        foreach($stock_list['data'] as $stock) {
+
+            $stock_result['list'][] = [
+                'updated_at' => app_to_string($stock['updated_at']),
+                'goods_id' => app_to_int($stock['goods_id']),
+                'speck_id' => app_to_int($stock['id']),
+                'goods_name' => app_to_string($stock['name']),
+                'big_category_name' => app_to_string($stock['big_category_name']),
+                'mid_category_name' => app_to_string($stock['mid_category_name']),
+                'small_category_name' => app_to_string($stock['small_category_name']),
+                'mall_name' => app_to_string($stock['mall_name']),
+                'mall_id' => app_to_string($stock['mall_id']),
+                'lock_number' => app_to_int($stock['lock_number']),
+                'enable_number' => app_to_int($stock['enable_number']),
+                'sku' => app_to_string($stock['sku']),
+                'upc' => app_to_string($stock['upc'])
+            ];
+
+        }
+
+        return $stock_result;
+
+    }
+
+
+
+    public function get($sku, $stock_spec, $mall_id)
+    {
+
+
+
+    }
+
+
+}

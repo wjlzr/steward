@@ -1,0 +1,171 @@
+<?php
+
+namespace App\Services\Order;
+
+use App\Models\Order\StOrder;
+use App\Models\Order\StOrderGoods;
+use App\Models\Order\StOrderApply;
+use App\Models\Order\StOrderTrace;
+use App\Models\Goods\StGoodsSale;
+use App\Models\StApp;
+use App\Models\StRegion;
+use App\Models\Mall\StMall;
+
+use DB;
+
+
+class OrderSubmitService
+{
+
+    const BD_LBS_AK = 'mGi6xeiGPBvUmcVGuys1fhvO';
+
+    private $total_fee = 0;
+
+    private $goods_total_number = 0;
+
+    public function add($order_data)
+    {
+
+        $mall = StMall::where('code', $order_data['mall_code'])->first();
+        if (!$mall) {
+            return $this->log_write('门店信息没有找到');
+        }
+
+        $request_url = 'http://api.map.baidu.com/geocoder/v2/?ak=
+        '.self::BD_LBS_AK.'&callback=renderReverse&location='.$order_data['deliver_lat'].','.$order_data['deliver_lng'].'&output=xml&pois=1';
+        $data = file_get_contents($request_url);
+        $xmlData = simplexml_load_string($data);
+
+        $addressComponent = $xmlData->result->addressComponent;
+        $province = $this->regionIdByName($addressComponent->province, 0, 1);
+        $city = $this->regionIdByName($addressComponent->city, $province[0], 2);
+        $county = $this->regionIdByName($addressComponent->district, $city[0], 3);
+
+        $order = new StOrder();
+        $order->day_sequence = 0;
+        $order->status = 0;
+        $order->day_sequence = 0;
+        $order->total_fee = 0;
+        $order->user_fee = $order_data['user_fee'];
+        $order->order_fee = $order_data['order_fee'];
+        $order->mall_fee = $order_data['mall_fee'];
+        $order->service_fee = $order_data['service_fee'];
+        $order->mall_act_fee = $order_data['mall_act_fee'];
+        $order->app_act_fee = $order_data['app_act_fee'];
+        $order->discount_fee = $order_data['mall_act_fee'] + $order_data['app_act_fee'];
+        $order->points_fee = $order_data['points_fee'];
+        $order->balance_fee = $order_data['balance_fee'];
+        $order->package_fee = $order_data['package_fee'];
+        $order->freight_fee = $order_data['freight_fee'];
+        $order->pay_type = 2;
+        $order->pacakge_weight = 0;
+        $order->total_goods_number = 0;
+        $order->mall_id = $mall->id;
+        $order->mall_name = $mall->name;
+        $order->mall_code = $mall->name;
+        $order->send_time = $order_data['send_time'];
+        $order->send_type = 1;
+        $order->province_id = $province[0];
+        $order->city_id = $city[0];
+        $order->county_id = $county[0];
+        $order->province = $province[1];
+        $order->city = $city[1];
+        $order->county = $county[1];
+        $order->deliver_name = $order_data['deliver_name'];
+        $order->deliver_mobile = $order_data['deliver_mobile'];
+        $order->deliver_address = $order_data['deliver_address'];
+
+        $order_goods_array = [];
+
+        foreach($order_data['goods'] as $goods) {
+
+            $order_goods = new StOrderGoods();
+
+            $goods_sale = StGoodsSale::where('sku', $goods['sku'])->first();
+            if ($goods_sale) {
+                $goods_images = explode(',', $goods_sale->images);
+                $order_goods->goods_id = $goods_sale->goods_id;
+                $order_goods->spec_id = $goods_sale->id;
+                $order_goods->goods_image = $goods_images[0];
+            }
+
+            $order_goods->goods_name = $goods['goods_name'];
+            $order_goods->sku = 0;
+            $order_goods->upc = 0;
+            $order_goods->sku_spec = 1;
+            $order_goods->sku_spec = 0;
+            $order_goods->goods_number = 0;
+            $order_goods->sale_price = $goods['sale_price'];
+            $order_goods->goods_price = $goods['goods_price'];
+
+            $order->total_fee += $goods['price'] * $goods['goods_number'];
+            $order->total_goods_number += $goods['goods_number'];
+
+            $order_goods_array[] = $order_goods;
+
+        }
+
+        if (empty($order_goods_array)) {
+            $this->log_write('订单商品信息没有找到');
+        }
+
+
+
+    }
+
+
+    /**
+     * 根据区域名称查询区域Id
+     * @param $name
+     * @param $p_id
+     * @param int $level
+     * @return array|int
+     */
+    private function regionIdByName($name, $p_id, $level = 1) {
+
+        if (empty($name)) {
+            return 0;
+        }
+
+        if ($level == 1) {
+            if (mb_strrpos($name, '省')) {
+                $name = mb_substr($name, 0, mb_strrpos($name, '省')).'%';
+            }
+        } else if ($level == 2) {
+            if (mb_strrpos($name, '市')) {
+                $name = mb_substr($name, 0, mb_strrpos($name, '市')).'%';
+            }
+        } else {
+            if (mb_strrpos($name, '县')) {
+                $name = mb_substr($name, 0, mb_strrpos($name, '县')).'%';
+            } else if (mb_strrpos($name, '区')) {
+                $name = mb_substr($name, 0, mb_strrpos($name, '区')).'%';
+            }
+        }
+
+        if ($p_id > 0) {
+            $region = StRegion::where(['p_id'=>$p_id, 'level'=>$level])
+                ->where('name', 'like', $name)
+                ->first();
+        } else {
+            $region = StRegion::where('level', $level)
+                ->where('name', 'like', $name)
+                ->first();
+        }
+
+        return $region ? [$region->id, $region->name] : 0;
+
+    }
+
+
+    /**
+     * 错误处理
+     * @param $log_msg
+     * @return \Illuminate\Http\JsonResponse
+     */
+    private function log_write($log_msg) {
+        return ['code'=>400, 'message'=>$log_msg];
+    }
+
+
+}

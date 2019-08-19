@@ -1,0 +1,290 @@
+@extends('admin.layoutEdit')
+
+@section('css')
+    <link href="/libs/iCheck/skins/square/blue.css" rel="stylesheet">
+    <link href="http://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.bootcss.com/bootstrap-table/1.11.1/bootstrap-table.min.css">
+    <style>
+        .select-btn{
+            width:251px;
+            margin-left: 12px;
+            margin-bottom: 30px;
+        }
+        .fixed-table-container{
+            width:900px;
+            margin-top: 10px;
+        }
+        .statistics{
+            margin:10px;
+            width:1055px;
+            height:56px;
+            background-color: rgba(255, 255, 204, 1);
+            line-height:56px;
+            padding-left: 25px;
+        }
+        .table-a{
+            border:1px solid rgb(220, 221, 222);
+        }
+    </style>
+@endsection
+
+@section('title')
+    <li>
+        <span>同步商品至分店 </span>
+    </li>
+@endsection
+
+@section('go-back-btn')
+    <a id="go-back" style="display:inline-block;padding-top:9px;">&lt;&lt;返回同步商品</a>
+@endsection
+
+@section('content')
+    <div class="items">
+        <button type="button" class="select-btn btn btn-primary b-1">第一步：选择商品</button>
+        <button type="button" class="btn select-btn b-2">第二步：选择门店</button>
+        <button type="button" class="btn select-btn b-3">第三步：选择线上平台</button>
+        <button type="button" class="btn select-btn b-4">第四步：发布商品</button>
+    </div>
+    <!--第一步选择商品-->
+    <div id="select_goods">
+        <div class="panel panel-default" style="margin: 10px;">
+            <div class="panel-heading">
+                <h3 class="panel-title">商品列表</h3>
+            </div>
+            <div class="panel-body">
+
+                <div class="form-group">
+                    <div class="col-sm-8 radio-box">
+                        <input type="radio" class="square-radio" name="selector_goods_type" value="1" checked>
+                        <label class="ml5">全部商品</label>&nbsp;
+                        <input type="radio" class="square-radio" name="selector_goods_type" value="2">
+                        <label class="ml5">部分商品</label>
+                    </div>
+                </div>
+
+                <div class="form-group select-goods-div" style="display: none;" >
+                <label class="col-sm-2 control-label"></label>
+                <div class="col-sm-8" style="margin-top: 20px;">
+                    <button type="button" class="btn btn-primary mb10" onclick="plugin.search_goods()" >添加商品</button>
+                    <button type="button" class="btn btn-primary mb10" onclick="" >导入商品</button>
+                    <button type="button" class="btn btn-danger mb10"  onclick="plugin.del_goods();">移除</button>
+                    <table id="goods_list" class="table table-hover" data-toggle="table" data-pagination="true">
+                        <thead>
+                        <tr>
+                            <th data-field="id" class="col-md-2" data-align="center" data-visible="false"></th>
+                            <th data-field="product_code" class="col-md-2" data-align="center">商家编码</th>
+                            <th data-field="upc" class="col-md-2" data-align="center">条形码</th>
+                            <th data-field="goodsName" class="col-md-4">商品名称</th>
+                            <th data-field="category" class="col-md-3">商品分类</th>
+                            <th data-field="operation" class="col-md-1" data-align="center" data-checkbox="true"></th>
+                        </tr>
+                        </thead>
+                    </table>
+                </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bottom_fixbox">
+            <div class="rectbox tac" style="text-align: center;margin-top: 20px;">
+                <input type="hidden" id ="dataCache" name="dataCache" value="">
+                <input type="button" id="select-goods-1" class="btn btn-primary mb10" style="margin-right: 20px" value="下一步：选择门店" />
+                <input type="button" id="go-back" class="btn btn-default" value="取消">
+            </div>
+        </div>
+    </div>
+    <!--第二步选择门店-->
+    <div id="select_mall" style="display: none;">
+        <div class="statistics goods_num">已选择：100个商品SKU</div>
+        <div class="panel panel-default" style="margin: 10px;">
+            <div class="panel-heading">
+                <h3 class="panel-title">门店列表</h3>
+            </div>
+            <div class="panel-body">
+
+                <div class="form-group">
+                    <div class="col-sm-8 radio-box">
+                        <input type="radio" class="square-radio" name="selector_mall_type" value="1"  checked>
+                        <label class="ml5">全部门店</label>&nbsp;
+                        <input type="radio" class="square-radio" name="selector_mall_type" value="2">
+                        <label class="ml5">部分门店</label>
+                    </div>
+                </div>
+
+                <div class="form-group select-mall-div" style="display: none;" >
+                    <label class="col-sm-2 control-label"></label>
+                    <div class="col-sm-8" style="margin-top: 20px;">
+                        <button type="button" class="btn btn-primary mb10" onclick="plugin.search_goods()" >添加门店</button>
+                        <button type="button" class="btn btn-primary mb10" onclick="uploadGoods.goodsPop()" >导入门店</button>
+                        <button type="button" class="btn btn-danger mb10"  onclick="plugin.del_goods();">移除</button>
+                        <table id="mall_list" class="table table-hover" data-toggle="table" data-pagination="true">
+                            <thead>
+                            <tr>
+                                <th data-field="postID" class="col-md-2" data-align="center" data-visible="false"></th>
+                                <th data-field="product_code" class="col-md-2" data-align="center">门店编号</th>
+                                <th data-field="product_code" class="col-md-4" data-align="center">门店名称</th>
+                                <th data-field="product_code" class="col-md-2" data-align="center">城市</th>
+                                <th data-field="goodsName" class="col-md-3" data-align="center">营业时间</th>
+                                <th data-field="operation" class="col-md-1" data-align="center" data-checkbox="true"></th>
+                            </tr>
+                            </thead>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bottom_fixbox">
+            <div class="rectbox tac" style="text-align: center;margin-top: 20px;">
+                <input type="hidden" id ="dataCache" name="dataCache" value="">
+                <input type="button" id="select-goods-2" class="btn btn-default" style="margin-right: 20px" value="上一步：选择商品" />
+                <input type="button" id="select-goods-3" class="btn btn-primary mb10" value="下一步：选择线上平台">
+            </div>
+        </div>
+    </div>
+
+    <!--第三步选择线上平台-->
+    <div id="select_platform" style="display: none;">
+        <div class="statistics">已选择：100个商品SKU、10家门店</div>
+        <div class="panel panel-default" style="margin: 10px;">
+            <div class="panel-heading">
+                <h3 class="panel-title">线上平台列表</h3>
+            </div>
+            <div class="panel-body">
+                <table class="table-a" border= "1" width= "100%" style="border-collapse:collapse" >
+                    <tr><td rowspan="5" style="text-align: center;line-height: 127px;">线上平台</td></tr>
+                    <tr>
+                        <td style="padding:12px;"><input type="checkbox" class="square-radio" id="" name="rankID" value=""><img src="/images/admin/app/order-icon3.png"/>京东到家</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:12px;"><input type="checkbox" class="square-radio" id="" name="rankID" value="" ><img src="/images/admin/app/order-icon4.png"/>美团外卖</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:12px;"><input type="checkbox" class="square-radio" id="" name="rankID" value="" ><img src="/images/admin/app/order-icon1.png"/>饿了吗</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:12px;"><input type="checkbox" class="square-radio" id="" name="rankID" value="" ><img src="/images/admin/app/order-icon5.png"/>百度外卖</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <div class="bottom_fixbox">
+            <div class="rectbox tac" style="text-align: center;margin-top: 20px;">
+                <input type="hidden" id ="dataCache" name="dataCache" value="">
+                <input type="button" id="select-goods-4" class="btn btn-default" style="margin-right: 20px" value="上一步：选择门店" />
+                <input type="button" class="btn btn-primary mb10" onclick="promotion.close()" value="下一步：发布商品">
+            </div>
+        </div>
+    </div>
+@endsection
+
+@section('js')
+    <script src="/libs/iCheck/icheck.js"> </script>
+    <script src="https://cdn.bootcss.com/bootstrap-table/1.9.1/bootstrap-table.min.js"></script>
+    <script src="/libs/bootstrap-table-master/dist/locale/bootstrap-table-zh-CN.js"></script>
+    <script>
+
+        $(function () {
+
+            $('.square-radio').iCheck({
+                checkboxClass: 'icheckbox_square-blue',
+                radioClass: 'iradio_square-blue',
+                increaseArea: '20%' // optional
+            });
+        });
+
+        $(document).on('click','#go-back',function(){
+            window.history.back();
+        });
+
+        //选择商品
+        $(document).on('ifChecked', 'input[name="selector_goods_type"]', function () {
+            if ($(this).val() == 1) {
+                $('.select-goods-div').hide();
+            } else {
+                $('.select-goods-div').show();
+            }
+        }).on('ifChecked', 'input[name="selector_mall_type"]', function () {
+            if ($(this).val() == 1) {
+                $('.select-mall-div').hide();
+            } else {
+                $('.select-mall-div').show();
+            }
+        });
+
+        $(document).on('click','#select-goods-1',function(){
+            $('#select_mall').show();
+            $('#select_goods').hide();
+            $('.b-1').removeClass('btn-primary');
+            $('.b-2').addClass('btn-primary');
+        }).on('click','#select-goods-2',function(){
+            $('#select_mall').hide();
+            $('#select_goods').show();
+            $('.b-2').removeClass('btn-primary');
+            $('.b-1').addClass('btn-primary');
+        }).on('click','#select-goods-3',function(){
+            $('#select_mall').hide();
+            $('#select_platform').show();
+            $('.b-2').removeClass('btn-primary');
+            $('.b-3').addClass('btn-primary');
+        }).on('click','#select-goods-4',function(){
+            $('#select_platform').hide();
+            $('#select_mall').show();
+            $('.b-3').removeClass('btn-primary');
+            $('.b-2').addClass('btn-primary');
+        });
+
+        var app = {
+
+        };
+
+        //商品列表
+        var plugin = {
+
+            data: { } ,
+
+            search_goods: function () {
+
+                layer.open({
+                    title: '选择商品',
+                    type: 2,
+                    area: ['900px', '500px'],
+                    content: '/admin/plugin'
+                });
+            },
+
+            goods: function( data,goods_num) {
+                plugin.loadGoods( data );
+                $('.goods_num').html('已选择：'+goods_num+'个商品SKU');
+            },
+
+            //删除商品
+            del_goods: function() {
+
+                //获取选中需删除的商品
+                var ids = $.map($("#goods_list").bootstrapTable('getSelections'), function (row) {
+                    //删除data中保存的商品信息
+                    //delete  plugin.data[row.postID] ;
+                     return row.id;
+                    //添加商品到表格中
+                });
+                //从表格中移除商品列
+                $("#goods_list").bootstrapTable('remove', { field: 'id', values: ids });
+
+            },
+
+            loadGoods: function( data ){
+                //循环选中的商品
+                $.each( data, function ( k ,v ) {
+
+                    //添加商品到表格中
+                    $("#goods_list").bootstrapTable( 'prepend', { id: v.id, product_code: v.sku , upc:v.upc, goodsName: v.name, category:v.big_category_name } );
+
+                });
+            }
+
+        };
+
+    </script>
+@endsection

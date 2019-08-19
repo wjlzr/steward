@@ -1,0 +1,174 @@
+/*公共*/
+a {
+    text-decoration: none;
+    color: #000
+}
+* {
+    margin: 0;
+    padding: 0
+}
+body{
+    background:#fbfbfb;
+}
+.mr10 {
+    margin-right: 10px;
+}
+.orange {
+    color: #ff9709;
+}
+.blue {
+    color: #00a0e9;
+}
+
+.main {
+    margin: 0 auto 20px;
+    height: auto;
+    border: 1px solid #eee;
+    border-radius: 4px;
+    overflow: hidden;
+    padding: 20px 15px;
+}
+.main .step-box {
+    width: 100%;
+    padding-bottom: 5px;
+}
+.step-box ul {
+    height: 35px;
+    border-bottom: 1px solid #eee;
+}
+.step-box ul li {
+    float: left;
+    width: 25%;
+    text-align: center;
+}
+.step-box ul li a {
+    display: block;
+    color: #666;
+}
+.step-box ul li.cur-step a{
+    color: #00a0e9;
+    padding-bottom: 20px;
+    background: url("/images/admin/index/bg-line.png") repeat-x 0 24px;
+}
+.step-title,.has-choose {
+    height: 42px;
+    line-height: 42px;
+    padding: 0 15px;
+}
+.step-title {
+    color: #313131;
+    background: #fbfbfb;
+}
+.radio-box {
+    padding: 10px 15px 12px;
+    border-bottom: 1px solid #eee;
+}
+.radio-box span {
+    line-height: 24px;
+    margin: 0 20px 0 5px;
+}
+.btn-box {
+    padding: 15px;
+}
+.btn-box button {
+    margin-right: 10px;
+}
+.table-box {
+    border-top: 1px solid #d6d6d6;
+}
+.width5 {
+    width: 5%;
+}
+.width15 {
+    width: 15%;
+}
+.width20 {
+    width: 20%;
+}
+.width30 {
+    width: 30%;
+}
+.width40 {
+    width: 40%;
+}
+.table>tbody>tr>td {
+    border-top: none;
+    border-bottom: 1px solid #eee;
+    padding: 12px 8px;
+}
+.table>tbody>tr:first-child>td  {
+    border-top: 1px solid #eee;
+}
+.table>tbody>tr>td span.name {
+    display: block;
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.platf {
+    overflow: hidden;
+}
+.platf-logo {
+    display: block;
+    float: left;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    overflow: hidden;
+    background-position: center center;
+    background-size: cover;
+}
+.platf-name {
+    float: left;
+    line-height: 32px;
+    margin: 0 0 0 10px;
+    color: #666;
+}
+.page-box {
+    overflow: hidden;
+}
+.page-box .left-page {
+    float: left;
+}
+.left-page span {
+    color: #00a0e9;
+}
+.left-page .form-control {
+    display: inline-block;
+    width: auto;
+}
+.page-box .pagination {
+    float: right;
+    margin: 0;
+}
+.bottom-btn {
+    text-align: center;
+}
+.platf-box .platf-inner {
+    padding-left: 30%;
+    border-top: 1px solid #eee;
+}
+.platf-box .platf-inner:first-child {
+    border-top: none;
+}
+.platf-box .platf {
+    margin: 50px 0;
+}
+.platf-box .rat-list {
+    margin-bottom: 50px;
+}
+.rat-list li {
+    margin-bottom: 20px;
+    color: #666;
+    overflow: hidden;
+}
+.rat-list li span {
+    float: left;
+}
+.rat-list li span.line {
+    display: inline-block;
+    width: 30%;
+    border-bottom: 1px dashed #666;
+    margin: 10px;
+}

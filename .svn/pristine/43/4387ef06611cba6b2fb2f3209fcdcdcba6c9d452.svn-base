@@ -1,0 +1,198 @@
+<?php
+
+namespace App\Services\Analyse;
+
+use DB;
+
+class SellService
+{
+
+
+    /**
+     * 销售看板
+     * @param $args = [
+     *      'mall_id' => int 门店ID
+     *      'app_id' => int 应用ID
+     *      'start_date' => string 开始日期
+     *      'end_date' => string 结束日期
+     * ]
+     * @return array = [
+     *      'total_turnover' => string 总营业额【必须】
+     *      'expected_income' => string 预计收入【必须】
+     *      'valid_orders' => int 有效订单数【必须】
+     *      'unit_price' => string 客单价【必须】
+     * ]
+     */
+    public function sellBoard($args)
+    {
+
+        $page = !empty($args['page'])
+            ? $args['page']
+            : 0;
+
+        $page_size = !empty($args['page_size'])
+            ? $args['page_size']
+            : 10;
+
+        $where = [];
+
+        if (isset($args['app_id']) && !empty($args['app_id'])) {
+            $where[] = ['app_id', $args['app_id']];
+        }
+
+        if (isset($args['mall_id']) && !empty($args['mall_id'])) {
+            $where[] = ['mall_id', $args['mall_id']];
+        }
+
+        if (isset($args['start_date']) && !empty($args['start_date'])) {
+            $where[] = ['cal_date', '>=', $args['start_date']];
+        }
+
+        if (isset($args['end_date']) && !empty($args['end_date'])) {
+            $where[] = ['cal_date', '<=', $args['end_date']];
+        }
+
+        $sell_data = DB::table('st_stat_mall_analyse')
+            ->select(DB::raw('SUM(total_user_fee) AS total_user_fee, SUM(total_mall_fee) AS total_mall_fee ,
+            SUM(total_bill_num) AS total_bill_num,SUM(total_cancel_bill_num) AS total_cancel_bill_num'))
+            ->where($where)
+            ->offset($page)
+            ->limit($page_size)
+            ->get()
+            ->toArraY();
+
+        $return_result = [];
+
+        if ($sell_data) {
+
+            foreach ($sell_data as $sell) {
+                $return_result = [
+                    'total_turnover' => app_to_decimal($sell->total_user_fee),
+                    'expected_income' => app_to_decimal($sell->total_mall_fee),
+                    'valid_orders' => app_to_int($sell->total_bill_num - $sell->total_cancel_bill_num),
+                    'unit_price' => round($sell->total_user_fee/$sell->total_bill_num,2)
+                ];
+            }
+        }
+
+        return $return_result;
+
+    }
+
+
+    /**
+     * 销售分析列表
+     * @param $args = [
+     *      'mall_id' => int 门店ID
+     *      'app_id' => int 应用ID
+     *      'start_date' => string 开始日期
+     *      'end_date' => string 结束日期
+     *      'page' => int 当前页码【选填】(默认为1)
+     *      'page_size' => int 每页数量【选填】(默认为10)
+     * ]
+     * @return array = [
+     *      'total' => int 总条数
+     *      'list' => [
+     *          [
+     *              'cal_date' => string 日期(结果要按此字段进行倒序)
+     *              'sub' => [
+     *                  [
+     *                      'app_id' => int 应用ID
+     *                      'app_name' => string '应用名称'
+     *                      'total_turnover' => string 总营业额
+     *                      'expected_income' => string 预计收入
+     *                      'valid_orders' => int 有效订单数
+     *                      'unit_price' => string 客单价
+     *                  ]
+     *              ]
+     *          ]
+     *      ]
+     */
+    public function sell($args)
+    {
+
+        $page = !empty($args['page'])
+            ? $args['page']
+            : 0;
+
+        $page_size = !empty($args['page_size'])
+            ? $args['page_size']
+            : 10;
+
+        $where = [];
+
+        if (isset($args['app_id']) && !empty($args['app_id'])) {
+            $where[] = ['app_id', $args['app_id']];
+        }
+
+        if (isset($args['mall_id']) && !empty($args['mall_id'])) {
+            $where[] = ['mall_id', $args['mall_id']];
+        }
+
+        if (isset($args['start_date']) && !empty($args['start_date'])) {
+            $where[] = ['cal_date', '>=', $args['start_date']];
+        }
+
+        if (isset($args['end_date']) && !empty($args['end_date'])) {
+            $where[] = ['cal_date', '<=', $args['end_date']];
+        }
+
+        $total = DB::table('st_stat_mall_analyse')
+            ->select(DB::raw('DISTINCT(cal_date)'))
+            ->where($where)
+            ->get()
+            ->toArray();
+
+        $cel_data = DB::table('st_stat_mall_analyse')
+            ->select(DB::raw('DISTINCT(cal_date)'))
+            ->where($where)
+            ->orderBy('cal_date','DESC')
+            ->offset($page)
+            ->limit($page_size)
+            ->get()
+            ->toArraY();
+
+        $return_result = [
+            'total' => !empty($total)?sizeof($total):0,
+            'list' => [],
+        ];
+
+        foreach ($cel_data as $d) {
+
+            $date_index = $d->cal_date;
+
+            $solo_data = DB::table('st_stat_mall_analyse')
+                ->leftJoin('st_app','st_app.id','=','st_stat_mall_analyse.app_id')
+                ->select(DB::raw('app_id,st_app.name,SUM(total_user_fee) AS total_user_fee,SUM(total_mall_fee) AS 
+                total_mall_fee, SUM(total_goods_num) AS total_goods_num ,
+                SUM(total_bill_num) AS total_bill_num,SUM(total_cancel_bill_num) AS total_cancel_bill_num'))
+                ->where($where)
+                ->where('cal_date',$date_index)
+                ->groupBy('app_id')
+                ->get();
+
+            foreach ($solo_data as $row) {
+
+                $return_result['list'][] = [
+                    'cal_date' => $date_index,
+                    'sub' =>
+                        [
+                            'app_id' => app_to_int($row->app_id),
+                            'app_name' => app_to_string($row->name),
+                            'total_turnover' => app_to_decimal($row->total_user_fee),
+                            'expected_income' => app_to_decimal($row->total_mall_fee),
+                            'valid_orders' => app_to_int($row->total_bill_num-$row->total_cancel_bill_num),
+                            'unit_price' => ($row->total_bill_num-$row->total_cancel_bill_num)>0 ? round(($row->
+                                total_user_fee/($row->total_bill_num-$row->total_cancel_bill_num)),2) : 0,
+                        ]
+                ];
+            }
+
+        }
+
+        return $return_result;
+
+    }
+
+
+}

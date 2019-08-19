@@ -1,0 +1,371 @@
+<?php
+namespace App\Services\Wm\JdDj\Request;
+
+use App\Models\ConfigureFunction;
+use App\Services\Wm\GoodsFactoryInterface;
+use Carbon\Carbon;
+use Mockery\CountValidator\Exception;
+use DB;
+
+class JdGoodsRequest implements GoodsFactoryInterface
+{
+
+    /**
+     * EleGoodsRequest constructor.
+     * @param $curl
+     */
+    public function __construct($curl)
+    {
+        $this->curl = $curl;
+    }
+
+    /**
+     * 查询商家店内分类信息接口
+     * @param $args
+     * @return mixed
+     */
+    public function get_shop_categories($args_data)
+    {
+        return $this->curl->call('/pms/queryCategoriesByOrgCode', [
+            'fields' => ['ID', 'PID', 'SHOP_CATEGORY_NAME', 'SHOP_CATEGORY_LEVEL', 'SORT']
+        ]);
+    }
+
+    /**
+     * 新增商家店内分类信息接口
+     * @param $args
+     * @return mixed
+     */
+    public function create_category($args_data)
+    {
+        if (!isset($args_data['name']) || empty($args_data['name'])) {
+            return $this->curl->response('分类名称不能为空');
+        }
+
+        if (!isset($args_data['category_id']) || empty($args_data['category_id'])) {
+            return $this->curl->response('分类id不能为空');
+        }
+
+        return $this->curl->call('/pms/addShopCategory', [
+            'pid' => $args_data['category_id'],
+            'shopCategoryName' => $args_data['name']
+        ]);
+    }
+
+    /**
+     * 修改商家店内分类信息接口
+     * @param $args
+     * @return mixed
+     */
+    public function update_category($args_data)
+    {
+        if (!isset($args_data['category_id']) || empty($args_data['category_id'])) {
+            return $this->curl->response('分类id不能为空');
+        }
+        return $this->curl->call('/pms/updateShopCategory', ['id' => $args_data['category_id']]);
+    }
+
+    /**
+     * 删除商品分类
+     * @param $args_data
+     * @return mixed
+     */
+    public function delete_category($args_data)
+    {
+        if (!isset($args_data['category_id']) || empty($args_data['category_id'])) {
+            return $this->curl->response('分类id不能为空');
+        }
+        $wm_category = WmGoodsCategory::find($args_data['category_id']);
+        $res = $this->curl->call('/pms/delShopCategory', ['id' => $wm_category->wm_category_id]);
+        if ($res['code'] == 200) {
+            WmGoodsCategory::destroy($args_data['category_id']);
+            $wm_category_data = WmGoodsCategory::where('parent_id', $args_data['category_id'])->first();
+            if (count($wm_category_data)) {
+                WmGoodsCategory::destroy($wm_category_data->id);
+                $wm_category_data_le = WmGoodsCategory::where('parent_id', $wm_category_data->id)->first();
+                if (count($wm_category_data_le)) {
+                    WmGoodsCategory::destroy($wm_category_data_le->id);
+                }
+            }
+        }
+        return $res;
+    }
+
+    /**
+     * 添加商品
+     * @param array $args_data
+     * @return array
+     */ 
+    public function create_product($args_data)
+    {
+        if (!isset($args_data) || empty($args_data || is_array($args_data))) {
+            return $this->curl->response('请检查传入数据');
+        }
+
+        $domain_url = ConfigureFunction::getConfigureField(43, 'domain_url');
+        $goods_master = Goods::where('mainPostID', $args_data['main_goods_id'])->first();
+        $wm_catergory = WmGoodsCategory::find($args_data['category_id']);
+        $wm_shop = WmShop::where(['wm_id' => 1, 'mall_code' => $args_data['mall_code']])->first();
+        $item = [
+            'categoryId' => $args_data['category_id'],
+            'brandId' => $goods_master->brandID,
+        ];
+
+        //数据入wm_goods
+        $wm_goods = new WmGoods();
+        $wm_goods->updated_at = Carbon::now();
+        $wm_goods->creator = 'system';
+        $wm_goods->created_at = Carbon::now();
+        $wm_goods->main_goods_id = $args_data['main_goods_id'];
+        $wm_goods->name = $args_data['goods_name'];
+        $wm_goods->description = '';
+        $wm_goods->status = 1;
+        $wm_goods->category_id = $args_data['category_id'];
+        $wm_goods->category_name = $wm_catergory->name;
+        $wm_goods->mall_code = $args_data['mall_code'];
+        $wm_goods->wm_id = 4;
+        $wm_goods->wm_shop_id = $wm_shop->wm_shop_id;
+        $wm_goods->save();
+
+        $res = [];
+        $wm_array = [];
+        foreach ($args_data['spec'] as $specs) {
+
+            $good_sale = GoodsSale::where('product_code', $specs['product_code'])->first();
+            $item['outSkuId'] = $specs['product_code'];
+            $item['skuName'] = $args_data['goods_name'] . $specs['name'];
+            $item['skuPrice'] = $specs['price'];
+            $item['weight'] = $good_sale->goodsWeight;
+            $item['images'] = $domain_url . $good_sale->goodsMainPic;
+            $item['fixedStatus'] = 1;
+            $item['isSale'] = true;
+
+            $result_data = $this->curl->call('/pms/sku/addSku', $item);
+            $res[] = $result_data;
+            $sku_id = $result_data['data']['result']['skuId'];
+
+            //数据入wm_goodsd_sale
+            $wm_goods_sale = new WmGoodsSale();
+            $wm_goods_sale->updated_at = Carbon::now();
+            $wm_goods_sale->creator = 'system';
+            $wm_goods_sale->created_at = Carbon::now();
+            $wm_goods_sale->goods_id = $wm_goods->id;
+            $wm_goods_sale->name = $args_data['goods_name'];
+            $wm_goods_sale->spec_name = $specs['name'];
+            $wm_goods_sale->price = $specs['price'];
+            $wm_goods_sale->status = 1;
+            $wm_goods_sale->main_goods_id = $args_data['main_goods_id'];
+            $wm_goods_sale->product_code = $specs['product_code'];
+            $wm_goods_sale->product_upc = '';
+            $wm_goods_sale->category_id = $args_data['category_id'];
+            $wm_goods_sale->category_name = $wm_catergory->name;
+            $wm_goods_sale->wm_spec_id = $sku_id;
+            $wm_goods_sale->mall_code = $args_data['mall_code'];
+            $wm_goods_sale->wm_id = 4;
+            $wm_goods_sale->wm_shop_id = $wm_shop->wm_shop_id;
+            $wm_array[] = $wm_goods_sale;
+        }
+
+        try {
+            //开启事务
+            DB::beginTransaction();
+
+            $wm_goods->save();
+            foreach ($wm_array as $wm_obj) {
+                $wm_obj->save();
+            }
+            DB::commit();
+            return $res;
+
+        } catch (Exception $e) {
+            DB::rollback();//事务回滚
+            echo $e->getMessage();
+            echo $e->getCode();
+        }
+
+    }
+
+    /**
+     * 批量新增商品
+     * @param $args
+     * @return mixed
+     */
+    public function batch_create_product($args_data)
+    {
+        $res = [];
+        foreach ($args_data as $goods_array) {
+            $domain_url = ConfigureFunction::getConfigureField(43, 'domain_url');
+            $goods_master = Goods::where('mainPostID', $goods_array['main_goods_id'])->first();
+            $wm_catergory = WmGoodsCategory::find($goods_array['category_id']);
+            $wm_shop = WmShop::where(['wm_id' => 1, 'mall_code' => $goods_array['mall_code']])->first();
+            $item = [
+                'categoryId' => $goods_array['category_id'],
+                'brandId' => $goods_master->brandID,
+            ];
+
+            //数据入wm_goods
+            $wm_goods = new WmGoods();
+            $wm_goods->updated_at = Carbon::now();
+            $wm_goods->creator = 'system';
+            $wm_goods->created_at = Carbon::now();
+            $wm_goods->main_goods_id = $goods_array['main_goods_id'];
+            $wm_goods->name = $goods_array['goods_name'];
+            $wm_goods->description = '';
+            $wm_goods->status = 1;
+            $wm_goods->category_id = $goods_array['category_id'];
+            $wm_goods->category_name = $wm_catergory->name;
+            $wm_goods->mall_code = $goods_array['mall_code'];
+            $wm_goods->wm_id = 4;
+            $wm_goods->wm_shop_id = $wm_shop->wm_shop_id;
+            $wm_goods->save();
+
+            $wm_array = [];
+            foreach ($args_data['spec'] as $specs) {
+
+                $good_sale = GoodsSale::where('product_code', $specs['product_code'])->first();
+                $item['outSkuId'] = $specs['product_code'];
+                $item['skuName'] = $args_data['goods_name'] . $specs['name'];
+                $item['skuPrice'] = $specs['price'];
+                $item['weight'] = $good_sale->goodsWeight;
+                $item['images'] = $domain_url . $good_sale->goodsMainPic;
+                $item['fixedStatus'] = 1;
+                $item['isSale'] = true;
+
+                $result_data = $this->curl->call('/pms/sku/addSku', $item);
+                $res[] = $result_data;
+                $sku_id = $result_data['data']['result']['skuId'];
+
+                //数据入wm_goodsd_sale
+                $wm_goods_sale = new WmGoodsSale();
+                $wm_goods_sale->updated_at = Carbon::now();
+                $wm_goods_sale->creator = 'system';
+                $wm_goods_sale->created_at = Carbon::now();
+                $wm_goods_sale->goods_id = $wm_goods->id;
+                $wm_goods_sale->name = $args_data['goods_name'];
+                $wm_goods_sale->spec_name = $specs['name'];
+                $wm_goods_sale->price = $specs['price'];
+                $wm_goods_sale->status = 1;
+                $wm_goods_sale->main_goods_id = $args_data['main_goods_id'];
+                $wm_goods_sale->product_code = $specs['product_code'];
+                $wm_goods_sale->product_upc = '';
+                $wm_goods_sale->category_id = $args_data['category_id'];
+                $wm_goods_sale->category_name = $wm_catergory->name;
+                $wm_goods_sale->wm_spec_id = $sku_id;
+                $wm_goods_sale->mall_code = $args_data['mall_code'];
+                $wm_goods_sale->wm_id = 4;
+                $wm_goods_sale->wm_shop_id = $wm_shop->wm_shop_id;
+                $wm_array[] = $wm_goods_sale;
+            }
+
+            try {
+                //开启事务
+                DB::beginTransaction();
+
+                $wm_goods->save();
+                foreach ($wm_array as $wm_obj) {
+                    $wm_obj->save();
+                }
+                DB::commit();
+                return $res;
+
+            } catch (Exception $e) {
+                DB::rollback();//事务回滚
+                echo $e->getMessage();
+                echo $e->getCode();
+            }
+
+        }
+
+    }
+
+    /**
+     * 批量上下架商品
+     * @param array $args = [
+     *      $goods_id
+     * ]
+     * @param int $is_shelf 上下架：0、下架 1、上架
+     * @return mixed
+     */
+    public function batch_update_self($args)
+    {
+    }
+
+    /**
+     * 批量修改商品价格
+     * @param $args
+     * @param $mall_code
+     */
+    public function batch_update_price($args)
+    {
+    }
+
+    /**
+     * 批量修改商品库存
+     * @param $args
+     */
+    public function batch_update_stock($args)
+    {
+    }
+
+    /**
+     * 编辑商品
+     * @param $args
+     * @return mixed
+     */
+    public function update_product($args)
+    {
+    }
+
+    /**
+     * 批量编辑商品
+     * @param $args
+     * @return mixed
+     */
+    public function batch_update_product($args)
+    {
+    }
+
+    /**
+     * 获取商品列表信息
+     * @param $args = [
+     *      'shop_id' => string 店铺id,
+     *      'page' => int 当前分页
+     *      'page_size' => int 分页条数（默认20）
+     * ]
+     * @return mixed
+     */
+    public function get_shop_product($args)
+    {
+        // TODO: Implement get_shop_product() method.
+    }
+
+    /**
+     * 批量删除商品
+     * @param array $args = [
+     *      'mall_code' => string 门店编号
+     *      'goods' => [
+     *          $goods_id
+     *      ]
+     * ]
+     * @return mixed
+     */
+    public function del_goods($args)
+    {
+        // TODO: Implement del_goods() method.
+    }
+
+    /**
+     * 批量删除商品
+     * @param array $args = [
+     *      'mall_code' => string 门店编号
+     *      'goods' => [
+     *          $goods_id
+     *      ]
+     * ]
+     * @return mixed
+     */
+    public function batch_delete_goods($args)
+    {
+        // TODO: Implement batch_delete_goods() method.
+    }
+}

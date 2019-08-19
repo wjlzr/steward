@@ -1,0 +1,44 @@
+<?php
+
+namespace App\Http\Middleware;
+
+use Closure;
+use App\Models\StApp;
+use App\Models\Log\StAppLog;
+
+
+class ReceiveService
+{
+
+    /**
+     * Handle an incoming request.
+     * @param  \Illuminate\Http\Request  $request
+     * @param  \Closure  $next
+     * @return mixed
+     */
+    public function handle($request, Closure $next)
+    {
+
+        $start_time = microtime(true);
+        $request_data = $request->input();
+
+        $_url_array = explode('/', ltrim($request_data['_url'], '/'));
+        $app = StApp::find($_url_array[2]);
+        if (!$app) {
+            $return_data = response()->json(['code'=>404, 'message'=>'应用没有找到']);
+            StAppLog::add($request_data, $return_data, 'api-push');
+            return $return_data;
+        }
+
+        $request->offsetSet('_app', $app);
+        $return_data = $next($request);
+
+        $creator = 'api-'.strtolower($app->alias).'-push';
+        StAppLog::add($request_data, $return_data, $creator, $app->id, $start_time);
+
+        return $return_data;
+
+    }
+
+
+}

@@ -1,0 +1,392 @@
+<?php
+
+namespace App\Http\Controllers\Admin\Goods;
+
+use Wm;
+use App\Models\Goods\StGoods;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Models\StApp;
+use App\Models\Mall\StAppMall;
+use App\Models\Mall\StMall;
+use Illuminate\Http\Request;
+use App\Models\Goods\StGoodsSale;
+use App\Models\Goods\StGoodsStock;
+use App\Models\Goods\StAppGoodsSale;
+use App\Http\Controllers\Controller;
+
+class GoodsSynchController extends Controller
+{
+
+    //商品同步首页
+    public function index(Request $request)
+    {
+
+        return view('admin/goods/synch/index', []);
+
+    }
+
+    //列表页数据
+    public function search (Request $request)
+    {
+
+        //返回数组
+        $return_result = [
+            'code' => 0,
+            'count' => 1,
+            'data' => []
+        ];
+
+        $return_result['data'][] = array(
+            'sDesc' => '2018-01-03 20 : 45',
+            'sid' => '同步商品至线上分店',
+            'releaseTime' => '李建兵',
+            'status' => '已完成',
+            'testStatus' => '35 个商品上架成功'
+        );
+
+        return $return_result;
+    }
+
+    //商品同步上线/下线页
+    public function edit($type)
+    {
+        return view('admin/goods/synch/edit')->with('type',$type);
+    }
+
+
+    /**
+     * 商品同步上线/下线提交
+     * @param Request $request
+     * @return mixed
+     */
+    public function submit(Request $request)
+    {
+        $type = $request->input('type');
+        $goods_type = $request->input('goods_type');
+        $mall_type = $request->input('mall_type');
+        $goods_data = $request->input('goods_data');
+        $mall_data = $request->input('mall_data');
+        $app_data = $request->input('app_data');
+
+        /*error_log('======//goods_data');
+        error_log(var_export($goods_data,true));
+        error_log(var_export($mall_data,true));*/
+
+        if (empty($type)) {
+            return response()->json(['code' => 400, 'message' => '参数错误：type']);
+        }
+
+        if (!empty($goods_type)) {
+            if ($goods_type == 2) {
+                if (empty($goods_data)) {
+                    return response()->json(['code' => 400, 'message' => '请选择需要同步的商品']);
+                }
+            }else{
+                $goods_data = $this->allGoods();
+            }
+        }else{
+            return response()->json(['code' => 400, 'message' => '参数错误：goods_type']);
+        }
+
+        if (!empty($mall_type)) {
+            if ($mall_type == 2) {
+                if (empty($mall_data)) {
+                    return response()->json(['code' => 400, 'message' => '请选择需要同步的门店']);
+                }
+            }else{
+                $mall_data = $this->allMall();
+            }
+        }else{
+            return response()->json(['code' => 400, 'message' => '参数错误：mall_type']);
+        }
+
+        if (empty($app_data)) {
+            return response()->json(['code' => 400, 'message' => '请选择同步平台']);
+        }
+        
+        //同步商品至线上平台
+        if ($type == 1) {
+
+            foreach ($app_data as $app_id=>$app_name) {
+
+                $request_data = [];
+                foreach ($mall_data as $mall) {
+
+                    //查询此门店是否在平台创建
+                    $appMall = StAppMall::where(['mall_id' => $mall['id'], 'status' => 1, 'app_id' => $app_id])->first();
+                    if (!$appMall) {
+                        continue;
+                    }
+
+                    foreach ($goods_data as $k => $v) {
+
+                        $stAppGoods = StAppGoodsSale::where(['goods_id' => $k, 'mall_id' => $mall['id'], 'app_id' => $app_id])->get();
+                        if ($stAppGoods->count() > 0) {
+                            continue;
+                        }
+
+                        $stGoods = StGoods::find($k);
+                        if (!$stGoods) {
+                            continue;
+                        }
+
+                        if ($stGoods->small_category_id) {
+                            $category_id = $stGoods->small_category_id;
+                        } elseif ($stGoods->mid_category_id) {
+                            $category_id = $stGoods->mid_category_id;
+                        } else {
+                            $category_id = $stGoods->big_category_id;
+                        }
+
+                        $stGoodsSale = StGoodsSale::where('goods_id', $k)->get();
+                        if ($stGoodsSale->count() <= 0) {
+                            continue;
+                        }
+                        $spec = [];
+                        foreach ($stGoodsSale as $sale) {
+
+                            //库存
+                            $stGoodsStock = StGoodsStock::where(['sku' => $sale->sku, 'mall_id' => $mall['id']])->first();
+
+                            $spec[] = [
+                                'spec_id' => $sale->id,
+                                'name' => $sale->name,
+                                'price' => $sale->price,
+                                'product_code' => $sale->sku,
+                                'stock' => !empty($stGoodsStock->enable_number) ? $stGoodsStock->enable_number : 10,
+                                'upc' => $sale->upc
+                            ];
+                        }
+
+                        $request_data[] = [
+                            'mall_id' => $mall['id'],
+                            'category_id' => $category_id,
+                            'goods_name' => $stGoods->name,
+                            'goods_id' => $stGoods->id,
+                            'spec' => $spec
+                        ];
+                    }
+
+                }
+
+                $res = Wm::send("$app_id".'.goods.batch_create_product', $request_data);
+                if( $res['code'] != 200 ){
+                    return response()->json(['code' => 400 ,'message' => $res['message']]);
+                }
+
+            }
+
+            return response()->json(['code'=>200, 'message'=>'发布成功', 'data'=>[]]);
+
+        }else{
+
+            foreach ($app_data as $app_id=>$app_name) {
+
+                $request_data = [];
+                foreach ($mall_data as $mall) {
+
+                    //查询此门店是否在平台创建
+                    $appMall = StAppMall::where(['mall_id' => $mall['id'],'status' => 1,'app_id' => $app_id])->first();
+                    if (!$appMall) {
+                        continue;
+                    }
+                    $goods_id = [];
+                    foreach ($goods_data as $k=>$v) {
+
+                        $stAppGoods = StAppGoodsSale::where(['goods_id' => $k,'mall_id' => $mall['id'],'app_id' => $app_id])->get();
+                        if ($stAppGoods->count() <= 0) {
+                            continue;
+                        }
+
+                        $stGoods = StGoods::find($k);
+                        if (!$stGoods) {
+                            continue;
+                        }
+
+                        $goods_id[] = $k;
+
+                    }
+
+                    $request_data[] = [
+                        'mall_code' => $appMall->mall_code,
+                        'goods' => $goods_id
+                    ];
+
+                }
+
+                $res = Wm::send("$app_id".'.goods.batch_delete_goods', $request_data);
+                if( $res['code'] != 200 ){
+                    return response()->json(['code' => 400 ,'message' => $res['message']]);
+                }
+            }
+
+            return response()->json(['code'=>200, 'message'=>'下架成功', 'data'=>[]]);
+        }
+
+    }
+
+    //获取平台数据
+    public function app()
+    {
+
+        $app_data = StApp::all()->where('enable',1)->toArray();
+
+        if (empty($app_data)) {
+            return response()->json(['code' => 400, 'message' => '暂无应用平台']);
+        }
+
+        return response()->json(['code' => 200, 'message' => 'ok', 'data' => $app_data]);
+    }
+
+    /**
+     * 导入商品
+     * @param Request $request
+     */
+    public function goodsImport(Request $request)
+    {
+
+        error_log('======//导入商品');
+
+        //获取上传文件
+        $file = $request->file('file');
+
+        //获得文件扩展名
+        $file_ext = $file->getClientOriginalExtension();
+
+        if( !in_array( $file_ext ,['xls','xlsx'])){
+            return response()->json(['code' => 400,'message' => '扩展名是[' . $file_ext . ']的文件禁止上传']);
+        }
+
+        //临时目录
+        $path = $file -> getRealPath();
+
+        $new_file_name = date('YmdHis') . rand(10000, 99999) . '.' . $file_ext;
+
+        $directory = public_path()."/upload/temp";
+        if( !is_dir($directory)){
+            mkdir($directory,0777,true);
+        }
+
+        $file_url = $directory .'/'. $new_file_name;
+
+        if (!file_exists( $file_url )){
+
+            move_uploaded_file( $path , $file_url );
+        };
+
+        $result_data = [];
+
+        Excel::load( $file_url,function($reader) use (&$result_data){
+
+            $data = $reader->getSheet(0);
+
+            if($data){
+
+                $data = $data->toArray();
+                error_log('=====//ffffffff');
+                error_log(var_export($data,true));
+                unset($data[0]);
+            }
+
+            foreach ($data as $item) {
+
+                foreach ($item as $value) {
+
+                    error_log(33333);
+                    error_log($value);
+
+                    $stGoodsSale = StGoodsSale::where('sku',$value)->first();
+
+                    error_log(444444);
+                    error_log(var_export($stGoodsSale,true));
+
+                    $result_data[] = StGoods::find($stGoodsSale->goods_id)->toArray();
+
+                    error_log(55555);
+                    error_log(var_export($result_data,true));
+                }
+            }
+
+        });
+
+        unlink( $file_url );
+
+        return response()->json(['code' => 200, 'message' => 'ok', 'data' => $result_data]);
+    }
+
+    /**
+     * 导入门店
+     * @param Request $request
+     */
+    public function mallImport(Request $request)
+    {
+
+        $file_url = public_path().$request->input('file_url');
+
+        $result_data = [];
+
+        Excel::load( $file_url,function($reader) use (&$result_data){
+
+            $data = $reader->getSheet(0);
+
+            if($data){
+
+                $data = $data->toArray();
+                unset($data[0]);
+            }
+
+            foreach ($data as $item) {
+
+                foreach ($item as $value) {
+
+                    $result_data[] = StMall::where('code',$value)->first()->toArray();
+                }
+            }
+
+        });
+
+        return response()->json(['code' => 200, 'message' => 'ok', 'data' => $result_data]);
+    }
+
+    /**
+     * 模板下载
+     */
+    public function download($type)
+    {
+
+        if ($type == 1) {
+            return response()->download(public_path().'/templet/synch/goods.xlsx', '商品导入模板.xls');
+        }else{
+            return response()->download(public_path().'/templet/synch/mall.xlsx', '门店导入模板.xls');
+        }
+    }
+
+    //获取全部门店数据
+    public function allMall()
+    {
+        $mall_data = StMall::all()->toArray();
+
+        $request = [];
+        foreach ($mall_data as $mall) {
+            $request[$mall['id']] = ['id' => $mall['id']];
+        }
+
+        return $request;
+    }
+
+    //获取全部商品数据
+    public function allGoods()
+    {
+
+        $stGoods = StGoods::all()->toArray();
+
+        $request = [];
+        foreach ($stGoods as $goods) {
+            $request[$goods['id']] = ['id' => $goods['id']];
+        }
+
+        return $request;
+
+    }
+
+}

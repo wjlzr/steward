@@ -1,0 +1,504 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use DB;
+use Illuminate\Http\Request;
+use App\Models\Order\StOrder;
+use App\Models\StApp;
+use App\Models\Goods\StGoods;
+use App\Models\Order\StOrderGoods;
+use App\Models\Mall\StAppMall;
+use App\Models\Mall\StMall;
+use App\Http\Controllers\Controller;
+
+
+class IndexController extends Controller
+{
+
+    /**
+     * 销售概况接口
+     * @param Request $request = [
+     *      'mall_id' => int 门店ID，
+     *      'date_type' => int 日期类型：1、今天 2、昨天 3、近7天 4、近30天
+     * ]
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function salesProfile(Request $request)
+    {
+
+        $where = $this->where($request->input('date_type', 1), $request->input('mall_id', 0));
+
+        $data = DB::table('st_order')
+                    ->where($where)
+                    ->select(DB::raw('SUM(order_fee) as total_sales,SUM(package_fee) as package_sales,SUM(user_fee) as expect_sales,COUNT(*) as valid_orders,AVG(order_fee) as avg_price'))
+                    ->whereNotIn('status',[5, 6])
+                    ->first();
+
+        $total_orders = StOrder::where($where)->count();
+
+        $return_result = [
+            'total_sales' => app_to_string(round($data->total_sales,2)), //总营业额
+            'package_sales' => app_to_string(round($data->package_sales,2)), //包装收入
+            'expect_sales' => app_to_string(round($data->expect_sales,2)), //预计收入
+            'valid_orders' => app_to_int($data->valid_orders), //有效订单数
+            'total_orders' => app_to_int($total_orders), //总订单数
+            'avg_price' => app_to_string(round($data->avg_price)) //客单价
+        ];
+
+        return response()->json(['code'=>200, 'message'=>'ok', 'data'=>$return_result]);
+
+    }
+
+
+    /**
+     * 平台销售占比接口
+     * @param Request $request = [
+     *      'mall_id' => int 门店ID
+     *      'date_type' => int 日期类型：1、今天 2、昨天 3、近7天 4、近30天
+     * ]
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function appOrdersSales(Request $request)
+    {
+
+        $where = $this->where($request->input('date_type', 1), $request->input('mall_id', 0));
+
+        $return_result = [];
+
+        //平台
+        $stApp = StApp::all();
+
+        foreach ($stApp as $app) {
+
+            $sale_value = StOrder::where($where)
+                                ->where('app_id',$app->id)
+                                ->sum('order_fee');
+
+            $bill_value = StOrder::where($where)
+                                ->where('app_id',$app->id)
+                                ->count();
+
+            $return_result['sales'][] = [
+                'value' => $sale_value,
+                'name' => $app->name
+            ];
+            $return_result['orders'][] = [
+                'value' => $bill_value,
+                'name' => $app->name
+            ];
+        }
+
+       /* error_log('=====//平台占比');
+        error_log(var_export($return_result,true));*/
+
+        return response()->json(['code'=>200, 'message'=>'ok', 'data'=>$return_result]);
+
+    }
+
+
+    /**
+     * 商品、门店动销接口
+     * @param Request $request = [
+     *      'mall_id' => int 门店ID
+     *      'date_type' => int 日期类型：1、今天 2、昨天 3、近7天 4、近30天
+     * ]
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function goodsMallActSales(Request $request)
+    {
+
+        $where = $this->where($request->input('date_type', 1), $request->input('mall_id', 0));
+
+        //总商品数
+        $total_number = StGoods::where($where)
+                               ->count();
+
+        //上架商品数
+        $shelf_number = StGoods::where($where)
+                                ->where('status',1)
+                                ->count();
+
+        //动销商品数
+        $act_number = StOrderGoods::where($where)
+                                ->sum('goods_number');
+
+        //总门店数
+        $mall_total_number = StMall::where($where)
+                                ->count();
+
+        //上架门店数
+        $mall_shelf_number = StAppMall::where($where)
+                                ->where('status',1)
+                                ->groupBy('app_id')
+                                ->get();
+
+        //动销门店数
+        $mall_act_number = StOrder::where($where)
+                                ->groupBy('mall_id')
+                                ->get();
+
+        $return_result = [
+                'total_number' => app_to_int($total_number),    //总商品数
+                'shelf_number' => app_to_int($shelf_number),    //上架商品数
+                'act_number' => app_to_int($act_number),   //动销商品数
+                'mall_total_number' => app_to_int($mall_total_number),    //总门店数
+                'mall_helf_number' => app_to_int($mall_shelf_number->count()),    //上架门店数
+                'mall_act_number' => app_to_int($mall_act_number->count())   //动销门店数
+        ];
+
+        return response()->json(['code'=>200, 'message'=>'ok', 'data'=>$return_result]);
+
+    }
+
+
+    /**
+     * 热销商品排行接口
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function hotSellGoodsRank(Request $request)
+    {
+
+        $where = $this->where($request->input('date_type', 1), $request->input('mall_id', 0),'st_order');
+
+
+        $return_result = [];
+        $stOrdersGoods = DB::table('st_order_goods')
+                            ->leftJoin('st_order','st_order.id','=','st_order_goods.order_id')
+                            ->select('goods_name',DB::raw('SUM(total_price) as total_money,SUM(goods_number) as total_number,AVG(total_price) as avg_price'))
+                            ->where($where)
+                            ->groupBy('goods_id')
+                            ->orderBy('total_number','desc')
+                            ->take(10)
+                            ->get();
+
+        foreach ($stOrdersGoods as $goods) {
+            $return_result[] = [
+                'goods_name' => app_to_string($goods->goods_name),
+                'total_money' => app_to_string(round($goods->total_money,2)),
+                'total_number' => app_to_int($goods->total_number),
+                'avg_price' => app_to_string(round($goods->avg_price,2))
+            ];
+        }
+
+        return response()->json(['code'=>200, 'message'=>'ok', 'data'=>$return_result]);
+
+    }
+
+    /**
+     * 热销分类排行接口
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function hotSaleCategoryRank(Request $request)
+    {
+
+        $where = $this->where($request->input('date_type', 1), $request->input('mall_id', 0),'st_order');
+
+        $return_result = [];
+        $stOrdersGoods = DB::table('st_order_goods')
+            ->leftJoin('st_order','st_order.id','=','st_order_goods.order_id')
+            ->select('category_name',DB::raw('SUM(goods_price) as total_money,SUM(goods_number) as total_number,AVG(total_price) as avg_price'))
+            ->where($where)
+            ->groupBy('category_id')
+            ->orderBy('total_number','desc')
+            ->take(10)
+            ->get();
+
+        foreach ($stOrdersGoods as $goods) {
+            $return_result[] = [
+                'category_name' => app_to_string($goods->category_name),
+                'total_money' => app_to_string(round($goods->total_money,2)),
+                'total_number' => app_to_int($goods->total_number),
+                'avg_price' => app_to_string(round($goods->avg_price,2))
+            ];
+        }
+
+        return response()->json(['code'=>200, 'message'=>'ok', 'data'=>$return_result]);
+
+    }
+
+
+    /**
+     * 所有门店营收入排行
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function mallRevenueRank(Request $request)
+    {
+
+        $where = $this->where($request->input('date_type', 1), $request->input('mall_id', 0));
+
+        $return_result = [];
+        $stOrder = DB::table('st_order')
+                    ->select('mall_name','mall_id',DB::raw('SUM(order_fee) as total_sales,SUM(package_fee) as package_sales,SUM(user_fee) as expect_sales,COUNT(*) as total_orders,AVG(order_fee) as avg_price'))
+                    ->where($where)
+                    ->whereNotIn('status',[5,6])
+                    ->groupBy('mall_id')
+                    ->orderBy('total_sales','desc')
+                    ->take(10)
+                    ->get();
+
+        if ($stOrder->count() > 0) {
+
+            $mall_id = [];
+            foreach ($stOrder as $key=>$order) {
+                $mall_id[$key] = $order->mall_id;
+            }
+
+            $total_orders = DB::table('st_order')
+                ->select('mall_id',DB::raw('COUNT(id) as num'))
+                ->where($where)
+                ->whereIn('mall_id',$mall_id)
+                ->groupBy('mall_id')
+                ->take(10)
+                ->get();
+
+            $m_count = [];
+
+            foreach($total_orders as $o) {
+                $m_count[$o->mall_id] = $o->num;
+            }
+
+            foreach($stOrder as $order) {
+                $return_result[] = [
+                    'mall_name' => app_to_string($order->mall_name),
+                    'total_sales' => app_to_string(round($order->total_sales,2)), //总营业额
+                    'package_sales' => app_to_string(round($order->package_sales,2)), //包装收入
+                    'expect_sales' => app_to_string(round($order->expect_sales,2)), //预计收入
+                    'valid_orders' => app_to_int($order->total_orders), //有效订单数
+                    'total_orders' => app_to_int($m_count[$order->mall_id]), //总订单数
+                    'avg_price' => app_to_string(round($order->avg_price,true)) //客单价
+                ];
+            }
+
+        }
+
+        return response()->json(['code'=>200, 'message'=>'ok', 'data'=>$return_result]);
+
+    }
+
+
+    /**
+     * 所有门店订单效率排行
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function mallOrderEfficiencyRank(Request $request)
+    {
+
+        $where = $this->where($request->input('date_type', 1), $request->input('mall_id', 0));
+
+        $return_result = [];
+        $res_count = DB::table('st_order')
+            ->select('mall_name',DB::raw('AVG(complete_at-created_at) as t'))
+            ->where($where)
+            ->where('status',4)
+            ->whereRaw('complete_at>=created_at')
+            ->groupBy('mall_id')
+            ->orderBy('t','desc')
+            ->get();
+
+        foreach ($res_count as $item) {
+            $return_result[] = [
+                'mall_name' => app_to_string($item->mall_name), //门店名称
+                'efficiency' => app_to_string($item->t), //效率（秒计：s）
+            ];
+        }
+
+        return response()->json(['code'=>200, 'message'=>'ok', 'data'=>$return_result]);
+
+    }
+
+
+    /**
+     * 门店统计营收排名
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function salesRank(Request $request)
+    {
+
+        $mall_id = $request->input('mall_id', 0);
+
+        $where = $this->where($request->input('date_type', 1), $mall_id);
+
+        $shop = 0;
+        $shop_array = [];
+        $stOrder = DB::table('st_order')
+            ->select('mall_id',DB::raw('SUM(user_fee) as item'))
+            ->where($where)
+            ->where('status',4)
+            ->groupBy('mall_id')
+            ->get();
+
+        if ($stOrder->count() <= 0) {
+            $return_result = [
+                'low' => 0,
+                'avg' => 0,
+                'this' => 0,
+                'high' => 0
+            ];
+        }else{
+            foreach ($stOrder as $item) {
+                if ($item->mall_id == $mall_id) {
+                    $shop = $item->item;
+                }
+                $shop_array[] = $item->item;
+            }
+            $return_result = [
+                'low' => min($shop_array),
+                'avg' => round(array_sum($shop_array)/count($shop_array), 2),
+                'this' => $shop,
+                'high' => max($shop_array)
+            ];
+        }
+
+        return response()->json(['code'=>200, 'message'=>'ok', 'data'=>$return_result]);
+
+    }
+
+
+    /**
+     * 门店统计订单效率排名
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function orderEfficiencyRank(Request $request)
+    {
+
+        $mall_id = $request->input('mall_id', 0);
+
+        $where = $this->where($request->input('date_type', 1), $mall_id);
+
+        $shopEffic = 0;
+        $shopEffic_array = [];
+        $res_count = DB::table('st_order')
+            ->select('mall_id',DB::raw('AVG(complete_at-created_at) as t'))
+            ->where($where)
+            ->where('status',4)
+            ->whereRaw('complete_at>=created_at')
+            ->groupBy('mall_id')
+            ->orderBy('t','desc')
+            ->get();
+
+        if ($res_count->count() <= 0) {
+            $return_result = [
+                'low' => 0,
+                'avg' => 0,
+                'this' => 0,
+                'high' => 0
+            ];
+        }else{
+            foreach ($res_count as $count){
+                if($count->mall_id == $mall_id)
+                    $shopEffic = $count->t;
+                $shopEffic_array[] = $count->t;
+            }
+
+            $return_result = [
+                'low' => round(max($shopEffic_array)),
+                'avg' => round(array_sum($shopEffic_array)/count($shopEffic_array)),
+                'this' => round($shopEffic),
+                'high' => round(min($shopEffic_array))
+            ];
+        }
+
+        return response()->json(['code'=>200, 'message'=>'ok', 'data'=>$return_result]);
+
+    }
+
+
+    /**
+     * 门店订单状态数量统计
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function orderStatusCount(Request $request)
+    {
+
+        $where = $this->where($request->input('date_type', 1), $request->input('mall_id', 0));
+
+        //新订单
+        $new_orders = StOrder::where($where)
+                            ->where(['status'=>0,'hang_up'=>0])
+                            ->count();
+
+        //代发配送
+        $wait_send_orders = StOrder::where($where)
+                                ->where('hang_up',0)
+                                ->whereNotIn('status',[0,4,5])
+                                ->count();
+
+        //异常单
+        $abnormal_orders = StOrder::where($where)
+                                ->where('hang_up',1)
+                                ->count();
+
+        //催单
+        $remind_orders = StOrder::where($where)
+                                ->where(['hang_up'=>0,'apply' => 3])
+                                ->count();
+
+        //退单
+        $refund_orders = StOrder::where($where)
+                                ->where('hang_up',0)
+                                ->whereIn('apply',[1,2])
+                                ->count();
+
+        $return_result = [
+            'new_orders' => app_to_int($new_orders),
+            'wait_send_orders' => app_to_int($wait_send_orders),
+            'abnormal_orders' => app_to_int($abnormal_orders),
+            'remind_orders' => app_to_int($remind_orders),
+            'refund_orders' => app_to_int($refund_orders)
+        ];
+
+        return response()->json(['code'=>200, 'message'=>'ok', 'data'=>$return_result]);
+
+    }
+
+
+    /**
+     * 查询条件处理
+     * @param int $date_type
+     * @param int $mall_id
+     * @param string $table
+     * @return array
+     */
+    private function where($date_type = 1, $mall_id = 0, $table = '')
+    {
+
+        $table  = !empty($table)
+            ? $table . '.'
+            : '';
+
+        $str_time = '';
+
+        if ($date_type == 2) {
+            $str_time = strtotime('-1 day');
+        } else if ($date_type == 3) {
+            $str_time = strtotime('-7 day');
+        } else if ($date_type == 4) {
+            $str_time = strtotime('-30 day');
+        }
+
+        $start = empty($str_time)
+            ? date('Y-m-d 00:00:00')
+            : date('Y-m-d 00:00:00', $str_time);
+
+        $where = [
+            [$table . 'created_at', '>=', $start],
+            [$table . 'created_at', '<=', date('Y-m-d H:i:s')]
+        ];
+
+        if (!empty($mall_id)) {
+            $where[] = [ $table . 'mall_id', $mall_id];
+        }
+
+        return $where;
+
+    }
+
+
+}

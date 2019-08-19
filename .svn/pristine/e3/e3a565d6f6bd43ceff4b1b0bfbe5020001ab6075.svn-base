@@ -1,0 +1,155 @@
+﻿* {
+    margin:0;
+    padding:0;
+}
+ul,li{
+    list-style: none;
+}
+body{
+    background:#f8f8f8;
+}
+.manager-content{
+    padding:18px;
+    background:#fff;
+}
+.gray_bg{
+    background:#fbfbfb;
+    padding:20px 0 20px 55px;
+}
+.gray_bg div{
+    line-height:22px;
+}
+.add-btn .btn{
+    cursor: pointer;
+    width:150px;
+    height:40px;
+    background: #5f8af7;
+    color:#fff;
+    text-align: center;
+    margin-top:30px;
+    line-height:40px;
+    padding:0;
+}
+.manage-body{
+    width : 100% ;
+    margin-top: 20px;
+}
+.manage-body .title{
+    overflow: hidden;
+    border-bottom:1px solid #ccc;
+}
+.manage-body .title span{
+    float: left;
+    text-align: center;
+    width:20%;
+    line-height: 50px;
+}
+
+/*编辑区域*/
+.edit-list li{
+    overflow: hidden;
+}
+.over{
+    margin:10px 0 0 30px;
+    overflow: hidden;
+}
+.icon-place{
+    width:20px;
+    height:20px;
+    float: left;
+    margin-right:10px;
+    margin-top:6px;
+}
+.icon-none{
+    width:20px;
+    height:20px;
+    float: left;
+    margin-right:10px;
+    margin-top:6px;
+    margin-left:8%;
+}
+.prevent{
+    background:url('/images/admin/toggle-up.png') no-repeat center left;
+    background-size:18px;
+    width:20px;
+    height:20px;
+    float:left;
+    margin-top:6px;
+    margin-right:10px;
+    cursor: pointer;
+}
+.shadeholder{
+    background:url('/images/admin/toggle-down.png') no-repeat center left;
+    background-size:18px;
+    width:20px;
+    height:20px;
+    float:left;
+    margin-top:6px;
+    margin-right:10px;
+    cursor: pointer;
+}
+.right-corner{
+    float: left;
+    width:90%;
+}
+.icon-del{
+    background:url('/static/images/steward/icon-android-cancel.png') no-repeat center left;
+    background-size:10px;
+    padding-left: 25px;
+    line-height:24px;
+    display: inline-block;
+    *display: inline;
+    zoom:1;
+    cursor: pointer;
+}
+.add-icon{
+    background:url('/images/admin/toggle-down.png') no-repeat center left;
+    background-size:18px 20px;
+    padding-left: 30px;
+    line-height:24px;
+    display: inline-block;
+    *display: inline;
+    zoom:1;
+    margin-left:30px;
+    cursor: pointer;
+}
+.input-control{
+    width:180px;
+    float: left;
+}
+.icon{
+    text-align:center;
+    float: right;
+    height:34px;
+    line-height:34px;
+    width:204px;
+}
+.submitnav{
+    display: none;
+}
+
+.submitnav li .right-corner{
+    width:86%;
+}
+.thirdnav{
+    display: none;
+}
+.thirdnav li .icon-place{
+    margin-left:8%;
+}
+.thirdnav li .right-corner{
+    width:82%;
+}
+.save-btn{
+    text-align: center;
+    padding-right: 50px;
+}
+
+.save-btn .btn{
+    width:150px;
+    height:40px;
+    background:#5f8af7;
+    color:#fff;
+    padding:0;
+    line-height:40px;
+}

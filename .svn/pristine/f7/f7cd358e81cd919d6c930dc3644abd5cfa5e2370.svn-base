@@ -1,0 +1,236 @@
+
+@extends('admin.layoutList')
+@section('css')
+    <style>
+        .col-extend-css {
+            width:100%;
+            text-align: left;
+        }
+    </style>
+@endsection
+@section('title')
+    <li class="cur">
+        <span>门店列表</span>
+    </li>
+@endsection
+
+@section('search')
+    <div class="form-group" >
+        <label for="app_name">平台：</label>
+        <input style="width: 125px" type="text" placeholder="请输入平台" class="form-control" name="app_name" id="product_code">&nbsp;&nbsp;
+    </div>
+    <div class="form-group" >
+        <label for="mall_code">门店号：</label>
+        <input style="width: 125px" type="text" placeholder="请输入门店号" class="form-control" name="mall_code" id="goodsName">
+    </div>
+    <div class="form-group" >
+        <label for="mall_name">门店名：</label>
+        <input style="width: 125px" type="text" placeholder="请输入门店名称" class="form-control" name="mall_name" id="goodsName">
+    </div>
+    <div class="form-group" >
+        <label for="mall_status">门店状态：</label>
+        <select class="form-control" name="status">
+            <option value="0">全部</option>
+            <option value="1">启用</option>
+            <option value="2">禁用</option>
+        </select>
+    </div>
+
+@endsection
+
+@section('js')
+    <script type="text/javascript">
+
+        var bootstrap_table_ajax_url = '/admin/search';
+        bootstrap_table({
+            sortName : '',
+            sortOrder : 'desc',
+            columns: [ //字段
+                { title: 'checkStatus',checkbox : true},
+                { title: '操作', field: 'operation', align: 'center' , width:'100px' },
+                { title: '门店编号',  field: 'mall_code', align: 'left' },
+                { title: '门店名称', field: 'mall_name', align: 'left', width:'85px' },
+                { title: '城市', field: 'city', align: 'left', width:'100px' },
+                { title: '详细地址', field: 'address', align: 'left', width:'150px' },
+                { title: '营业时间', field: 'business_time', align: 'left', width:'100px' },
+                { title: '上线平台', field: 'app_s', align: 'left', width:'100px' },
+                { title: '库存共享率(%)', field: 'stock_rate', align: 'left', width:'100px' },
+                { title: '安全库存(件)', field: 'stock_limit', align: 'left', width:'100px' },
+                { title: '创建时间', field: 'created_time', align: 'left', width:'100px' },
+                { title: '更新时间', field: 'update_time', align: 'left', width:'100px' }
+            ]
+        });
+
+        //搜索条件的判断
+        $(document).on('blur','#store_start',function(){
+            var store_start = $(this).val();
+            var store_end = $('#store_end').val();
+            if(store_start && !E.isNum(store_start)){
+                layer.msg('请输入正确的库存',{icon:2,shade: [0.15, 'black'],offset:'120px',time:2000});
+                return false;
+            }
+            if(store_start && store_end && store_start > store_end){
+                layer.msg('开始库存不能大于结束库存',{icon:2,shade: [0.15, 'black'],offset:'120px',time:2000})
+            }
+        }).on('blur','#store_end',function(){
+            var store_end = $(this).val();
+            var store_start = $('#store_start').val();
+            if(store_end && !E.isNum(store_end)){
+                layer.msg('请输入正确的库存',{icon:2,shade: [0.15, 'black'],offset:'120px',time:2000});
+                return false;
+            }
+            if(store_start && store_end && store_start > store_end){
+                layer.msg('开始库存不能大于结束库存',{icon:2,shade: [0.15, 'black'],offset:'120px',time:2000})
+            }
+        })
+
+
+        //删除
+        $(document).on('click','.delete',function(){
+            var del_str='';
+            var notice='';
+            var err_msg = '';
+            var del_arr = [];
+
+            if($(this).hasClass('all')){
+                //批量操作
+                notice = '您确定将所选库存删除吗？';
+                var num_selected = 0;
+                $('.selected').each(function(){
+                    num_selected = 1;
+                    var product_code = $(this).find('a').attr('data_id');
+                    var mainPostID = $(this).find('a').attr('data_type');
+                    if(E.isInt(product_code) && product_code > 0 ){
+                        del_str=product_code+','+mainPostID;
+                        del_arr.push(del_str);
+                    }else {
+                        err_msg = '参数错误，请刷新页面';
+                    }
+                })
+                if(num_selected==0){
+                    layer.msg('请选择要操作的商品',{icon:2,shade: [0.15, 'black'],offset:'120px',time:2000});
+                    return false;
+                }
+            }
+            else{
+                //单独操作
+                var mainPostID = $(this).attr('data_type');
+                var product_code = $(this).attr('data_id');
+                //单独操作
+                if ( E.isInt( mainPostID ) && mainPostID > 0 ) {
+                    del_str=product_code+','+mainPostID;
+                    notice = '您确定将该库存删除吗？';
+                    del_arr.push(del_str);
+                } else {
+                    err_msg = '参数错误，请刷新页面';
+                }
+            }
+
+            if (err_msg) {
+                layer.msg( err_msg , {icon: 2,shade: [0.15, 'black'],offset:'120px',time:1000});
+                return false;
+            }
+
+            layer.confirm(notice,{icon:3,offset:'50px'},function( index ){
+
+                layer.close(index);
+
+                E.ajax({
+                    type:'get',
+                    url:'/lar/steward/stock/deletes',
+                    data: {
+                        'data':del_arr
+                    },
+                    success: function (o) {
+                        if(o.code == 200){
+                            layer.msg(o.message,{icon:1,time:1000});
+                            bootstrap_table_init();
+                        }else{
+                            layer.msg('操作失败',{icon:2,time:1000});
+                        }
+                    }
+                });
+            })
+        })
+
+        //修改库存
+        $(document).on('click','.update',function() {
+            var _this=$(this);
+            var type= $(this).attr('data_type');
+            var stock=$(this).attr('data');
+            var product_code=$(this).attr('data_id');
+            var name='';
+            var html='<div id="pop" style="margin-top:10px;" style="width: 100%"> ' +
+                    '<div style="background: #ffffff">' +
+                    ' <form id="pop_form" onsubmit="return false;" class="form-horizontal" role="form"> ' +
+                    '<div class="form-group" style="margin-right: 1px; margin-left: 1px;"> ' +
+                    '<label class="col-sm-3 control-label" for="stock_edit" >' +
+                    '<span style="color:red">* </span>'+name+'库存：</label>' +
+                    '<div class="col-sm-8">' +
+                    '<input class="form-control"  style="width: 200px;" type="text" id="stock_edit" name="stock_edit" maxlength="100" value="'+stock+'" />' +
+                    '</div></div>' +
+                    '</form></div></div>';
+
+            if(type==1)
+            {
+                name='可售库存修改';
+            }else{
+                name='虚拟库存修改';
+            }
+            if(type==1 || type==2){
+                if( E.isInt( product_code ) && product_code > 0){
+                    layer.open({
+                        title: name,
+                        type: 1,
+                        area: ['400px', '200px'],
+                        content: html,
+                        btn:['修改','关闭'],
+                        yes: function(index, layero){
+                            var stock_edit=$('#stock_edit').val();
+
+                            if(stock_edit=='')
+                            {
+                                err_msg='库存量不得为空';
+                                layer.msg( err_msg , {icon: 2,shade: [0.15, 'black'],offset:'120px',time:1000});
+                                return false;
+                            }
+
+                            if(!E.isInt( stock_edit ) ||  stock_edit < 0)
+                            {
+                                err_msg='库存量必须为大于零的整数';
+                                layer.msg( err_msg , {icon: 2,shade: [0.15, 'black'],offset:'120px',time:1000});
+                                return false;
+                            }
+                            $.ajax({
+                                type: "get",
+                                dataType: "json",
+                                url: '/lar/steward/stock/update',
+                                data: {
+                                    type:type,
+                                    product_code:product_code,
+                                    stock:stock_edit
+                                },
+                                success: function (msg) {
+                                    if (msg.code==200) {
+                                        layer.closeAll();
+                                        layer.msg( msg.message , {icon: 1,shade: [0.15, 'black'],offset:'120px',time:1000});
+                                        var data='&nbsp;<a href="javascript:void(0)" class="update" data_type="'+type+'" data_id="'+product_code+ '" data="'+stock_edit+'"><img src="/static/images/steward/common/updates.png"></a>';
+                                        $("#"+type+product_code).html(stock_edit+data);
+                                        _this.attr('data',stock_edit);
+                                        $("#t_"+product_code).html(msg.data);
+                                    }else{
+                                        layer.msg( msg.message , {icon: 2,shade: [0.15, 'black'],offset:'120px',time:1000});
+                                    }
+                                }
+                            });
+                        }
+                        ,btn2: function(index, layero){
+                            var index = parent.layer.getFrameIndex(window.name);
+                            parent.layer.close(index);
+                        }
+                    })
+                }
+            }
+        });
+    </script>
+@endsection

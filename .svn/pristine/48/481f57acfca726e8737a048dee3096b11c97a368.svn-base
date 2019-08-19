@@ -1,0 +1,34 @@
+<?php
+
+namespace App\Service\Wm\Bd;
+
+
+class Config
+{
+    public $getWay = 'http://api.waimai.baidu.com';
+    public $testGetWay = 'http://api.waimai.baidu.com';
+    public $appKey;
+    public $appSecret;
+    public $version = '3';
+    public $alias = 'bd';
+    public $userAgent = 'ebsig-bd-api';
+    public $debug = 0;
+    public $wmID = 1;
+    public static $operator = 'bd-api';
+    public $encrypt = '';
+
+    //默认属性重载
+    public function _cover_attribute()
+    {
+
+        $attr_arr = [];
+
+        if ($this->debug) {
+            $attr_arr['getWay'] = $this->testGetWay;
+        }
+
+        return $attr_arr;
+
+    }
+
+}

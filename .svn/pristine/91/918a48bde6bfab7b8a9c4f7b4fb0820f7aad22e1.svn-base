@@ -1,0 +1,15 @@
+<?php
+/*
+|--------------------------------------------------------------------------
+| Task Routes
+|--------------------------------------------------------------------------
+|
+|
+*/
+
+Route::middleware(['admin.service'])->group(function () {
+
+    //任务调度
+    Route::any('admin/task/exec/{type}', 'Admin\execController@exec');
+
+});

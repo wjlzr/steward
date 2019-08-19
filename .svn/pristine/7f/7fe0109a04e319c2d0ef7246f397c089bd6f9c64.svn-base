@@ -1,0 +1,181 @@
+@extends('admin.layoutEdit')
+@section('css')
+    <style>
+        #map {
+            height: 360px;
+            margin-left: 0px !important;
+            width: 99%;
+            background: #F4F4F4;
+            font-size: 16px;
+            text-align: center;
+            padding-top: 170px;
+        }
+        #send_area_list table td{
+            width:229px; !important;
+            height:35px;
+            cursor:pointer;
+        }
+
+        #send_area_list table td.addArea{
+            text-align: center;
+        }
+
+        #send_area_list table td>a{
+            color:red;
+            float:right;
+        }
+
+        #send_area_list table td div{
+            float:right;
+        }
+
+    </style>
+@endsection
+
+@section('title')
+    <ul>
+        <li class="cur">
+            <span>@if($mall_id)编辑门店@else新建门店@endif</span>
+        </li>
+    </ul>
+@endsection
+
+@section('content')
+
+    <div class="content">
+
+        <form id="mall-form" class="form-horizontal" onsubmit="return false;">
+
+            <input type="hidden" name="mallID" id="mallID" value="">
+
+            <div class="form-group">
+                <label for="mallName" class="col-sm-2 control-label"><span class="red">*</span> <span class="change-name">门店</span>名称：</label>
+                <div class="col-sm-4">
+                    <input type="text" class="form-control" placeholder="请输入门店名称(15字内)" id="mallName" name="mallName" value="" />
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="mallCode" class="col-sm-2 control-label"><span class="red">*</span> <span class="change-name">门店</span>号：</label>
+                <div class="col-sm-2">
+                    <input type="text" class="form-control" placeholder=" 请输入门店编号" id="mallCode" name="mallCode" value=""/>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="mobile" class="col-sm-2 control-label"><span class="red">*</span> <span class="change-name">门店</span>电话：</label>
+                <div class="col-sm-4">
+                    <input type="text" class="form-control" placeholder=" 请输入电话或手机(至少填写一个)" id="telephone" name="telephone" value="" maxlength="20"/>
+                </div>
+            </div>
+
+            <div class="form-group" id="platform" >
+                <label class="col-sm-2 control-label">营业时间：</label>
+                <div class="col-sm-7 radio-box">
+                <span>
+                   <input type="radio" class="square-radio" name="time" value="1">24小时
+                </span>
+                    <span>
+                    <input type="radio" class="square-radio" name="time" value="1">时间段
+                </span>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="mallCode" class="col-sm-2 control-label"><span class="change-name">库存</span>共享率：</label>
+                <div class="col-sm-2">
+                    <input type="text" class="form-control" id="mallCode" name="mallCode" value=""/>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="mallCode" class="col-sm-2 control-label"><span class="change-name">安全</span>库存：</label>
+                <div class="col-sm-2">
+                    <input type="text" class="form-control" id="mallCode" name="mallCode" value=""/>
+                </div>
+            </div>
+
+    <div class="form-group">
+        <label class="col-sm-2 control-label"><span class="red">*</span> <span class="change-name">门店</span>详细地址：</label>
+        <div class="col-sm-10 form-inline">
+            <select id="province_list" class="form-control"  name="provinceid">
+                <option value="0">请选择</option>
+            </select>
+            <select id="city_list" class="form-control" name="cityid">
+                <option value="0">请选择</option>
+            </select>
+            <select id="county_list" class="form-control" name="countyid">
+                <option value="0">请选择</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label class="col-sm-2 control-label">&nbsp;</label>
+        <div class="col-sm-5">
+            <div class="input-group">
+                <input type="text" class="form-control"  placeholder="请输入门店详细地址" name="address" id="address" value="" />
+                <span class="input-group-btn">
+                        <button type="button" class="btn btn-success" onclick="Mall.getCoordinate();">获取经纬度</button>
+                    </span>
+            </div>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label for="longitude" class="col-sm-2 control-label"><span class="red">*</span> 经纬度：</label>
+        <div class="col-sm-2">
+            <input type="text" class="form-control " placeholder="经度" name="longitude" id="longitude" value="" />
+        </div>
+        <div class="col-sm-1" style="width: 20px;margin-left: -15px;margin-top: 6px;">～</div>
+        <div class="col-sm-2">
+            <input type="text" class="form-control coordinate" placeholder="纬度"  name="latitude" id="latitude" value="" />
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label class="col-sm-2 control-label"><span class="red">*</span> 地图定位：</label>
+        <div class="col-sm-10">
+            <div id="map" class="col-sm-offset-1 col-sm-10"></div>
+        </div>
+    </div>
+
+
+    <div class="form-group" >
+        <label class="col-sm-2 control-label"></label>
+        <div class="col-sm-10">
+            <input type="button" class="btn btn-primary" onclick="Mall.edit();" value="保存" />
+            <input type="button" style="margin-left: 20px;" class="btn btn-default layer-go-back" value="关闭">
+        </div>
+    </div>
+
+    </form>
+
+    </div>
+@endsection
+
+@section('js')
+    <script src="/libs/uploadify/jquery.uploadify.min.js?v=20151216131"></script>
+    <script src="http://api.map.baidu.com/api?v=2.0&ak=F6ab12c949c3b6dfefc63d8899cc34ea"></script>
+    <script charset="utf-8" src="http://map.qq.com/api/js?v=2.exp&libraries=drawing"></script>
+    <script type="text/javascript" src="https://3gimg.qq.com/lightmap/components/geolocation/geolocation.min.js"></script>
+    <script src="/libs/iCheck/icheck.js"></script>
+    <script src="/libs/layui-v2.1.7/layui.js"></script>
+
+    <script>
+        $('.square-radio').iCheck({
+            checkboxClass: 'icheckbox_square-blue',
+            radioClass: 'iradio_square-blue',
+            increaseArea: '20%' // optional
+        });
+
+    </script>
+
+
+@endsection
+
+
+
+
+
+

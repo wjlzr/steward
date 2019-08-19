@@ -1,0 +1,375 @@
+@extends('admin.layoutList')
+@section('css')
+    <style>
+        .col-extend-css {
+            width: 100%;
+            text-align: left;
+        }
+
+        .item {
+            width: 100%;
+            height: 30px;
+        }
+
+        .item-one {
+            font-size: 14px;
+        }
+
+        .item-two {
+            font-size: 12px;
+        }
+
+        .item-three {
+            margin-left: 15px;
+            margin-top: 15px;
+        }
+
+        .hr {
+            margin-left: 10px;
+            width: 1000px;
+        }
+
+        .img {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            margin-left: 15px;
+            margin-top: 45px;
+        }
+
+        .content {
+            width: 240px;
+            height: 120px;
+            float: left;
+            margin-bottom: 15px;
+        }
+
+        .one {
+            position: absolute;
+            margin-top: 5px;
+            margin-left: 75px;
+        }
+
+        .two {
+            margin-left: 80px;
+            position: absolute;
+            font-size: 50px;
+            margin-top: 45px;
+        }
+
+        .three {
+            margin-top: 5px;
+            margin-left: 155px;
+            position: absolute;
+        }
+
+        .four {
+            margin-left: 175px;
+            position: absolute;
+            font-size: 50px;
+            margin-top: 45px;
+        }
+
+        .div {
+            position: absolute;
+        }
+
+        .item-hr {
+            width: 1px;
+            height: 105px;
+            margin-left: 225px;
+        }
+    </style>
+@endsection
+@section('title')
+    <li class="cur">
+        <span>门店列表</span>
+    </li>
+@endsection
+@section('head')
+    <div class="item">
+        <div class="item-three">
+            <span class="item-one">全部门店</span><span class="item-two">(共{{ $count }}家)</span>
+        </div>
+    </div>
+    <hr class="hr">
+    <div class="content">
+        <div>
+            <div class="div">
+                <img src="/images/admin/app/order-icon1.png" alt="" class="img">
+            </div>
+
+            <div>
+                <span class="one">营业中</span>
+            </div>
+            <div>
+                <span class="two">{{ $ele_open }}</span>
+            </div>
+            <div>
+                <span class="three">暂时关闭</span>
+            </div>
+            <div>
+                <span class="four">{{ $ele_close }}</span>
+            </div>
+            <hr class="item-hr">
+        </div>
+    </div>
+    <div class="content">
+        <div>
+            <div class="div">
+                <img src="/images/admin/app/order-icon4.png" alt="" class="img">
+            </div>
+
+            <div>
+                <span class="one">营业中</span>
+            </div>
+            <div>
+                <span class="two">{{ $mt_open }}</span>
+            </div>
+            <div>
+                <span class="three">暂时关闭</span>
+            </div>
+            <div>
+                <span class="four">{{ $mt_close }}</span>
+            </div>
+            <hr class="item-hr">
+        </div>
+    </div>
+    <div class="content">
+        <div>
+            <div class="div">
+                <img src="/images/admin/app/order-icon3.png" alt="" class="img">
+            </div>
+
+            <div>
+                <span class="one">营业中</span>
+            </div>
+            <div>
+                <span class="two">{{ $jd_open }}</span>
+            </div>
+            <div>
+                <span class="three">暂时关闭</span>
+            </div>
+            <div>
+                <span class="four">{{ $jd_close }}</span>
+            </div>
+            <hr class="item-hr">
+        </div>
+    </div>
+    <div class="content">
+        <div>
+            <div class="div">
+                <img src="/images/admin/app/order-icon5.png" alt="" class="img">
+            </div>
+
+            <div>
+                <span class="one">营业中</span>
+            </div>
+            <div>
+                <span class="two">{{ $bd_open }}</span>
+            </div>
+            <div>
+                <span class="three">暂时关闭</span>
+            </div>
+            <div>
+                <span class="four">{{ $bd_close }}</span>
+            </div>
+            <hr class="item-hr">
+        </div>
+    </div>
+@endsection
+
+@section('search')
+
+    <div class="form-group">
+        <label for="app_name">平台：</label>
+        <input style="width: 125px" type="text" placeholder="请输入平台" class="form-control" name="app_name" id="app_name">&nbsp;&nbsp;
+    </div>
+    <div class="form-group">
+        <label for="mall_code">门店号：</label>
+        <input style="width: 125px" type="text" placeholder="请输入门店号" class="form-control" name="mall_code"
+               id="app_name">
+    </div>
+    <div class="form-group">
+        <label for="mall_name">门店名：</label>
+        <input style="width: 125px" type="text" placeholder="请输入门店名称" class="form-control" name="mall_name"
+               id="mall_name">
+    </div>
+    <div class="form-group">
+        <label for="mall_status">门店状态：</label>
+        <select class="form-control" name="status">
+            <option value="0">全部</option>
+            <option value="1">启用</option>
+            <option value="2">禁用</option>
+        </select>
+    </div>
+@endsection
+@section('button')
+    <div style="margin-top: 5px;margin-left: 5px">
+        <button id="new_mall" class="btn btn-info">新建门店</button>
+        <button id="export_mall" class="btn btn-info">导入门店</button>
+        <button class="btn btn-info">设置上线平台</button>
+        <button class="btn btn-info">设置营业时间</button>
+    </div>
+@endsection
+
+@section('js')
+    <script type="text/javascript">
+
+        var bootstrap_table_ajax_url = '/admin/mall/search';
+        bootstrap_table({
+            sortName: 'id',
+            sortOrder: 'desc',
+            columns: [ //字段
+                {title: 'checkStatus', checkbox: true},
+                {title: '操作', field: 'operation', align: 'center', width: '120px'},
+                {title: '门店编号', field: 'mall_code', align: 'left'},
+                {title: '门店名称', field: 'mall_name', align: 'left', width: '85px'},
+                {title: '城市', field: 'city', align: 'left', width: '100px'},
+                {title: '详细地址', field: 'address', align: 'left', width: '150px'},
+                {title: '营业时间', field: 'business_time', align: 'left', width: '100px'},
+                {title: '上线平台', field: 'app_platform', align: 'left', width: '100px'},
+                {title: '库存共享率(%)', field: 'stock_rate', align: 'left', width: '100px'},
+                {title: '安全库存(件)', field: 'stock_limit', align: 'left', width: '100px'},
+                {title: '创建时间', field: 'created_time', align: 'left', width: '100px'},
+                {title: '更新时间', field: 'update_time', align: 'left', width: '100px'}
+            ]
+        });
+
+        //新建门店
+        $(document).on('click', '#new_mall', function () {
+            alert(1);
+        })
+
+        //启用&&禁用
+        $(document).on('click', '.delete', function () {
+            var notice = '';
+            var err_msg = '';
+
+            var mall_id = $(this).attr('data_id');
+            var status = $(this).attr('data_type');
+            if (E.isInt(mall_id) && mall_id > 0) {
+                if (status == 1) {
+                    notice = '您确定将该门店禁用吗？';
+                } else {
+                    notice = '您确定将该门店启用吗？';
+                }
+            } else {
+                err_msg = '参数错误，请刷新页面';
+            }
+
+            if (err_msg) {
+                layer.msg(err_msg, {icon: 2, shade: [0.15, 'black'], offset: '120px', time: 1000});
+                return false;
+            }
+
+            layer.confirm(notice, {icon: 3, offset: '50px'}, function (index) {
+
+                layer.close(index);
+
+                E.ajax({
+                    type: 'get',
+                    url: '/admin/mall/status',
+                    data: {
+                        'data': mall_id + ',' + status
+                    },
+                    success: function (o) {
+                        if (o.code == 200) {
+                            layer.msg(o.message, {icon: 1, time: 1000});
+                            bootstrap_table_init();
+                        } else {
+                            layer.msg('操作失败', {icon: 2, time: 1000});
+                        }
+                    }
+                });
+            })
+        })
+
+        //修改库存
+        $(document).on('click', '.update', function () {
+            var _this = $(this);
+            var type = $(this).attr('data_type');
+            var stock = $(this).attr('data');
+            var mall_id = $(this).attr('data_id');
+            var name = '';
+            var html = '<div id="pop" style="margin-top:10px;" style="width: 100%"> ' +
+                    '<div style="background: #ffffff">' +
+                    ' <form id="pop_form" onsubmit="return false;" class="form-horizontal" role="form"> ' +
+                    '<div class="form-group" style="margin-right: 1px; margin-left: 1px;"> ' +
+                    '<label class="col-sm-3 control-label" for="stock_edit" >' +
+                    '<span style="color:red">* </span>' + name + '输入：</label>' +
+                    '<div class="col-sm-8">' +
+                    '<input class="form-control"  style="width: 200px;" type="text" id="stock_edit" name="stock_edit" maxlength="100" value="' + stock + '" />' +
+                    '</div></div>' +
+                    '</form></div></div>';
+
+            if (type == 1) {
+                name = '设置库存共享率';
+            } else {
+                name = '设置安全库存';
+            }
+            if (type == 1 || type == 2) {
+                if (E.isInt(mall_id) && mall_id > 0) {
+                    layer.open({
+                        title: name,
+                        type: 1,
+                        area: ['400px', '200px'],
+                        content: html,
+                        btn: ['修改', '关闭'],
+                        yes: function (index, layero) {
+                            var stock_edit = $('#stock_edit').val();
+
+                            if (stock_edit == '') {
+                                if (type == 1) {
+                                    err_msg = '库存共享率不能为空';
+                                } else if (type == 2) {
+                                    err_msg = '安全库存不得为空';
+                                }
+                                layer.msg(err_msg, {icon: 2, shade: [0.15, 'black'], offset: '120px', time: 1000});
+                                return false;
+                            }
+
+                            if (type == 1 && stock_edit > 1) {
+                                err_msg = '库存共享率最大为1';
+                                layer.msg(err_msg, {icon: 2, shade: [0.15, 'black'], offset: '120px', time: 1000});
+                                return false;
+                            }
+                            $.ajax({
+                                type: "get",
+                                dataType: "json",
+                                url: '/admin/mall/update',
+                                data: {
+                                    type: type,
+                                    mall_id: mall_id,
+                                    stock: stock_edit
+                                },
+                                success: function (msg) {
+                                    if (msg.code == 200) {
+                                        layer.closeAll();
+                                        layer.msg(msg.message, {
+                                            icon: 1,
+                                            shade: [0.15, 'black'],
+                                            offset: '120px',
+                                            time: 1000
+                                        });
+                                    } else {
+                                        layer.msg(msg.message, {
+                                            icon: 2,
+                                            shade: [0.15, 'black'],
+                                            offset: '120px',
+                                            time: 1000
+                                        });
+                                    }
+                                }
+                            });
+                        }
+                        , btn2: function (index, layero) {
+                            var index = parent.layer.getFrameIndex(window.name);
+                            parent.layer.close(index);
+                        }
+                    })
+                }
+            }
+        });
+    </script>
+@endsection

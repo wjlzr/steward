@@ -1,0 +1,50 @@
+<?php
+
+namespace App\Services\Order;
+
+use App\Models\Order\StOrder;
+use App\Models\Order\StOrderApply;
+use App\Models\StApp;
+
+use App\Services\Wm\FieldsService;
+use GuzzleHttp\Psr7\Request;
+
+
+class EditService
+{
+
+
+    public function receive(Request $request) {}
+
+
+    public function cancel(Request $request) {}
+
+
+    public function hang_up() {}
+
+
+    public function cancel_hang_up() {}
+
+
+    public function packs() {}
+
+
+    public function complete_packs() {}
+
+
+    public function delivery() {}
+
+
+    public function complete() {}
+
+
+    public function agree_refund() {}
+
+
+    public function disagree_refund() {}
+
+
+    public function reply_remind() {}
+
+
+}

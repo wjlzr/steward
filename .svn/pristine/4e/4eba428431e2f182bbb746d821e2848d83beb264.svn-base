@@ -1,0 +1,116 @@
+<?php
+
+namespace App\Http\Controllers\Admin\User;
+
+use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
+use App\Models\User\StUser;
+use App\Services\User\SearchService;
+
+
+class UserController extends Controller
+{
+
+
+    //用户列表业
+    public function index(Request $request)
+    {
+
+        return view('admin/user/index');
+
+    }
+
+
+    //用户列表查询
+    public function search(Request $request) {
+
+        $rp = $request->input('rp', 10);
+        $offset = $request->input('offset', 0);
+        $sort=$request->input('sort');
+        $order=$request->input('order');
+        $where = [];
+        //用户名称
+        if ($request->input('mobile')) {
+            $where[] = ['mobile', $request->input('mobile')];
+        }
+
+        $User=new SearchService();
+        $Userdata=$User->search($where,$rp,$offset,$sort,$order);
+        return $Userdata;
+    }
+
+
+    //用户新增页
+    public function add(Request $request)
+    {
+
+        return view('admin/user/edit');
+
+    }
+
+
+    //用户编辑页
+    public function edit(Request $request) {
+        $id='';
+        if($request['id']){
+            $id=$request['id'];
+
+            $U =new SearchService();
+            $data=$U->edit_user($id);
+            $user_data=$data[0];
+        }else{
+            $user_data=[];
+        }
+
+
+        return view('admin/user/edit',['user_data' => $user_data,'id'=>$id]);
+
+    }
+
+
+    //提交用户信息
+    public function submit(Request $request)
+    {
+        if (!isset($request['data']) || empty($request['data'])) {
+            return response()->json(['code' => 10001, 'message' => '缺少参数']);
+        }
+
+        $user_data=$request['data'];
+
+        if(!$user_data['id']){
+            $user_data['created_at']=date('Y-m-d H:i:s',time());
+            $user_data['updated_at']=date('Y-m-d H:i:s',time());
+            $U =new SearchService();
+            $num=$U->add_user($user_data);
+        }else {
+            $user_data['updated_at']=date('Y-m-d H:i:s',time());
+            $U =new SearchService();
+            $num=$U->update_user($user_data);
+        }
+
+        if($num){
+            return response()->json(['code'=>200, 'message'=>'成功']);
+        }
+
+    }
+
+    //启用&禁用
+    public function status(Request $request)
+    {
+        if (!isset($request['data']) || empty($request['data'])) {
+            return response()->json(['code' => 10001, 'message' => '缺少参数']);
+        }
+        $user_data = explode(',', $request['data']);
+        $status = 1;
+        if ($user_data[1] == $status) {
+            $status = 0;
+        }
+        $num = StUser::where('id', $user_data[0])->update(['status' => $status]);
+        if ($num) {
+            return response()->json(['code' => 200, 'message' => '操作成功', 'data' => []]);
+        }
+    }
+
+
+
+}

@@ -1,0 +1,408 @@
+@extends('admin.layout')
+@section('css')
+    <link  rel="stylesheet" href="/css/admin/index/mall.css?v=2018011116">
+@endsection
+
+
+@section('content')
+
+    <div class="main">
+        <!--紧急通知-->
+        <div class="main-notice">
+            <a href="javascript:;"><span id="urgent_message">紧急通知：艺术家合作卡发布疯狂星期五，清洁用品2件5折！414乐视超级电视最高直降980家装节钜惠，3件8.8折！</span></a>
+            <span class="icon-cancel"><img src="/images/admin/icon/icon-cancel.png"> </span>
+        </div>
+
+        <!--各数据统计-->
+        <div class="main-info-box">
+            <div class="info-choose">
+                <ul>
+                    <li class="active"><a href="javascript:;">今日</a></li>
+                    <li><a href="javascript:;">昨日</a></li>
+                    <li><a href="javascript:;">近7日</a></li>
+                    <li><a href="javascript:;">近30天</a></li>
+                </ul>
+            </div>
+            <div class="main-show">
+                <div class="shop-logo" style="background-image: url(/images/admin/icon/logo.png)"></div>
+                <div class="shop-name">上海宝虹中心店</div>
+                <ul class="shop-info-list">
+                    <li>
+                        <a href="javascript:;">
+                            <div class="title-info">总营业额（元）</div>
+                            <div class="today-number">2222</div>
+                            <div class="tom-number">昨日  <span>11</span>元</div>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="javascript:;">
+                            <div class="title-info">包装收入（元）</div>
+                            <div class="today-number">222</div>
+                            <div class="tom-number">昨日  <span>111</span>元</div>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="javascript:;">
+                            <div class="title-info">预计收入（元）</div>
+                            <div class="today-number">2222</div>
+                            <div class="tom-number">昨日  <span>111</span>单</div>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="javascript:;">
+                            <div class="title-info">有效订单数</div>
+                            <div class="today-number">22</div>
+                            <div class="tom-number">昨日  <span>11</span>单</div>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="javascript:;">
+                            <div class="title-info">总订单数</div>
+                            <div class="today-number">222</div>
+                            <div class="tom-number">昨日  <span>11</span>单</div>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="javascript:;">
+                            <div class="title-info">客单价</div>
+                            <div class="today-number">1234</div>
+                            <div class="tom-number">昨日  <span>123</span>元</div>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+            <ul class="order-flex-5">
+                <li>
+                    <a href="javascript:;">
+                        <div class="flex-img flex-1">
+                            <img src="/images/admin/index/order-1.png">
+                        </div>
+                        <div class="flex-num">
+                            <p>新订单</p>
+                            <p>11</p>
+                        </div>
+                    </a>
+                </li>
+                <li>
+                    <a href="javascript:;">
+                        <div class="flex-img flex-2">
+                            <img src="/images/admin/index/order-2.png">
+                        </div>
+                        <div class="flex-num">
+                            <p>待发配送</p>
+                            <p>22</p>
+                        </div>
+                    </a>
+                </li>
+                <li>
+                    <a href="javascript:;">
+                        <div class="flex-img flex-3">
+                            <img src="/images/admin/index/order-3.png">
+                        </div>
+                        <div class="flex-num">
+                            <p>异常单</p>
+                            <p>1</p>
+                        </div>
+                    </a>
+                </li>
+                <li>
+                    <a href="javascript:;">
+                        <div class="flex-img flex-4">
+                            <img src="/images/admin/index/order-4.png">
+                        </div>
+                        <div class="flex-num">
+                            <p>催单</p>
+                            <p>22</p>
+                        </div>
+                    </a>
+                </li>
+                <li>
+                    <a href="javascript:;">
+                        <div class="flex-img flex-5">
+                            <img src="/images/admin/index/order-5.png">
+                        </div>
+                        <div class="flex-num">
+                            <p>退单</p>
+                            <p>2</p>
+                        </div>
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+        <!--热销排行-->
+        <div class="chart-z-list chart-list">
+            <div class="chart-z chart-list-1">
+                <div class="chart-title">
+                    <span><img src="/images/admin/index/hot-1.png" alt=""></span>
+                    <span class="chart-info">热销商品排名</span>
+                </div>
+                <div class="chart-table">
+                    <table>
+                        <thead>
+                        <tr>
+                            <td>排行</td>
+                            <td class="td-name">商品名称</td>
+                            <td>总金额</td>
+                            <td>总数量</td>
+                            <td>均单价</td>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr>
+                            <td><span class="first">1</span></td>
+                            <td class="td-name"><p>乐事薯片 600克</p></td>
+                            <td>1853.4 </td>
+                            <td>34</td>
+                            <td>13</td>
+                        </tr>
+                        <tr>
+                            <td><span class="second">2</span></td>
+                            <td class="td-name"><p>乐事薯片 600克</p></td>
+                            <td>1853.4 </td>
+                            <td>34</td>
+                            <td>13</td>
+                        </tr>
+                        <tr>
+                            <td><span class="third">3</span></td>
+                            <td class="td-name"><p>乐事薯片 600克</p></td>
+                            <td>1853.4 </td>
+                            <td>34</td>
+                            <td>13</td>
+                        </tr>
+                        <tr>
+                            <td><span>4</span></td>
+                            <td class="td-name"><p>乐事薯片 600克</p></td>
+                            <td>1853.4 </td>
+                            <td>34</td>
+                            <td>13</td>
+                        </tr>
+                        <tr>
+                            <td><span>5</span></td>
+                            <td class="td-name"><p>乐事薯片 600克</p></td>
+                            <td>1853.4 </td>
+                            <td>34</td>
+                            <td>13</td>
+                        </tr>
+                        <tr>
+                            <td><span>6</span></td>
+                            <td class="td-name"><p>乐事薯片 600克</p></td>
+                            <td>1853.4 </td>
+                            <td>34</td>
+                            <td>13</td>
+                        </tr>
+                        <tr>
+                            <td><span>7</span></td>
+                            <td class="td-name"><p>乐事薯片 600克</p></td>
+                            <td>1853.4 </td>
+                            <td>34</td>
+                            <td>13</td>
+                        </tr>
+                        <tr>
+                            <td><span>8</span></td>
+                            <td class="td-name"><p>乐事薯片 600克</p></td>
+                            <td>1853.4 </td>
+                            <td>34</td>
+                            <td>13</td>
+                        </tr>
+                        <tr>
+                            <td><span>9</span></td>
+                            <td class="td-name"><p>乐事薯片 600克</p></td>
+                            <td>1853.4 </td>
+                            <td>34</td>
+                            <td>13</td>
+                        </tr>
+                        <tr>
+                            <td><span>10</span></td>
+                            <td class="td-name"><p>乐事薯片 600克</p></td>
+                            <td>1853.4 </td>
+                            <td>34</td>
+                            <td>13</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="chart-z chart-list-2">
+                <div class="chart-title">
+                    <span><img src="/images/admin/index/hot-2.png" alt=""></span>
+                    <span class="chart-info">热销分类排名</span>
+                </div>
+                <div class="chart-table">
+                    <table>
+                        <thead>
+                        <tr>
+                            <td>排行</td>
+                            <td class="td-name">分类名称</td>
+                            <td>总金额</td>
+                            <td>总数量</td>
+                            <td>均单价</td>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr>
+                            <td><span class="first">1</span></td>
+                            <td class="td-name"><p>酒水饮料</p></td>
+                            <td>1853.4 </td>
+                            <td>34</td>
+                            <td>13</td>
+                        </tr>
+                        <tr>
+                            <td><span class="second">2</span></td>
+                            <td class="td-name"><p>护肤彩妆</p></td>
+                            <td>1853.4 </td>
+                            <td>34</td>
+                            <td>13</td>
+                        </tr>
+                        <tr>
+                            <td><span class="third">3</span></td>
+                            <td class="td-name"><p>个人护理</p></td>
+                            <td>1853.4 </td>
+                            <td>34</td>
+                            <td>13</td>
+                        </tr>
+                        <tr>
+                            <td><span>4</span></td>
+                            <td class="td-name"><p>母婴用品</p></td>
+                            <td>1853.4 </td>
+                            <td>34</td>
+                            <td>13</td>
+                        </tr>
+                        <tr>
+                            <td><span>5</span></td>
+                            <td class="td-name"><p>个人护理</p></td>
+                            <td>1853.4 </td>
+                            <td>34</td>
+                            <td>13</td>
+                        </tr>
+                        <tr>
+                            <td><span>6</span></td>
+                            <td class="td-name"><p>个人护理</p></td>
+                            <td>1853.4 </td>
+                            <td>34</td>
+                            <td>13</td>
+                        </tr>
+                        <tr>
+                            <td><span>7</span></td>
+                            <td class="td-name"><p>个人护理</p></td>
+                            <td>1853.4 </td>
+                            <td>34</td>
+                            <td>13</td>
+                        </tr>
+                        <tr>
+                            <td><span>8</span></td>
+                            <td class="td-name"><p>个人护理</p></td>
+                            <td>1853.4 </td>
+                            <td>34</td>
+                            <td>13</td>
+                        </tr>
+                        <tr>
+                            <td><span>9</span></td>
+                            <td class="td-name"><p>个人护理</p></td>
+                            <td>1853.4 </td>
+                            <td>34</td>
+                            <td>13</td>
+                        </tr>
+                        <tr>
+                            <td><span>10</span></td>
+                            <td class="td-name"><p>个人护理</p></td>
+                            <td>1853.4 </td>
+                            <td>34</td>
+                            <td>13</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="chart-z chart-list-3">
+                <div class="chart-title">
+                    <span><img src="/images/admin/index/hot-3.png" alt=""></span>
+                    <span class="chart-info">渠道占比</span>
+                </div>
+                <div class="change-type">
+                    <span class="cur-type">销售额</span>
+                    <span>订单数</span>
+                </div>
+                <div class="proportion">
+
+                </div>
+                <ul class="pro-list">
+                    <li>
+                        <span style="background: #00b7ee;"></span>微电汇
+                    </li>
+                    <li>
+                        <span style="background: #00b7ee;"></span>饿了么
+                    </li>
+                    <li>
+                        <span style="background: #ff6d8f;"></span>百度外卖
+                    </li>
+                    <li>
+                        <span style="background: #00dba9;"></span>京东到家
+                    </li>
+                    <li>
+                        <span style="background: #ff9b12;"></span>美团
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!--营收排名\订单效率-->
+        <div class="chart-z-list" style="overflow: hidden;">
+            <div class="chart-z">
+                <div class="chart-title">
+                    <span><img src="/images/admin/index/chart-1.png" alt=""></span>
+                    <span class="chart-info">营收排名</span>
+                </div>
+                <div class="chart-box" id="chart-revenue" style="height:300px;background:#fff !important;"></div>
+            </div>
+            <div class="chart-z chart-second">
+                <div class="chart-title">
+                    <span><img src="/images/admin/index/chart-2.png" alt=""></span>
+                    <span class="chart-info">订单效率</span>
+                </div>
+                <div class="chart-box" id="chart-effic" style="height:300px;background:#fff !important;"></div>
+            </div>
+        </div>
+
+        <!--新手上路\产品动态-->
+        <div class="chart-z-list">
+            <div class="chart-z">
+                <div class="chart-title border-b">
+                    <span class="chart-info">新手上路</span>
+                    <div class="sel-day-btn">
+                        <a href="javascript:;"  class="more">更多</a>
+                    </div>
+                </div>
+                <div class="chart-box">
+                    <ul class="news-list guide-list">
+                        <li><a href="javascript:;">商管家交易条款</a></li>
+                        <li><a href="javascript:;">商管家交易条款</a></li>
+                        <li><a href="javascript:;">商管家交易条款</a></li>
+                        <li><a href="javascript:;">商管家交易条款</a></li>
+                        <li><a href="javascript:;">商管家交易条款</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="chart-z">
+                <div class="chart-title border-b">
+                    <span class="chart-info">产品动态</span>
+                    <div class="sel-day-btn">
+                        <a href="javascript:;" class="more">更多</a>
+                    </div>
+                </div>
+                <div class="chart-box">
+                    <ul class="news-list movement-list">
+                        <li><a href="javascript:;">商管家交易条款</a><span>2017-02-04</span></li>
+                        <li><a href="javascript:;">商管家交易条款</a><span>2017-02-04</span></li>
+                        <li><a href="javascript:;">商管家交易条款</a><span>2017-02-04</span></li>
+                        <li><a href="javascript:;">商管家交易条款</a><span>2017-02-04</span></li>
+                        <li><a href="javascript:;">商管家交易条款</a><span>2017-02-04</span></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+@endsection
+@section('js')
+@endsection

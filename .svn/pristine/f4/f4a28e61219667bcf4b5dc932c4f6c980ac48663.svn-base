@@ -1,0 +1,37 @@
+<?php
+
+namespace App\Http\Controllers\Receive\Functions;
+
+use App\Models\Export\ExportManage;
+use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
+
+
+class ExportController extends Controller
+{
+
+    /**
+     * 大数据导出回调
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function index(Request $request)
+    {
+
+        $req_id = $request -> input('req_id','');
+        $file_url = $request -> input('file_url','');
+        $err_msg = $request -> input('err_msg','');
+
+        $data = $request -> all();
+        error_log(var_export($data , true ));
+        if( $err_msg == NUll){
+            ExportManage::where('req_id',$req_id) -> update(['status' => 2 ,'down_url' => $file_url]);
+        }else{
+            ExportManage::where('req_id',$req_id) -> update(['status' => 3 ,'error_msg' => $err_msg]);
+        }
+
+        return response()->json(['code' => 200 ,'message' => 'ok']);
+    }
+
+
+}

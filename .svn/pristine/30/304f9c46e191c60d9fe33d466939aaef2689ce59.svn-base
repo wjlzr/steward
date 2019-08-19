@@ -1,0 +1,1411 @@
+<?php
+
+namespace App\Http\Controllers\Admin\Goods;
+
+
+use App\Models\Goods\StAppGoodsSale;
+use App\Models\Goods\StCategory;
+use App\Models\Goods\StGoods;
+use App\Models\Goods\StGoodsSale;
+use App\Models\Mall\StMall;
+use App\Models\StApp;
+use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
+use Maatwebsite\Excel\Facades\Excel;
+use Wm;
+
+
+class GoodsController extends Controller
+{
+    /**
+     * test
+     * @param Request $request
+     * @return \Illuminate\Contracts\View\Factory|\Illuminate\View\View
+     */
+    public function test(Request $request)
+    {
+        $input_all = $request->input();
+
+        $api_name = $input_all['api'];
+        $args_data = [];
+        foreach($input_all as $k=>$i) {
+            $args_data[$k] = $i;
+        }
+
+        error_log('======//1111');
+        error_log(var_export($args_data,true));
+
+        if (!empty($api_name)) {
+            $res = Wm::send($api_name, $args_data);
+            dd($res);
+        }
+
+        return view('steward/test');
+    }
+
+    /**
+     * 商品资料列表首页
+     * @param Request $request
+     * @return \Illuminate\Contracts\View\Factory|\Illuminate\View\View
+     */
+    public function index(Request $request)
+    {
+
+        return view('admin/goods/index', []);
+    }
+
+    /**
+     * 商品列表查询
+     * @param Request $request
+     * @param $type
+     * @return array
+     */
+    public function search(Request $request ,$type)
+    {
+
+        $name = $request -> input( 'name' ,'');
+        $search_sku = $request -> input( 'sku' ,'');
+        $search_upc = $request -> input( 'upc' ,'');
+        $category_id = $request -> input( 'category_id' ,'');
+        $search_image = $request -> input('image','');
+        $search_weight = $request -> input('weight','');
+
+        $where = [];
+
+        //图片
+        if( !empty($search_image)){
+            $where[] = [ 'image' ,NULL];
+        }
+
+        //商品名称
+        if( !empty($name)){
+            $where[] = ['name','like','%'.$name.'%'];
+        }
+
+        //商品分类
+        if(!empty($category_id)){
+
+            $category = StCategory::find($category_id);
+
+            if( $category ){
+                switch ( $category -> level ){
+                    case '1' :
+                        $where[] = ['big_category_id', $category_id ];
+                        break;
+                    case '2' :
+                        $where[] = ['mid_category_id', $category_id ];
+                        break;
+                    case '3' :
+                        $where[] = ['small_category_id', $category_id ];
+                        break;
+                }
+            }
+        }
+
+        if( $type == 1 ){
+            $where[] = ['status', 1 ];
+        }
+
+        if( $type == 2 ){
+            $where[] = ['status', 2 ];
+        }
+
+        $st_goods = StGoods::where($where)
+                            ->orderBy($request->input('sort'), $request->input('order'))
+                            ->paginate($request->input('limit'), ['*'], '', $request->input('offset') / 10 + 1 )
+                            ->toArray();
+
+        //返回数组
+        $result_data = [
+            'total' => 0,
+            'rows' =>[]
+        ];
+
+        if( !empty($st_goods)){
+
+            foreach ( $st_goods['data'] as $goods){
+
+                $where_sale = [];
+
+                if( !empty($search_sku)){
+                    $where_sale[] = ['sku',$search_sku];
+                }
+
+                if( !empty($search_upc)){
+                    $where_sale[] = ['upc',$search_upc];
+                }
+
+                $st_goods_sale = StGoodsSale::where($where_sale)->where('goods_id',$goods['id'])->get();
+
+                if( !$st_goods_sale->isEmpty()){
+
+                    $price_arr = [];
+                    $weight_arr = [];
+
+                    foreach ( $st_goods_sale as $item ){
+
+                        $price_arr[] = $item -> price;
+                        $weight_arr[] = $item -> weight;
+                    }
+
+                    $sku = $st_goods_sale[0]->sku;
+                    $upc = $st_goods_sale[0]->upc;
+
+                    if( min($price_arr) == max($price_arr)){
+                        $price = min($price_arr);
+                    }else{
+                        $price = min($price_arr) . '~' .max($price_arr);
+                    }
+
+                    if( min($weight_arr) == max($weight_arr)){
+                        $weight = min($weight_arr);
+                    }else{
+                        $weight = min($weight_arr) . '~' .max($weight_arr);
+                    }
+
+                    if( !empty($goods['big_category_name'])){
+
+                        if( !empty($goods['mid_category_name'])){
+
+                            $category = $goods['big_category_name'] . '->'.$goods['mid_category_name'];
+                        }else{
+                            $category = $goods['big_category_name'];
+                        }
+
+                    }
+
+                    $operation = $goods['status']==1 ? '下架' :'上架' ;
+
+                    if( empty($goods['image'])){
+
+                        $info = $goods['name'];
+                    }else{
+
+                        $info = '<img src="'. explode(',',$goods['image'])[0].'" style="width:30px;height:30px;margin-right:10px;" >'. $goods['name'] ;
+                    }
+
+                    if( !empty($search_weight)){
+
+                        if($weight == 0 ){
+
+                            $result_data['total'] ++ ;
+
+                            $result_data['rows'][] = [
+                                'operation' => '<a href="#" class="goods-add" data-type="2" data-id="'.$goods['id'].'">编辑</a>&nbsp;&nbsp;<a href="#" class="forsale" data-id="'.$goods['id'].'" data-type="'. $goods['status'] .'">' . $operation . '</a>',
+                                'info' => $info ,
+                                'sku_upc' => $sku .'<br/>' .$upc ,
+                                'price' => $price . '<a href="#" class="price" data-id="'. $goods['id'] .'"><img src="/images/admin/updates.png" width="30px;" style="margin-top:-3px;"></a>' ,
+                                'category' => $category ,
+                                'unit' => $goods['unit'] ,
+                                'weight' => $weight ,
+                                'status' => $goods['status'] == 1 ? '售卖中' : '已下架'
+                            ];
+                        }
+                    }else{
+
+                        $result_data['total'] ++ ;
+
+                        $result_data['rows'][] = [
+                            'operation' => '<a href="#" class="goods-add" data-type="2" data-id="'.$goods['id'].'">编辑</a>&nbsp;&nbsp;<a href="#" class="forsale" data-id="'.$goods['id'].'" data-type="'. $goods['status'] .'">' . $operation . '</a>',
+                            'info' => $info ,
+                            'sku_upc' => $sku .'<br/>' .$upc ,
+                            'price' => $price . '<a href="#" class="price" data-id="'. $goods['id'] .'"><img src="/images/admin/updates.png" width="30px;" style="margin-top:-3px;"></a>' ,
+                            'category' => $category ,
+                            'unit' => $goods['unit'] ,
+                            'weight' => $weight ,
+                            'status' => $goods['status'] == 1 ? '售卖中' : '已下架'
+                        ];
+                    }
+                }
+            }
+        }
+        
+        return $result_data;
+    }
+
+    /**
+     * 上下架
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+
+    public function  shelf(Request $request){
+
+        $ids = $request->input('id_arr','');
+        $status = $request->input('type','');
+
+        if( empty($status)){
+            return response()->json(['code' => 400 ,'message' => '缺少参数']);
+        }
+
+        if( empty($ids)){
+            return response()->json(['code' => 400 ,'message' => '缺少商品参数']);
+        }
+
+        $goods_status = $status == 1 ? 2 : 1 ;
+
+        foreach ( $ids as $id ){
+
+            $st_goods = StGoods::find($id);
+            $st_goods -> status = $goods_status ;
+            $st_goods -> save();
+
+            StGoodsSale::where('goods_id', $id )->update(['status' => $goods_status]);
+        }
+
+        $res = $this -> app_shelf( $ids , $status );
+        if( $res['code'] != 200 ){
+
+            return response()->json(['code' => 400 , 'message' => $res['messsage']]);
+        }
+
+        return response()->json(['code' => 200 , 'message' => '操作成功']);
+    }
+
+    /**
+     * 应用平台上下架同步
+     * @param $ids  array 主商品id
+     * @param $status  string 上下架 1 下架 2 上架
+     * @param $flag  string  标记 1 为同步商品并上架
+     * @return \Illuminate\Http\JsonResponse
+     */
+    private function app_shelf( $ids ,$status ,$flag = '' ){
+
+        //应用平台同步
+        $st_app = StApp::where('enable', 1 )->get();  //查询开通的应用
+
+        $goods_status = $status == 1 ? 2 : 1 ;
+
+        if( !$st_app ->isEmpty()){
+
+            foreach ($st_app as $app ){
+
+                switch ( $app -> id){
+
+                    case "1" :
+
+                        $st_ids = [];
+
+                        foreach ( $ids as $id ){
+
+                            if( $flag == 1 ){
+
+                                $st_goods  = StGoods::find( $id );
+
+                                $category_id = $st_goods -> big_category_id ;
+
+                                if( !empty( $st_goods -> mid_category_id )){
+                                    $category_id = $st_goods -> mid_category_id ;
+                                }
+
+                                if( !empty( $st_goods -> small_category_id )){
+                                    $category_id = $st_goods -> small_category_id ;
+                                }
+
+                                $st_mall = StMall::leftJoin('st_app_mall','st_mall.id', '=' , 'st_app_mall.mall_id')
+                                                    ->where('st_mall.status', 1 )
+                                                    ->where('st_app_mall.app_id' , 1 )
+                                                    ->get();
+
+                                if( !$st_mall -> isEmpty()){
+                                    foreach ( $st_mall as $mall ){
+
+                                        $spec = [];
+                                        $st_goods_sale = StGoodsSale::select('st_goods_sale.*','st_goods_stock.enable_number')
+                                                                        ->leftJoin('st_goods_stock','st_goods_sale.sku', '=','st_goods_stock.sku')
+                                                                        ->where('st_goods_sale.goods_id',$id)
+                                                                        ->where('st_goods_stock.mall_id',$mall->id)
+                                                                        ->get();
+
+                                        if( !$st_goods_sale -> isEmpty()){
+                                            foreach ( $st_goods_sale as $value ){
+                                                $spec[] = [
+                                                    'spec_id' => $value -> id ,
+                                                    'name' => $value ->name ,
+                                                    'price' => $value -> price,
+                                                    'stock' => $value -> enable_number,
+                                                    'product_code' => $value -> sku ,
+                                                    'upc' => $value -> upc
+                                                ];
+                                            }
+                                        }
+
+                                        $args_data = [
+                                            'category_id' => $category_id,
+                                            'mall_id' => $mall -> id ,
+                                            'goods_id' => $id,
+                                            'goods_name' => $st_goods -> name,
+                                            'spec' => $spec
+                                        ];
+
+                                        $res = Wm::send('bdfood.goods.batch_create_product', $args_data);
+
+                                        if( $res['code'] != 200 ){
+                                            return ['code' => 400 ,'message' => $res['message']];
+                                        }
+                                    }
+                                }
+                            }else{
+
+                                $st_app_goods_sale = StAppGoodsSale::select('o_goods_id')->where([['goods_id',$id],['app_id', 1]] )->get();
+
+                                if( !$st_app_goods_sale->isEmpty()){
+
+                                    foreach ( $st_app_goods_sale as $st_app_goods ){
+                                        $st_ids = $st_app_goods['o_goods_id'];
+                                    }
+                                }
+
+                                $args = [
+                                    'is_shelf' => $status == 1 ?  0  : 1 ,
+                                    'goods' => $st_ids
+                                ];
+
+                                $res = Wm::send('bd.goods.batch_update_self',$args);
+
+                                if( $res['code'] != 200 ){
+                                    return ['code' => 400 , 'message' => $res['message']];
+                                }
+
+                                StAppGoodsSale::whereIn('o_goods_id',$st_ids)->update(['status',$goods_status]);
+                            }
+                        }
+
+                        break;
+                    case "2" :
+
+                        $st_ids = [];
+
+                        foreach ( $ids as $id ){
+
+                            if( $flag == 1 ){
+
+                                $st_goods  = StGoods::find( $id );
+
+                                $category_id = $st_goods -> big_category_id ;
+
+                                if( !empty( $st_goods -> mid_category_id )){
+                                    $category_id = $st_goods -> mid_category_id ;
+                                }
+
+                                if( !empty( $st_goods -> small_category_id )){
+                                    $category_id = $st_goods -> small_category_id ;
+                                }
+
+                                $st_mall = StMall::leftJoin('st_app_mall','st_mall.id', '=' , 'st_app_mall.mall_id')
+                                                    ->where('st_mall.status', 1 )
+                                                    ->where('st_app_mall.app_id' , 2 )
+                                                    ->get();
+
+                                if( !$st_mall -> isEmpty()){
+                                    foreach ( $st_mall as $mall ){
+
+                                        $spec = [];
+                                        $st_goods_sale = StGoodsSale::select('st_goods_sale.*','st_goods_stock.enable_number')
+                                            ->leftJoin('st_goods_stock','st_goods_sale.sku', '=','st_goods_stock.sku')
+                                            ->where('st_goods_sale.goods_id',$id)
+                                            ->where('st_goods_stock.mall_id',$mall->id)
+                                            ->get();
+
+                                        if( !$st_goods_sale -> isEmpty()){
+                                            foreach ( $st_goods_sale as $value ){
+                                                $spec[] = [
+                                                    'spec_id' => $value -> id ,
+                                                    'name' => $value ->name ,
+                                                    'price' => $value -> price,
+                                                    'stock' => $value -> enable_number,
+                                                    'product_code' => $value -> sku ,
+                                                    'upc' => $value -> upc
+                                                ];
+                                            }
+                                        }
+
+                                        $args_data = [
+                                            'category_id' => $category_id,
+                                            'mall_id' => $mall -> id ,
+                                            'goods_id' => $id,
+                                            'goods_name' => $st_goods -> name,
+                                            'spec' => $spec
+                                        ];
+
+                                        $res = Wm::send('eleme.goods.batch_create_product', $args_data);
+
+                                        if( $res['code'] != 200 ){
+                                            return ['code' => 400 ,'message' => $res['message']];
+                                        }
+                                    }
+                                }
+                            }else{
+
+                                $st_app_goods_sale = StAppGoodsSale::select('o_goods_id')->where([['goods_id',$id],['app_id', 2]] )->get();
+
+                                if( !$st_app_goods_sale->isEmpty()){
+
+                                    foreach ( $st_app_goods_sale as $st_app_goods ){
+                                        $st_ids = $st_app_goods['o_goods_id'];
+                                    }
+                                }
+
+                                $args = [
+                                    'is_shelf' => $status == 1 ?  0  : 1 ,
+                                    'goods' => $st_ids
+                                ];
+
+                                $res = Wm::send('ele.goods.batch_update_self',$args);
+
+                                if( $res['code'] != 200 ){
+                                    return ['code' => 400 , 'message' => $res['message']];
+                                }
+
+                                StAppGoodsSale::whereIn('o_goods_id',$st_ids)->update(['status',$goods_status]);
+                            }
+                        }
+
+                        break;
+                    case "3" :
+
+                        $st_ids = [];
+
+                        foreach ( $ids as $id ){
+
+                            if( $flag == 1 ){
+
+                                $st_goods  = StGoods::find( $id );
+
+                                $category_id = $st_goods -> big_category_id ;
+
+                                if( !empty( $st_goods -> mid_category_id )){
+                                    $category_id = $st_goods -> mid_category_id ;
+                                }
+
+                                if( !empty( $st_goods -> small_category_id )){
+                                    $category_id = $st_goods -> small_category_id ;
+                                }
+
+                                $st_mall = StMall::leftJoin('st_app_mall','st_mall.id', '=' , 'st_app_mall.mall_id')
+                                    ->where('st_mall.status', 1 )
+                                    ->where('st_app_mall.app_id' , 3 )
+                                    ->get();
+
+                                if( !$st_mall -> isEmpty()){
+                                    foreach ( $st_mall as $mall ){
+
+                                        $spec = [];
+                                        $st_goods_sale = StGoodsSale::select('st_goods_sale.*','st_goods_stock.enable_number')
+                                            ->leftJoin('st_goods_stock','st_goods_sale.sku', '=','st_goods_stock.sku')
+                                            ->where('st_goods_sale.goods_id',$id)
+                                            ->where('st_goods_stock.mall_id',$mall->id)
+                                            ->get();
+
+                                        if( !$st_goods_sale -> isEmpty()){
+                                            foreach ( $st_goods_sale as $value ){
+                                                $spec[] = [
+                                                    'spec_id' => $value -> id ,
+                                                    'name' => $value ->name ,
+                                                    'price' => $value -> price,
+                                                    'stock' => $value -> enable_number,
+                                                    'product_code' => $value -> sku ,
+                                                    'upc' => $value -> upc
+                                                ];
+                                            }
+                                        }
+
+                                        $args_data = [
+                                            'category_id' => $category_id,
+                                            'mall_id' => $mall -> id ,
+                                            'goods_id' => $id,
+                                            'goods_name' => $st_goods -> name,
+                                            'spec' => $spec
+                                        ];
+
+                                        $res = Wm::send('mtfood.goods.batch_create_product', $args_data);
+
+                                        if( $res['code'] != 200 ){
+                                            return ['code' => 400 ,'message' => $res['message']];
+                                        }
+                                    }
+                                }
+                            }else{
+
+                                $st_app_goods_sale = StAppGoodsSale::select('o_goods_id')->where([['goods_id',$id],['app_id', 3]] )->get();
+
+                                if( !$st_app_goods_sale->isEmpty()){
+
+                                    foreach ( $st_app_goods_sale as $st_app_goods ){
+                                        $st_ids = $st_app_goods['o_goods_id'];
+                                    }
+                                }
+
+                                $args = [
+                                    'is_shelf' => $status == 1 ?  0  : 1 ,
+                                    'goods' => $st_ids
+                                ];
+
+                                $res = Wm::send('mt.goods.batch_update_self',$args);
+
+                                if( $res['code'] != 200 ){
+                                    return ['code' => 400 , 'message' => $res['message']];
+                                }
+
+                                StAppGoodsSale::whereIn('o_goods_id',$st_ids)->update(['status',$goods_status]);
+                            }
+
+                        }
+
+                        break;
+                    case "4" :
+
+                        $st_ids = [];
+
+                        foreach ( $ids as $id ){
+
+                            if( $flag == 1 ){
+
+                                $st_goods  = StGoods::find( $id );
+
+                                $category_id = $st_goods -> big_category_id ;
+
+                                if( !empty( $st_goods -> mid_category_id )){
+                                    $category_id = $st_goods -> mid_category_id ;
+                                }
+
+                                if( !empty( $st_goods -> small_category_id )){
+                                    $category_id = $st_goods -> small_category_id ;
+                                }
+
+                                $st_mall = StMall::leftJoin('st_app_mall','st_mall.id', '=' , 'st_app_mall.mall_id')
+                                                    ->where('st_mall.status', 1 )
+                                                    ->where('st_app_mall.app_id' , 4 )
+                                                    ->get();
+
+                                if( !$st_mall -> isEmpty()){
+                                    foreach ( $st_mall as $mall ){
+
+                                        $spec = [];
+                                        $st_goods_sale = StGoodsSale::select('st_goods_sale.*','st_goods_stock.enable_number')
+                                            ->leftJoin('st_goods_stock','st_goods_sale.sku', '=','st_goods_stock.sku')
+                                            ->where('st_goods_sale.goods_id',$id)
+                                            ->where('st_goods_stock.mall_id',$mall->id)
+                                            ->get();
+
+                                        if( !$st_goods_sale -> isEmpty()){
+                                            foreach ( $st_goods_sale as $value ){
+                                                $spec[] = [
+                                                    'spec_id' => $value -> id ,
+                                                    'name' => $value ->name ,
+                                                    'price' => $value -> price,
+                                                    'stock' => $value -> enable_number,
+                                                    'product_code' => $value -> sku ,
+                                                    'upc' => $value -> upc
+                                                ];
+                                            }
+                                        }
+
+                                        $args_data = [
+                                            'category_id' => $category_id,
+                                            'mall_id' => $mall -> id ,
+                                            'goods_id' => $id,
+                                            'goods_name' => $st_goods -> name,
+                                            'spec' => $spec
+                                        ];
+
+                                        $res = Wm::send('jddj.goods.batch_create_product', $args_data);
+
+                                        if( $res['code'] != 200 ){
+                                            return ['code' => 400 ,'message' => $res['message']];
+                                        }
+                                    }
+                                }
+                            }else{
+
+                                $st_app_goods_sale = StAppGoodsSale::select('o_goods_id')->where([['goods_id',$id],['app_id', 4]] )->get();
+
+                                if( !$st_app_goods_sale->isEmpty()){
+
+                                    foreach ( $st_app_goods_sale as $st_app_goods ){
+                                        $st_ids = $st_app_goods['o_goods_id'];
+                                    }
+                                }
+
+                                $args = [
+                                    'is_shelf' => $status == 1 ?  0  : 1 ,
+                                    'goods' => $st_ids
+                                ];
+
+                                $res = Wm::send('jd.goods.batch_update_self',$args);
+
+                                if( $res['code'] != 200 ){
+                                    return ['code' => 400 , 'message' => $res['message']];
+                                }
+
+                                StAppGoodsSale::whereIn('o_goods_id',$st_ids)->update(['status',$goods_status]);
+                            }
+                        }
+                        break;
+                }
+            }
+        }
+
+        return ['code' => 200 , 'message' => '操作成功'];
+    }
+
+    /**
+     * 查询单个商品规格价格
+     * @param $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function searchPrice( $id ){
+
+        $st_goods_sale = StGoodsSale::where('goods_id', $id )->get();
+
+        if( !$st_goods_sale -> isEmpty()){
+
+            $return_data['total'] = count($st_goods_sale);
+
+            foreach ( $st_goods_sale as $goods ){
+
+                $return_data['goods'][] = [
+                    'goodsName' => $goods -> name,
+                    'spec' => $goods -> spec,
+                    'salePrice' => $goods -> price,
+                    'spec_id' => $goods -> id,
+                    'goods_id' => $goods -> goods_id
+                ];
+            }
+        }
+
+        return response()->json(['code' => 200 ,'data' =>$return_data ]);
+    }
+
+    /**
+     * 修改商品价格
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function editPrice(Request $request){
+
+        $goods_id = $request -> input('goods_id' ,'');
+        $spec_id = $request -> input('spec_id' , '');
+        $price = $request -> input('price' ,'');
+
+        if( empty( $spec_id)){
+            return response()->json(['code' => 400 ,'message' => '缺少参数']);
+        }
+
+        $st_goods = StGoods::find($goods_id);
+        $st_goods -> price = $price[0];
+        $st_goods -> save();
+
+        foreach ( $spec_id as $key => $spec ){
+
+            $st_goods_sale = StGoodsSale::find( $spec );
+            $st_goods_sale -> price = $price[$key] ;
+            $st_goods_sale -> save();
+
+        }
+
+        //应用平台同步
+        $st_app = StApp::where('enable', 1 )->get();  //查询开通的应用
+
+        if( !$st_app -> isEmpty()){
+            foreach ( $st_app as $app ){
+
+                switch ( $app -> id ){
+                    case '1' :
+
+                        $st_mall = StMall::leftJoin('st_app_mall','st_mall.id', '=' , 'st_app_mall.mall_id')
+                                        ->where('st_mall.status', 1 )
+                                        ->where('st_app_mall.app_id' , 1 )
+                                        ->get();
+
+                        if( !$st_mall -> isEmpty()){
+
+                            foreach ($st_mall as $mall ){
+
+                                $args = [
+                                    'mall_code' => $mall -> code,
+                                    'goods' => [
+                                            $goods_id => array_combine($spec_id ,$price)
+                                    ]
+                                ];
+
+                                $res = Wm::send('bdfood.goods.batch_update_price' ,$args );
+
+                                if( $res['code'] != 200 ){
+                                    return response()->json(['code' => 400 ,'message' => $res['message']]);
+                                }
+
+                                foreach ($spec_id as $key => $item) {
+
+                                    StAppGoodsSale::where([['mall_id',$mall -> id ],['app_id', 1],['spec_id',$item]])->update(['price' => $price[$key]]);
+                                }
+
+                            }
+                        }
+                        break;
+                    case '2' :
+
+                        $st_mall = StMall::leftJoin('st_app_mall','st_mall.id', '=' , 'st_app_mall.mall_id')
+                            ->where('st_mall.status', 1 )
+                            ->where('st_app_mall.app_id' , 2 )
+                            ->get();
+
+                        if( !$st_mall -> isEmpty()){
+
+                            foreach ($st_mall as $mall ){
+
+                                $args = [
+                                    'mall_code' => $mall -> code,
+                                    'goods' => [
+                                        $goods_id => array_combine($spec_id ,$price)
+                                    ]
+                                ];
+
+                                $res = Wm::send('eleme.goods.batch_update_price' ,$args );
+
+                                if( $res['code'] != 200 ){
+                                    return response()->json(['code' => 400 ,'message' => $res['message']]);
+                                }
+
+                                foreach ($spec_id as $key => $item) {
+
+                                    StAppGoodsSale::where([['mall_id',$mall -> id ],['app_id', 2],['spec_id',$item]])->update(['price' => $price[$key]]);
+                                }
+
+                            }
+                        }
+                        break;
+                    case '3' :
+
+                        $st_mall = StMall::leftJoin('st_app_mall','st_mall.id', '=' , 'st_app_mall.mall_id')
+                                            ->where('st_mall.status', 1 )
+                                            ->where('st_app_mall.app_id' , 3 )
+                                            ->get();
+
+                        if( !$st_mall -> isEmpty()){
+
+                            foreach ($st_mall as $mall ){
+
+                                $args = [
+                                    'mall_code' => $mall -> code,
+                                    'goods' => [
+                                        $goods_id => array_combine($spec_id ,$price)
+                                    ]
+                                ];
+
+                                $res = Wm::send('mtfood.goods.batch_update_price' ,$args );
+
+                                if( $res['code'] != 200 ){
+                                    return response()->json(['code' => 400 ,'message' => $res['message']]);
+                                }
+
+                                foreach ($spec_id as $key => $item) {
+
+                                    StAppGoodsSale::where([['mall_id',$mall -> id ],['app_id', 3],['spec_id',$item]])->update(['price' => $price[$key]]);
+                                }
+
+                            }
+                        }
+                        break;
+                    case '4' :
+
+                        $st_mall = StMall::leftJoin('st_app_mall','st_mall.id', '=' , 'st_app_mall.mall_id')
+                                                ->where('st_mall.status', 1 )
+                                                ->where('st_app_mall.app_id' , 4 )
+                                                ->get();
+
+                        if( !$st_mall -> isEmpty()){
+
+                            foreach ($st_mall as $mall ){
+
+                                $args = [
+                                    'mall_code' => $mall -> code,
+                                    'goods' => [
+                                        $goods_id => array_combine($spec_id ,$price)
+                                    ]
+                                ];
+
+                                $res = Wm::send('jdDj.goods.batch_update_price' ,$args );
+
+                                if( $res['code'] != 200 ){
+                                    return response()->json(['code' => 400 ,'message' => $res['message']]);
+                                }
+
+                                foreach ($spec_id as $key => $item) {
+
+                                    StAppGoodsSale::where([['mall_id',$mall -> id ],['app_id', 4],['spec_id',$item]])->update(['price' => $price[$key]]);
+                                }
+
+                            }
+                        }
+                        break;
+                }
+            }
+        }
+        return response()->json(['code' => 200 ,'message' => '操作成功']);
+    }
+
+    /**
+     * 新增/编辑商品资料页
+     * @return \Illuminate\Contracts\View\Factory|\Illuminate\View\View
+     */
+    public function edit( $id )
+    {
+
+        if( !empty($id)){
+
+            $st_goods = StGoods::find($id);
+
+            if($st_goods->image != '' ){
+                $st_goods -> image = explode(',',$st_goods->image);
+                $st_goods -> image_num = count($st_goods -> image);
+            }else{
+                $st_goods -> image_num = 0 ;
+            }
+
+            $st_goods_sale = StGoodsSale::where('goods_id', $id )->get();
+
+            $id = 1 ;
+        }
+
+        $st_category = StCategory::where('status',1)->orderBy('sort','ASC')->get();
+
+        if( !$st_category -> isEmpty()){
+
+            $st_category = $this -> getTree( $st_category->toArray() , 0 );
+        }
+
+        return view('admin/goods/edit', [
+            'category' => json_encode($st_category),
+            'id' => $id ,
+            'goods' => isset($st_goods) ? $st_goods : '',
+            'goods_sale' => isset($st_goods_sale) ? $st_goods_sale : ''
+        ]);
+    }
+
+    /**
+     * 新增/编辑提交商品资料信息
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function submit(Request $request)
+    {
+
+        $request_data = $request->all();
+
+        if( empty($request_data['name'])){
+            return response()->json(['code' => 400 ,'message' => '请输入商品名称']);
+        }
+
+        if(empty($request_data['bigCategoryID'])){
+            return response()->json(['code' => 400 ,'message' => '请选择商品分类']);
+        }
+
+        if( empty($request_data['unit'])){
+            return response()->json(['code' => 400 ,'message' => '请输入商品单位']);
+        }
+
+        if( empty($request_data['price'])){
+            return response()->json(['code' => 400 ,'message' => '请输入商品价格']);
+        }
+
+        if( empty($request_data['spec'])){
+            return response()->json(['code' => 400 ,'message' => '请输入商品规格']);
+        }
+
+        if( empty($request_data['image'])){
+            return response()->json(['code' => 400 ,'message' => '请上传商品图片']);
+        }
+
+        //分类数据
+        $big_category_name = StCategory::find( $request_data['bigCategoryID']) -> name ;
+        $mid_category_name = '';
+        $small_category_name = '';
+
+        if(!empty($request_data['midCategoryID']) ){
+            $mid_category_name = StCategory::find($request_data['midCategoryID'])->name;
+        }
+
+        if(!empty($request_data['smallCategoryID']) ){
+            $small_category_name = StCategory::find($request_data['smallCategoryID'])->name;
+        }
+
+        if( $request_data['status'] == 2){  //保存
+
+            if( count($request_data['spec']) == 1){  //单规格
+
+                if( isset($request_data['goods_id']) && !empty($request_data['goods_id'])){
+
+                    $st_goods = StGoods::find( $request_data['goods_id']);
+                }else{
+
+                    $st_goods_name = StGoods::where('name',$request_data['name'])->first();
+
+                    if( $st_goods_name ){
+                        return response()->json(['code' => 400 ,'message' => '商品名称不能重复']);
+                    }
+
+                    $st_goods = new StGoods();
+                }
+
+                $st_goods -> creator = 'system';
+                $st_goods -> name = $request_data['name'];
+                $st_goods -> price = $request_data['price'][0];
+                $st_goods -> spec_type = 1 ;
+                $st_goods -> describe = $request_data['describe'];
+                $st_goods -> status = 2 ;
+                $st_goods -> big_category_id = $request_data['bigCategoryID'];
+                $st_goods -> big_category_name = isset($big_category_name) ? $big_category_name : '';
+                $st_goods -> mid_category_id = empty($request_data['midCategoryID']) ? '' : $request_data['midCategoryID'];
+                $st_goods -> mid_category_name = $mid_category_name ;
+                $st_goods -> small_category_id = empty($request_data['smallCategoryID']) ? '' : $request_data['smallCategoryID'];
+                $st_goods -> mid_category_name = $small_category_name ;
+                $st_goods -> image = implode(',', $request_data['image']);
+                $st_goods -> unit = empty($request['unit']) ? '件' : $request['unit'];
+                $st_goods ->save();
+
+                if( isset($request_data['goods_sale_id']) && !empty($request_data['goods_sale_id'])){
+
+                    $st_goods_sale = StGoodsSale::find($request_data['goods_sale_id'][0]);
+                }else{
+
+                    $st_goods_sale = new StGoodsSale();
+                }
+
+                $st_goods_sale -> creator = 'system';
+                $st_goods_sale -> goods_id = $st_goods -> id ;
+                $st_goods_sale -> name = $request_data['name'];
+                $st_goods_sale -> price = $request_data['price'][0];
+                $st_goods_sale -> spec = $request_data['spec'][0];
+                $st_goods_sale -> status = 2;
+                $st_goods_sale -> sku = $request_data['sku'][0];
+                $st_goods_sale -> upc = $request_data['upc'][0];
+                $st_goods_sale -> sku_spec = empty($request_data['sku_spec']) ?  1 : $request_data['sku_spec'][0];
+                $st_goods_sale -> big_category_id = $request_data['bigCategoryID'];
+                $st_goods_sale -> big_category_name = isset($big_category_name) ? $big_category_name : '';
+                $st_goods_sale -> mid_category_id = empty($request_data['midCategoryID']) ? '' : $request_data['midCategoryID'];
+                $st_goods_sale -> mid_category_name = $mid_category_name ;
+                $st_goods_sale -> small_category_id = empty($request_data['smallCategoryID']) ? '' : $request_data['smallCategoryID'];
+                $st_goods_sale -> mid_category_name = $small_category_name;
+                $st_goods_sale -> images = implode(',',$request_data['image'] );
+                $st_goods_sale -> package_price = $request_data['package_price'][0];
+                $st_goods_sale -> unit = empty($request['unit']) ? '件' : $request['unit'];
+                $st_goods_sale -> weight = $request_data['weight'][0];
+                $st_goods_sale -> save();
+
+            }else{   //多规格
+
+                if( isset($request_data['goods_id']) && !empty($request_data['goods_id'])){
+
+                    $st_goods = StGoods::find( $request_data['goods_id']);
+                }else{
+
+                    $st_goods_name = StGoods::where('name',$request_data['name'])->first();
+
+                    if( $st_goods_name ){
+                        return response()->json(['code' => 400 ,'message' => '商品名称不能重复']);
+                    }
+
+                    $st_goods = new StGoods();
+                }
+
+                $st_goods -> creator = 'system';
+                $st_goods -> name = $request_data['name'];
+                $st_goods -> price = $request_data['price'][0];
+                $st_goods -> spec_type = 2 ;
+                $st_goods -> describe = $request_data['describe'];
+                $st_goods -> status = 2 ;
+                $st_goods -> big_category_id = $request_data['bigCategoryID'];
+                $st_goods -> big_category_name = $big_category_name;
+                $st_goods -> mid_category_id = empty($request_data['midCategoryID']) ? '' : $request_data['midCategoryID'];
+                $st_goods -> mid_category_name = $mid_category_name ;
+                $st_goods -> small_category_id = empty($request_data['smallCategoryID']) ? '' : $request_data['smallCategoryID'];
+                $st_goods -> small_category_name = $small_category_name ;
+                $st_goods -> image = implode(',', $request_data['image'] );
+                $st_goods -> unit = empty($request['unit']) ? '件' : $request['unit'];
+                $st_goods ->save();
+
+                foreach ( $request_data['spec'] as $key => $spec ){
+
+                    if( isset($request_data['goods_sale_id']) && !empty($request_data['goods_sale_id'])){
+
+                        $st_goods_sale = StGoodsSale::find($request_data['goods_sale_id'][$key]);
+                    }else{
+
+                        $st_goods_sale = new StGoodsSale();
+                    }
+
+                    $st_goods_sale -> creator = 'system';
+                    $st_goods_sale -> goods_id = $st_goods -> id ;
+                    $st_goods_sale -> name = $request_data['name'];
+                    $st_goods_sale -> price = $request_data['price'][$key];
+                    $st_goods_sale -> spec = $spec;
+                    $st_goods_sale -> status = 2;
+                    $st_goods_sale -> sku = $request_data['sku'][$key];
+                    $st_goods_sale -> upc = $request_data['upc'][$key];
+                    $st_goods_sale -> sku_spec = empty($request_data['sku_spec']) ?  1 : $request_data['sku_spec'][$key];
+                    $st_goods_sale -> big_category_id = $request_data['bigCategoryID'];
+                    $st_goods_sale -> big_category_name = isset($big_category_name) ? $big_category_name : '';
+                    $st_goods_sale -> mid_category_id = empty($request_data['midCategoryID']) ? '' : $request_data['midCategoryID'];
+                    $st_goods_sale -> mid_category_name = $mid_category_name;
+                    $st_goods_sale -> small_category_id = empty($request_data['smallCategoryID']) ? '' : $request_data['smallCategoryID'];
+                    $st_goods_sale -> small_category_name = $small_category_name;
+                    $st_goods_sale -> images = implode(',',$request_data['image'] );
+                    $st_goods_sale -> package_price = $request_data['package_price'][$key];
+                    $st_goods_sale -> unit = empty($request['unit']) ? '件' : $request['unit'];
+                    $st_goods_sale -> weight = $request_data['weight'][$key];
+                    $st_goods_sale -> save();
+                }
+            }
+        }else{  //   保存并上架
+
+            if( count($request_data['spec']) == 1){  //单规格
+
+                if( isset($request_data['goods_id']) && !empty($request_data['goods_id'])){
+
+                    $st_goods = StGoods::find( $request_data['goods_id']);
+                }else{
+
+                    $st_goods_name = StGoods::where('name',$request_data['name'])->first();
+
+                    if( $st_goods_name ){
+                        return response()->json(['code' => 400 ,'message' => '商品名称不能重复']);
+                    }
+
+                    $st_goods = new StGoods();
+                }
+
+                $st_goods -> creator = 'system';
+                $st_goods -> name = $request_data['name'];
+                $st_goods -> price = $request_data['price'][0];
+                $st_goods -> spec_type = 1 ;
+                $st_goods -> describe = $request_data['describe'];
+                $st_goods -> status = 1 ;
+                $st_goods -> big_category_id = $request_data['bigCategoryID'];
+                $st_goods -> big_category_name = isset($big_category_name) ? $big_category_name : '';
+                $st_goods -> mid_category_id = empty($request_data['midCategoryID']) ? '' : $request_data['midCategoryID'];
+                $st_goods -> mid_category_name = $mid_category_name ;
+                $st_goods -> small_category_id = empty($request_data['smallCategoryID']) ? '' : $request_data['smallCategoryID'];
+                $st_goods -> small_category_name = $small_category_name ;
+                $st_goods -> image = implode(',', $request_data['image'] );
+                $st_goods -> unit = empty($request['unit']) ? '件' : $request['unit'];
+                $st_goods ->save();
+
+                if( isset($request_data['goods_sale_id']) && !empty($request_data['goods_sale_id'])){
+
+                    $st_goods_sale = StGoodsSale::find($request_data['goods_sale_id'][0]);
+                }else{
+
+                    $st_goods_sale = new StGoodsSale();
+                }
+
+                $st_goods_sale -> creator = 'system';
+                $st_goods_sale -> goods_id = $st_goods -> id ;
+                $st_goods_sale -> name = $request_data['name'];
+                $st_goods_sale -> price = $request_data['price'][0];
+                $st_goods_sale -> spec = $request_data['spec'][0];
+                $st_goods_sale -> status = 1;
+                $st_goods_sale -> sku = $request_data['sku'][0];
+                $st_goods_sale -> upc = $request_data['upc'][0];
+                $st_goods_sale -> sku_spec = empty($request_data['sku_spec']) ?  1 : $request_data['sku_spec'][0];
+                $st_goods_sale -> big_category_id = $request_data['bigCategoryID'];
+                $st_goods_sale -> big_category_name = isset($big_category_name) ? $big_category_name : '';
+                $st_goods_sale -> mid_category_id = empty($request_data['midCategoryID']) ? '' : $request_data['midCategoryID'];
+                $st_goods_sale -> mid_category_name = $mid_category_name;
+                $st_goods_sale -> small_category_id = empty($request_data['smallCategoryID']) ? '' : $request_data['smallCategoryID'];
+                $st_goods_sale -> small_category_name = $small_category_name;
+                $st_goods_sale -> images = implode(',',$request_data['image'] );
+                $st_goods_sale -> package_price = $request_data['package_price'][0];
+                $st_goods_sale -> unit = empty($request['unit']) ? '件' : $request['unit'];
+                $st_goods_sale -> weight = $request_data['weight'][0];
+                $st_goods_sale -> save();
+
+                $res = $this -> app_shelf([$st_goods -> id ] , 2 );
+
+                if( $res['code'] != 200 ){
+                    return response()->json(['code' => 400 ,'message' => $res['message']]);
+                }
+
+            }else{   //多规格
+
+                if( isset($request_data['goods_id']) && !empty($request_data['goods_id'])){
+
+                    $st_goods = StGoods::find( $request_data['goods_id']);
+                }else{
+
+                    $st_goods_name = StGoods::where('name',$request_data['name'])->first();
+
+                    if( $st_goods_name ){
+                        return response()->json(['code' => 400 ,'message' => '商品名称不能重复']);
+                    }
+
+                    $st_goods = new StGoods();
+                }
+
+                $st_goods -> creator = 'system';
+                $st_goods -> name = $request_data['name'];
+                $st_goods -> price = $request_data['price'][0];
+                $st_goods -> spec_type = 2 ;
+                $st_goods -> describe = $request_data['describe'];
+                $st_goods -> status = 2 ;
+                $st_goods -> big_category_id = $request_data['bigCategoryID'];
+                $st_goods -> big_category_name = isset($big_category_name) ? $big_category_name : '';
+                $st_goods -> mid_category_id = empty($request_data['midCategoryID']) ? '' : $request_data['midCategoryID'];
+                $st_goods -> mid_category_name = $mid_category_name ;
+                $st_goods -> small_category_id = empty($request_data['smallCategoryID']) ? '' : $request_data['smallCategoryID'];
+                $st_goods -> small_category_name = $small_category_name ;
+                $st_goods -> image = implode(',', $request_data['image'] );
+                $st_goods -> unit = empty($request['unit']) ? '件' : $request['unit'];
+                $st_goods ->save();
+
+                foreach ( $request_data['spec'] as $key => $spec ){
+
+                    if( isset($request_data['goods_sale_id']) && !empty($request_data['goods_sale_id'])){
+
+                        $st_goods_sale = StGoodsSale::find($request_data['goods_sale_id'][$key]);
+                    }else{
+
+                        $st_goods_sale = new StGoodsSale();
+                    }
+
+                    $st_goods_sale -> creator = 'system';
+                    $st_goods_sale -> goods_id = $st_goods -> id ;
+                    $st_goods_sale -> name = $request_data['name'];
+                    $st_goods_sale -> price = $request_data['price'][$key];
+                    $st_goods_sale -> spec = $spec;
+                    $st_goods_sale -> status = 2;
+                    $st_goods_sale -> sku = $request_data['sku'][$key];
+                    $st_goods_sale -> upc = $request_data['upc'][$key];
+                    $st_goods_sale -> sku_spec = empty($request_data['sku_spec']) ?  1 : $request_data['sku_spec'][$key];
+                    $st_goods_sale -> big_category_id = $request_data['bigCategoryID'];
+                    $st_goods_sale -> big_category_name = isset($big_category_name) ? $big_category_name : '';
+                    $st_goods_sale -> mid_category_id = empty($request_data['midCategoryID']) ? '' : $request_data['midCategoryID'];
+                    $st_goods_sale -> mid_category_name = $mid_category_name;
+                    $st_goods_sale -> small_category_id = empty($request_data['smallCategoryID']) ? '' : $request_data['smallCategoryID'];
+                    $st_goods_sale -> small_category_name = $small_category_name;
+                    $st_goods_sale -> images = implode(',',$request_data['image'] );
+                    $st_goods_sale -> package_price = $request_data['package_price'][$key];
+                    $st_goods_sale -> unit = empty($request['unit']) ? '件' : $request['unit'];
+                    $st_goods_sale -> weight = $request_data['weight'][$key];
+                    $st_goods_sale -> save();
+                }
+
+                $res = $this -> app_shelf([$st_goods -> id ] , 2  , 1 );
+
+                if( $res['code'] != 200 ){
+                    return response()->json(['code' => 400 ,'message' => $res['message']]);
+                }
+            }
+        }
+
+        return response()->json(['code'=>200, 'message'=>'操作成功']);
+    }
+
+
+    /**
+     * 商品导入模板下载
+     */
+    public function download(){
+
+        return response()->download(public_path().'/goods_upload.xlsx', '商品批量导入模板.xlsx');
+    }
+
+    /**
+     * 商品列表导出
+     */
+    public function export(){
+
+        $cellData = [
+            ['商家编码','SKU码','商品名称','一级分类名称','二级分类名称','规格名称','商品单位','价格／元','包装费／元','重量／克','上/下架','商品描述']
+        ];
+
+        $st_goods_sale = StGoodsSale::select('st_goods.describe','st_goods_sale.*')
+                                    ->leftJoin('st_goods','st_goods.id','=','st_goods_sale.goods_id')
+                                    ->get();
+
+        if( !$st_goods_sale -> isEmpty()){
+
+            foreach( $st_goods_sale as $goods){
+
+                $cellData[] = [
+                    $goods-> sku ,
+                    $goods-> upc ,
+                    $goods-> name ,
+                    $goods-> big_category_name ,
+                    $goods-> mid_category_name ,
+                    $goods-> spec ,
+                    $goods-> unit ,
+                    $goods-> price ,
+                    $goods-> package_price ,
+                    $goods-> weight ,
+                    $goods-> status == 1 ? '上架' : '下架' ,
+                    $goods-> describe ,
+                ];
+            }
+        }
+
+        Excel::create('商品列表',function($excel) use ($cellData){
+            $excel->sheet('goods', function($sheet) use ($cellData){
+                $sheet->rows($cellData);
+            });
+        })->export('xlsx');
+    }
+    /**
+     * 批量导入商品
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function batchUpload(Request $request)
+    {
+
+        $file_url = public_path(). $request -> input('file_url' , '');
+        $count_success = 0 ;
+        $count_fail = 0;
+
+        $res = Excel::load( $file_url,function($reader) use (&$count_success,&$count_fail){
+
+            $data = $reader->getSheet(0);
+
+            if($data){
+
+                $data = $data->toArray();
+                unset($data[0]);
+            }
+
+            $goods_name_arr = [] ;
+
+            $goods_name = StGoods::select('name')->get();
+
+            if( !$goods_name -> isEmpty()){
+                foreach ( $goods_name as $name ){
+                    $goods_name_arr[] = $name['name'];
+                }
+            }
+
+            foreach ($data as $item) {
+
+                if( empty($item[0])){
+
+                    $count_fail ++;
+                    continue;
+                }
+
+                if( in_array( $item[2] , $goods_name_arr )){   //判断是否多规格
+
+                    $st_goods_sale = StGoodsSale::where('sku',$item[0])->first();
+
+                    if( !$st_goods_sale ){
+
+                        $st_goods = StGoods::where('name',$item[2])->first();
+                        $st_goods -> spec_type = 1 ;
+                        $st_goods -> save();
+
+                        $st_goods_sale = new StGoodsSale();
+
+                        $st_goods_sale -> creator = 'upload';
+                        $st_goods_sale -> goods_id = $st_goods -> id ;
+                        $st_goods_sale -> name = $item[2];
+                        $st_goods_sale -> price = $item[9];
+                        $st_goods_sale -> spec = empty($item[8]) ? '' : $item[8];
+                        $st_goods_sale -> status = $item[12] == 1 ? 1  : 2 ;
+                        $st_goods_sale -> sku = $item[0];
+                        $st_goods_sale -> upc = $item[1];
+                        $st_goods_sale -> sku_spec = 1;
+                        $st_goods_sale -> big_category_id = $item[3];
+                        $st_goods_sale -> big_category_name = $item[4];
+                        $st_goods_sale -> mid_category_id = $item[5];
+                        $st_goods_sale -> mid_category_name = $item[6];
+                        $st_goods_sale -> package_price = $item[10];
+                        $st_goods_sale -> unit = $item[7];
+                        $st_goods_sale -> weight = $item[11];
+                        $st_goods_sale -> save();
+
+                        $count_success ++ ;
+
+                        if( $st_goods_sale ->status == 1 ){   //同步到应用平台
+
+                            $res = $this -> app_shelf([$st_goods -> id ] , 2 ,1 );
+
+                            if( $res['code'] != 200 ){
+                                return response()->json(['code' => 400 ,'message' => $res['message']]);
+                            }
+                        }
+                    }else{
+                        $count_fail ++;
+                    }
+                }else{
+
+                    $st_goods = new StGoods();
+                    $st_goods -> creator = 'upload';
+                    $st_goods -> name = $item[2];
+                    $st_goods -> price = $item[9];
+                    $st_goods -> name = $item[2];
+                    $st_goods -> spec_type = 0;
+                    $st_goods -> describe = $item[13];
+                    $st_goods -> status = $item[12] == 1 ? 1  : 2 ;
+                    $st_goods -> big_category_id = $item[3];
+                    $st_goods -> big_category_name = $item[4];
+                    $st_goods -> mid_category_id = $item[5];
+                    $st_goods -> mid_category_name = $item[6];
+                    $st_goods -> unit = $item[7];
+                    $st_goods -> save();
+
+                    $st_goods_sale = new StGoodsSale();
+                    $st_goods_sale -> creator = 'upload';
+                    $st_goods_sale -> goods_id = $st_goods -> id ;
+                    $st_goods_sale -> name = $item[2];
+                    $st_goods_sale -> price = $item[9];
+                    $st_goods_sale -> spec = empty($item[8]) ? '' : $item[8];
+                    $st_goods_sale -> status = $item[12] == 1 ? 1  : 2 ;
+                    $st_goods_sale -> sku = $item[0];
+                    $st_goods_sale -> upc = $item[1];
+                    $st_goods_sale -> sku_spec = 1;
+                    $st_goods_sale -> big_category_id = $item[3];
+                    $st_goods_sale -> big_category_name = $item[4];
+                    $st_goods_sale -> mid_category_id = $item[5];
+                    $st_goods_sale -> mid_category_name = $item[6];
+                    $st_goods_sale -> package_price = $item[10];
+                    $st_goods_sale -> unit = $item[7];
+                    $st_goods_sale -> weight = $item[11];
+                    $st_goods_sale -> save();
+
+                    $count_success ++ ;
+
+                    if( $st_goods -> status == 1 ){   // 同步到应用平台
+
+                        $res = $this -> app_shelf([$st_goods -> id ] , 2 ,1 );
+
+                        if( $res['code'] != 200 ){
+                            return response()->json(['code' => 400 ,'message' => $res['message']]);
+                        }
+                    }
+                }
+
+                $goods_name_arr[] = $item[2];
+            }
+        });
+
+        unlink(public_path().$request->input('file_url'));
+
+        return response()->json(['code' => 200 ,'message' => $count_success.'个商品操作成功,'.$count_fail.'个商品操作失败']);
+    }
+    /**
+     * 数据结构转换
+     * @param $data
+     * @param $pId
+     * @return array|string
+     */
+    private function getTree($data, $pId)
+    {
+        $tree = '';
+
+        foreach ($data as $k => $v){
+            if($v['p_id'] == $pId)
+            {
+                $v['children'] = $this->getTree($data, $v['id']);
+                $tree[] = $v;
+            }
+        }
+        return $tree;
+    }
+
+}

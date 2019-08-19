@@ -1,0 +1,49 @@
+<?php
+
+namespace App\Http\Controllers\Admin\Goods;
+
+
+use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
+
+
+class GoodsController extends Controller
+{
+
+
+    //商品资料列表首页
+    public function index(Request $request)
+    {
+
+        return view('admin/goods/index', []);
+
+    }
+
+
+    //商品列表数据查询
+    public function search()
+    {
+
+        return response()->json(['code'=>200, 'message'=>'ok', 'data'=>[]]);
+
+    }
+
+
+    //新增/编辑商品资料页
+    public function edit()
+    {
+
+        return view('admin/mall/index', []);
+
+    }
+
+
+    //新增/编辑提交商品资料信息
+    public function submit()
+    {
+
+        return response()->json(['code'=>200, 'message'=>'ok', 'data'=>[]]);
+
+    }
+
+}

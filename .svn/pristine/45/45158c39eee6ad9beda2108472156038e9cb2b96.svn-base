@@ -1,0 +1,39 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use Illuminate\Http\Request;
+use Carbon\Carbon;
+
+use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\DB;
+
+use Illuminate\Support\Facades\Redis as Redis;
+
+
+class CategoryController extends Controller
+{
+
+
+    public function index() {
+
+
+    }
+
+    public function search() {
+
+
+    }
+
+
+    public function edit() {
+
+
+    }
+
+    public function status() {
+
+
+    }
+
+}

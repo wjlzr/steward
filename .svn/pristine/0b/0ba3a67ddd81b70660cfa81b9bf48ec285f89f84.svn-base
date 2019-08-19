@@ -1,0 +1,42 @@
+<?php
+/**
+ * Created by PhpStorm.
+ * User: Administrator
+ * Date: 2018-01-11
+ * Time: 15:40
+ */
+$startDate = $request->input('startDate');
+$endDate = $request->input('endDate');
+$first_level_id = $request->input('first_level_id');
+$second_level_id = $request->input('second_level_id');
+$third_level_id = $request->input('third_level_id');
+
+$where = [];
+
+if ( !empty( $first_level_id ) ) {
+    $where[] = ['first_level_id','=',$first_level_id];
+}
+if ( !empty( $second_level_id ) ) {
+    $where[] = ['second_level_id','=',$second_level_id];
+}
+if ( !empty( $third_level_id ) ) {
+    $where[] = ['third_level_id','=',$third_level_id];
+}
+if ( !empty( $startDate ) ) {
+    $where[] = ['cal_date','>=',$startDate];
+}
+if ( !empty( $endDate ) ) {
+    $where[] = ['cal_date','<=',$endDate];
+}
+
+$category = DB::table('st_stat_goods_category_analyse')
+    ->select(DB::raw('first_level_id,second_level_id,third_level_id,first_level_name,second_level_name,third_level_name,SUM(total_bill_money) as total_bill_money'))
+    ->where($where)
+    ->groupBy('first_level_id','second_level_id','third_level_id')
+    ->orderby('total_bill_money','desc')
+    ->paginate($request->input('limit'))
+    ->toArray();
+
+$table = 'st_stat_goods_category_analyse_'.time();
+
+

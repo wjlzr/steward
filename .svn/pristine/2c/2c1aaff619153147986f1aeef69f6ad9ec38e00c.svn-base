@@ -1,0 +1,111 @@
+@extends('admin.layoutEdit')
+
+@section('css')
+    <link  rel="stylesheet" href="/css/admin/order/order.css?v=20180109002">
+    <style>
+        .col-extend-css {
+            width:100%;
+            text-align: left;
+            padding-left: 32px;
+        }
+        /*ie7、ie8兼容性*/
+        .form-inline button{
+            *vertical-align: top;
+            *margin-left:5px;
+        }
+        .form-inline .form-group{
+            display: inline;
+            zoom:1;
+        }
+        .form-inline .form-group label{
+            display: inline;
+            zoom:1;
+        }
+        .form-inline .form-group input{
+            width:auto;
+            display: inline;
+            zoom:1;
+            _line-height:35px;
+        }
+        .form-control{
+            *padding:0;
+        }
+        .layui-form-radio {display:block !important; }
+        .layui-form-radio i{
+            vertical-align: top !important;
+            padding-top:3px !important;
+            zoom:1;
+        }
+        .layui-form-radio span{
+            width:240px !important;
+        }
+        .pagination li {
+            _float: left;
+            _padding:10px 6px;
+            _border:1px solid #ccc;
+        }
+        .pagination li.active a{
+            _color:#fff;
+        }
+
+    </style>
+@endsection
+
+@section('title')
+    <li class="cur"><span class="pointer">订单列表</span></li>
+@endsection
+
+@section('content')
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="row">
+                <div class="col-md-9 col-extend-css">
+                    <form class="form-inline" id="search-form" onsubmit="return false;">
+                        <div class="form-group">
+                            <label for="app">渠&nbsp;&nbsp;&nbsp;&nbsp;道：</label>
+                            <select class="form-control" name="app_id" id="app_id" style="width:175px;display:inline-block;">
+                                <option value="0">全部渠道</option>
+                                @foreach($app_list as $app)
+                                    <option value="{{$app->id}}">{{$app->name}}</option>
+                                @endforeach
+                            </select>&nbsp;&nbsp;
+                        </div>
+                        <div class="form-group">
+                            <label for="order_sequence">订单序号：</label>
+                            <input type="text" placeholder="请输入订单序号" class="form-control" name="" id="order_sequence">&nbsp;&nbsp;
+                        </div>
+                        <div class="form-group">
+                            <label for="deliver_mobile">手机号：</label>
+                            <input type="text" placeholder="请输入手机号" class="form-control" name="deliver_mobile" id="deliver_mobile">&nbsp;&nbsp;
+                        </div>
+                        <div style="height:15px;"></div>
+                        <div class="form-group">
+                            <label for="app_order_id">订单号：</label>
+                            <input type="text" placeholder="请输入订单号" class="form-control" name="app_order_id" id="app_order_id">&nbsp;&nbsp;
+                        </div>
+                        <button class="btn btn-info" id="search" type="button">查询</button>
+                        <button class="btn btn-default" id="re-set" type="button">重置</button>
+                    </form>
+                </div>
+            </div>
+            <br/>
+            <div class="order-content">
+                <div class="top-jilu">共<span class="word-color" id="total"></span>条记录</div>
+                <ul class="order-list order-list-detail" id="order-list"></ul>
+                <div class="position-page"></div>
+            </div>
+        </div>
+    </div>
+@endsection
+
+@section('js')
+    <script src="/js/admin/order.event.js?v=20180191000"></script>
+    <script>
+
+        $(function () {
+            refresh();
+        });
+
+    </script>
+
+@endsection

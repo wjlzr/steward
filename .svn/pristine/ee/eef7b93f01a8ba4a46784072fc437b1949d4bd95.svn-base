@@ -1,0 +1,19 @@
+<?php
+
+namespace App\Models\Mall;
+
+use Illuminate\Database\Eloquent\Model;
+
+class StMall extends Model
+{
+
+    protected $table = 'st_mall';
+
+    public static function getAll()
+    {
+        $st_app = StMall::all();
+        return $id = count($st_app) > 0 ? 1 : 2;
+
+    }
+
+}

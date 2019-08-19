@@ -1,0 +1,307 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Redis as Redis;
+
+use App\Models\User\StUser;
+use App\Models\Mall\StMall;
+
+
+class IndexController extends Controller
+{
+
+    public function test()
+    {
+
+        $in = array (
+            'total' => '0.01',
+            'delivery_time' => '0',
+            'utime' => '1515490191',
+            'wm_poi_name' => 't_1aZp9ZupZU',
+            'taxpayer_id' => '',
+            'detail' => '%5B%7B%22app_food_code%22%3A%228424%E8%A5%BF%E7%93%9C%22%2C%22box_num%22%3A0%2C%22box_price%22%3A0.01%2C%22food_discount%22%3A1%2C%22food_name%22%3A%228424%E8%A5%BF%E7%93%9C%22%2C%22price%22%3A0.01%2C%22quantity%22%3A1%2C%22sku_id%22%3A%22%22%2C%22unit%22%3A%22%E4%BB%BD%22%7D%5D',
+            'poi_receive_detail' => '%7B%22actOrderChargeByMt%22%3A%5B%7B%22comment%22%3A%22%E6%B4%BB%E5%8A%A8%E6%AC%BE%22%2C%22feeTypeDesc%22%3A%22%E6%B4%BB%E5%8A%A8%E6%AC%BE%22%2C%22feeTypeId%22%3A10019%2C%22moneyCent%22%3A0%7D%5D%2C%22actOrderChargeByPoi%22%3A%5B%7B%22comment%22%3A%22%E8%B4%AD%E4%B9%B08424%E8%A5%BF%E7%93%9C%E5%8E%9F%E4%BB%B70.02%E5%85%83%E7%8E%B0%E4%BB%B70.01%E5%85%83%22%2C%22feeTypeDesc%22%3A%22%E6%B4%BB%E5%8A%A8%E6%AC%BE%22%2C%22feeTypeId%22%3A10019%2C%22moneyCent%22%3A1%7D%2C%7B%22comment%22%3A%22%E5%87%8F%E9%85%8D%E9%80%81%E8%B4%B91.0%E5%85%83%22%2C%22feeTypeDesc%22%3A%22%E6%B4%BB%E5%8A%A8%E6%AC%BE%22%2C%22feeTypeId%22%3A10019%2C%22moneyCent%22%3A1%7D%5D%2C%22foodShareFeeChargeByPoi%22%3A0%2C%22logisticsFee%22%3A1%2C%22onlinePayment%22%3A1%2C%22wmPoiReceiveCent%22%3A1%7D',
+            'caution' => '',
+            'original_price' => '0.03',
+            'order_id' => '27010273556331839',
+            'recipient_name' => '%E6%B5%8B%E8%AF%95%28%E5%85%88%E7%94%9F%29',
+            'timestamp' => '1515490210',
+            'city_id' => '999999',
+            'wm_poi_phone' => '13773652841',
+            'pay_type' => '2',
+            'wm_poi_id' => '2701027',
+            'longitude' => '95.369272',
+            'avg_send_time' => '2418.0',
+            'day_seq' => '3',
+            'status' => '2',
+            'invoice_title' => '',
+            'app_poi_code' => 'SHJT1001',
+            'shipper_phone' => '',
+            'is_third_shipping' => '0',
+            'shipping_fee' => '0.01',
+            'ctime' => '1515490191',
+            'has_invoiced' => '0',
+            'extras' => '%5B%7B%22act_detail_id%22%3A410383465%2C%22mt_charge%22%3A0%2C%22poi_charge%22%3A0.01%2C%22reduce_fee%22%3A0.01%2C%22remark%22%3A%22%E8%B4%AD%E4%B9%B08424%E8%A5%BF%E7%93%9C%E5%8E%9F%E4%BB%B70.02%E5%85%83%E7%8E%B0%E4%BB%B70.01%E5%85%83%22%2C%22type%22%3A17%7D%2C%7B%22act_detail_id%22%3A275582853%2C%22mt_charge%22%3A0%2C%22poi_charge%22%3A0.01%2C%22reduce_fee%22%3A1%2C%22remark%22%3A%22%E5%87%8F%E9%85%8D%E9%80%81%E8%B4%B91.0%E5%85%83%22%2C%22type%22%3A25%7D%5D',
+            'recipient_phone' => '18226603564',
+            'wm_poi_address' => '%E5%8D%97%E6%9E%81%E6%B4%B204%E5%8F%B7%E7%AB%99',
+            'wm_order_id_view' => '27010273556331839',
+            'app_id' => '722',
+            'latitude' => '29.77449',
+            'recipient_address' => '%E8%89%B2%E9%87%91%E6%8B%89+%28186%E5%8F%B7%29%40%23%E8%A5%BF%E8%97%8F%E8%87%AA%E6%B2%BB%E5%8C%BA%E6%9E%97%E8%8A%9D%E5%B8%82%E5%A2%A8%E8%84%B1%E5%8E%BF%E8%89%B2%E9%87%91%E6%8B%89',
+            'sig' => '06abf4a13fe24964cc9243e89438a219',
+            '_url' => '/open-api/mt/push/create',
+        );
+
+        $detail = json_decode(urldecode($in['detail']), true);
+        $poi_receive_detail = json_decode(urldecode($in['poi_receive_detail']), true);
+        $extras = json_decode(urldecode($in['extras']), true);
+        error_log('----------detail----------');
+        error_log(var_export($detail, true));
+        error_log('----------poi_receive_detail----------');
+        error_log(var_export($poi_receive_detail, true));
+        error_log('----------extras----------');
+        error_log(var_export($extras, true));
+
+
+    }
+
+
+    //用户登录页
+    public function login()
+    {
+
+        return view('admin/login');
+
+    }
+
+
+    //主框架
+    public function main(Request $request)
+    {
+
+        $menus = [
+            [
+                'icon' => '/images/admin/icon/index.png',
+                'name' => '首页',
+                'sub' => [
+                    [
+                        'name' => '首页',
+                        'link' => '/admin/index',
+                        'permission' => '1'
+                    ],
+                    [
+                        'name' => '首页',
+                        'link' => '/admin/index/mall',
+                        'permission' => '2'
+                    ]
+                ]
+            ],
+            [
+                'icon' => '/images/admin/icon/order.png',
+                'name' => '订单中心',
+                'sub' => [
+                    [
+                        'name' => '订单助手',
+                        'link' => '/admin/order'
+                    ],
+                    [
+                        'name' => '订单查询',
+                        'link' => '/admin/order/search'
+                    ]
+                ],
+                'permission' => '1,2'
+            ],
+            [
+                'icon' => '/images/admin/icon/menu.png',
+                'name' => '商品管理',
+                'sub' => [
+                    [
+                        'name' => '商家商品',
+                        'link' => '/admin/goods',
+                        'permission' => '1'
+                    ],
+                    [
+                        'name' => '商品分类',
+                        'link' => '/admin/category',
+                        'permission' => '1'
+                    ],
+                    [
+                        'name' => '商品同步',
+                        'link' => '/admin/goods/synch',
+                        'permission' => '1'
+                    ],
+                    [
+                        'name' => '门店商品',
+                        'link' => '/admin/mallgoods/index',
+                        'permission' => '2'
+                    ],
+                    [
+                        'name' => '异常商品',
+                        'link' => '/admin/mallgoods/Abnormal'
+                    ],
+                    [
+                        'name' => '违规商品',
+                        'link' => '/admin/mallgoods/illegal'
+                    ]
+                ],
+                'permission' => '1,2'
+            ],
+            [
+                'icon' => '/images/admin/icon/manager.png',
+                'name' => '经营分析',
+                'sub' => [
+                    [
+                        'name' => '营业分析',
+                        'link' => '/admin/business/analyse/1',
+                        'permission' => '2'
+                    ],
+                    [
+                        'name' => '销售分析',
+                        'link' => '/admin/business/analyse/2',
+                        'permission' => '2'
+                    ],
+                    [
+                        'name' => '商品分析',
+                        'link' => '/admin/business/analyse/3',
+                        'permission' => '2'
+                    ],
+                    [
+                        'name' => '商品类别分析',
+                        'link' => '/admin/business/analyse/4',
+                        'permission' => '2'
+                    ],
+                    [
+                        'name' => '门店分析',
+                        'link' => '/admin/business/analyse/5',
+                        'permission' => '2'
+                    ],
+                    [
+                        'name' => '门店结算表',
+                        'link' => '/admin/business/analyse/6',
+                        'permission' => '2'
+                    ],
+                ],
+                'permission' => '1,2'
+            ],
+            [
+            'icon' => '/images/admin/icon/mall.png',
+            'name' => '系统设置',
+            'sub' => [
+                [
+                    'name' => '基础设置',
+                    'link' => '/admin/mall1',
+                    'permission' => '1'
+                ],
+                [
+                    'name' => '企业信息',
+                    'link' => '/admin/mall',
+                    'permission' => '1'
+                ],
+                [
+                    'name' => '门店列表',
+                    'link' => '/admin/mall',
+                    'permission' => '1'
+                ],
+                [
+                    'name' => '用户列表',
+                    'link' => '/admin/user',
+                    'permission' => '1'
+                ],
+                [
+                    'name' => '任务管理',
+                    'link' => '/admin/task',
+                    'permission' => '1'
+                ],
+            ],
+            'permission' => '1,2'
+        ],
+        ];
+
+        $user_id = Redis::get('ST_USER_ID_' . session()->getId());
+        $mall_id = Redis::get('ST_MALL_ID_' . session()->getId());
+        $st_user = StUser::find($user_id);
+
+        $return_data = [
+            'left_menus' => $menus,
+            'user_name' => $st_user->name,
+            'domain_name' => $request->getSchemeAndHttpHost(),
+            'pc_client' => 0
+        ];
+
+        $permission = [$st_user->type];
+        if ($st_user->type == 1 && ebsig_is_int($mall_id)) {
+            $permission = [2];
+        }
+
+        foreach($menus as $key=>$m) {
+            if (isset($m['permission']) && !array_intersect(explode(',', $m['permission']), $permission)) {
+                unset($return_data['left_menus'][$key]);
+                continue;
+            }
+            if (isset($m['sub']) && !empty($m['sub'])) {
+                foreach($m['sub'] as $k=>$sub) {
+                    if (isset($sub['permission']) && !array_intersect(explode(',', $sub['permission']), $permission))
+                        unset($return_data['left_menus'][$key]['sub'][$k]);
+                }
+            }
+        }
+
+        if ($st_user->type == 1) {
+            $return_data['select_name'] = '全部门店';
+            $st_mall = StMall::get();
+            if ($st_mall->count() > 0) {
+                foreach($st_mall as $mall) {
+                    if ($mall_id && $mall_id == $mall->id ) {
+                        $return_data['select_name'] = $mall->name;
+                    }
+                    $return_data['mall'][] = [
+                        'mall_id' => $mall->id,
+                        'mall_name' => $mall->name,
+                        'mall_code' => $mall->code
+                    ];
+                }
+            }
+        }
+
+        return view('admin/main', $return_data);
+
+    }
+
+
+    //切换门店
+    public function selected($id)
+    {
+
+        $type = Redis::get('ST_USER_TYPE_' . session()->getId());
+        $user_id = Redis::get('ST_USER_ID_' . session()->getId());
+
+        Redis::setex('ST_USER_ID_' . session()->getId(), 86400, $user_id);
+        Redis::setex('ST_USER_TYPE_' . session()->getId(), 86400, $type);
+        Redis::setex('ST_MALL_ID_' . session()->getId(), 86400, $id);
+
+        return redirect('/admin');
+
+    }
+
+
+    //首页页面
+    public function index()
+    {
+
+        return view('admin/index/home', []);
+
+    }
+
+    //门店账号首页
+    public function mall()
+    {
+
+        return view('admin/index/mall');
+
+    }
+
+
+}

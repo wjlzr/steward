@@ -1,0 +1,186 @@
+<?php
+/**
+ * Created by PhpStorm.
+ * User: Administrator
+ * Date: 2018-01-11
+ * Time: 15:40
+ */
+
+use DB;
+use Carbon\Carbon;
+use App\Models\StApp;
+use App\Models\Common\MultiDataExport;
+use Illuminate\Support\Facades\Redis as Redis;
+
+    $startDate = $_REQUEST['startDate'];
+    $endDate = $_REQUEST['endDate'];
+    $first_level_id = $_REQUEST['first_level_id'];
+    $second_level_id = $_REQUEST['second_level_id'];
+    $third_level_id = $_REQUEST['third_level_id'];
+    $exportIndex = $_REQUEST['exportIndex'];
+
+    if ( empty( $exportIndex ) ) {
+        return ['code'=>10000,'message'=>'缺少导出索引'];
+    }
+
+    $table = 'st_stat_goods_category_analyse_'.time();
+
+    $where = [];
+
+    if ( !empty( $first_level_id ) ) {
+        $where[] = ['first_level_id','=',$first_level_id];
+    }
+    if ( !empty( $second_level_id ) ) {
+        $where[] = ['second_level_id','=',$second_level_id];
+    }
+    if ( !empty( $third_level_id ) ) {
+        $where[] = ['third_level_id','=',$third_level_id];
+    }
+    if ( !empty( $startDate ) ) {
+        $where[] = ['cal_date','>=',$startDate];
+    }
+    if ( !empty( $endDate ) ) {
+        $where[] = ['cal_date','<=',$endDate];
+    }
+
+    $category = DB::table('st_stat_goods_category_analyse')
+        ->select(DB::raw('first_level_id,second_level_id,third_level_id,first_level_name,second_level_name,third_level_name,SUM(total_bill_money) as total_bill_money'))
+        ->where($where)
+        ->groupBy('first_level_id','second_level_id','third_level_id')
+        ->orderby('total_bill_money','desc')
+        ->get()
+        ->toArray();
+
+    //导出数据数组
+    $export_data = [];
+
+    if ( $category ) {
+
+        foreach ($category as $k => $item) {
+
+            $other_where = [];
+
+            if ( !empty( $item->first_level_id ) ) {
+                $other_where[] = ['first_level_id', '=', $item->first_level_id];
+            }
+            if ( !empty( $item->second_level_id ) ) {
+                $other_where[] = ['second_level_id', '=', $item->second_level_id];
+            }
+            if ( !empty( $item->third_level_id ) ) {
+                $other_where[] = ['third_level_id', '=', $item->third_level_id];
+            }
+            if ( !empty( $startDate ) ) {
+                $other_where[] = ['cal_date', '>=', $startDate];
+            }
+            if ( !empty( $endDate ) ) {
+                $other_where[] = ['cal_date', '<=', $endDate];
+            }
+
+            $category_id = DB::table('st_stat_goods_category_analyse')->select(DB::raw('SUM(total_bill_money) as total_bill_money,app_id'))->where($other_where)->groupBy('app_id')->get()->toArray();
+
+            $redis_data = Redis::get('GLOBAL_APP_*');
+            $redis_array = [];
+            if ( !isset( $redis_data ) ) {
+
+                $redis_data = StApp::all();
+                $redis_data = $redis_data->toArray();
+            }
+
+            foreach ( $redis_data as $redis) {
+                $redis_array[$redis['id']] = $redis['id'];
+            }
+
+            $bill_money = [];
+
+            if ( $category_id ) {
+
+                foreach ( $category_id as $v ) {
+
+                    if ( isset( $redis_array[ $v['app_id' ]]) ) {
+
+                        $bill_money[$v['app_id']] = $v['total_bill_money'];
+                    }
+                }
+            }
+
+            $level = '';
+            if ( !empty( $item->first_level_name ) ) {
+                $level .= $item->first_level_name;
+            }
+            if ( !empty( $item->second_level_name ) ) {
+                $level .= '->' . $item->second_level_name;
+            }
+            if ( !empty( $item->third_level_name ) ) {
+                $level .= '->' . $item->third_level_name;
+            }
+
+            //导出组装数组
+            $export_data[] = [
+                'level' => $level,
+                'total_bill_money' => $item->total_bill_money,
+                'BdFood' => isset($bill_money[1]) ? $bill_money[1] : 0,
+                'EleMe' => isset($bill_money[2]) ? $bill_money[2] : 0,
+                'MtFood' => isset($bill_money[3]) ? $bill_money[3] : 0,
+                'JdDj' => isset($bill_money[4]) ? $bill_money[4] : 0,
+            ];
+        }
+    }
+
+    if ( !empty( $export_data ) ) {
+
+        DB::statement("CREATE TABLE IF NOT EXISTS $table (
+                                  `updated_at` DATETIME NOT NULL COMMENT '时间戳',
+                                  `creator` CHAR(60) DEFAULT NULL COMMENT '创建人',
+                                  `created_at` DATETIME NOT NULL COMMENT '创建时间',
+                                  `level` VARCHAR(2000) DEFAULT NULL COMMENT '分类',
+                                  `total_bill_money` DECIMAL(8,2)  DEFAULT NULL COMMENT '销售额',
+                                  `BdFood_money` DECIMAL(8,2)  DEFAULT NULL COMMENT '百度外卖',
+                                  `EleMe_money` DECIMAL(8,2)  DEFAULT NULL COMMENT '饿了么',
+                                  `MtFood_money` DECIMAL(8,2)  DEFAULT NULL COMMENT '美团外卖',
+                                  `JdDj_money` DECIMAL(8,2)  DEFAULT NULL COMMENT '京东到家',
+                                ) ENGINE=INNODB DEFAULT CHARSET=utf8 COMMENT='商品分类分析导出表'");
+
+        $values = '';
+
+        foreach ( $this->data as $category ) {
+
+            $values.= [ Carbon::now(), 'system', Carbon::now(), $category['level'], $category['total_bill_money'],$category['BdFood'],$category['EleMe'],$category['MtFood'],$category['JdDj']];
+        }
+
+        DB::insert('insert into '.$table.' values (?, ?, ?, ?, ?, ?, ?, ?)', $values );
+
+    }
+
+    //实例大数据导出类
+    $multi_data_obj = new MultiDataExport();
+
+    $search_sql = "SELECT  
+                    level AS 分类,
+                    total_bill_money AS 销售额,
+                    BdFood_money AS 百度外卖,
+                    EleMe_money AS 饿了么,
+                    MtFood_money AS 美团外卖,
+                    JdDj_money AS 京东到家
+                    FROM $table ";
+
+
+    /**
+     * ==========================
+     * 组装参数，生成导出数据
+     * ==========================
+     */
+
+    $title = '商管家商品类别分析导出';
+
+    $args_array = array(
+        'creator' => 'system',
+        'title' => $title. date('YmdHis'),
+        'exportIndex' => $exportIndex,
+        'sql' => $search_sql
+    );
+
+    $export_result = $multi_data_obj->add( $args_array );
+
+    return $export_result;
+
+

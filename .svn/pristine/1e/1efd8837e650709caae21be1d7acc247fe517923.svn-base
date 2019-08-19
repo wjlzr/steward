@@ -1,0 +1,21 @@
+<?php
+
+namespace App\Http\Controllers\Api\Mall;
+
+use Illuminate\Http\Request;
+use Carbon\Carbon;
+
+use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\DB;
+
+use Illuminate\Support\Facades\Redis as Redis;
+use App\Models\Mall\StMall;
+use App\Models\StApp;
+
+
+class MallController extends Controller
+{
+
+
+
+}

@@ -1,0 +1,111 @@
+<?php
+
+namespace App\Http\Controllers\Admin\Analyse;
+
+use Illuminate\Http\Request;
+use DB;
+use App\Http\Controllers\Controller;
+
+class OperatingIndexController extends Controller
+{
+    private $data = [];
+
+    //展示页面
+    public function index($op=1)
+    {
+
+        $data['op'] = $op;
+        $data['index'] = 'operating';
+
+        $data['url_data'] = array(
+            '1' => '营业分析',
+            '2' => '销售分析',
+            '3' => '商品分析',
+            '4' => '商品类别分析',
+            '5' => '门店分析',
+            '6' => '门店结算表',
+        );
+
+        $this->data = $data;
+
+        switch ($op){
+            case 1:
+                $view_blade = $this->buisness(); //营业分析
+                break;
+            case 2:
+                $view_blade = $this->saleanalyse(); //销售分析
+                break;
+            case 3:
+                $view_blade = $this->goodsanalyse(); //商品分析
+                break;
+            case 4:
+                $view_blade = $this->goodscategory(); //商品类别分析
+                break;
+            case 5:
+                $view_blade = $this->mallanalyse(); //门店分析
+                break;
+            case 6:
+                $view_blade = $this->mallbalance(); //门店结算表
+                break;
+
+        }
+
+        return view($view_blade,$this->data);
+    }
+
+    /**
+     * 营业分析
+     * @return string
+     */
+    public function buisness()
+    {
+        return 'admin/analyse/buisnessanalyse';
+    }
+
+    /**
+     * 销售分析
+     * @return string
+     */
+    public function saleanalyse()
+    {
+        return 'admin/analyse/saleanalyse';
+    }
+
+    /**
+     * 商品分析
+     * @return string
+     */
+    public function goodsanalyse()
+    {
+        return 'admin/analyse/goodsanalyse';
+    }
+
+    /**
+     * 商品类别分析
+     * @return string
+     */
+    public function goodscategory()
+    {
+        return 'admin/analyse/goodscategory';
+    }
+
+    /**
+     * 门店分析
+     * @return string
+     */
+    public function mallanalyse()
+    {
+        return 'admin/analyse/mallanalyse';
+    }
+
+
+    /**
+     * 门店结算表
+     * @return string
+     */
+    public function mallbalance()
+    {
+        return 'admin/analyse/mallbalance';
+    }
+
+}

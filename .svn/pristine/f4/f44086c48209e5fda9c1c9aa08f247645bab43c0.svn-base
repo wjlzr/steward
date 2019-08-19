@@ -1,0 +1,318 @@
+<?php
+
+namespace App\Http\Controllers\Admin\Analyse;
+
+use DB;
+
+use Illuminate\Http\Request;
+
+use App\Http\Models\Common\MultiDataExport;
+
+use App\Models\Goods\StStatMallSettleAccounts;
+
+use App\Models\Goods\StStatMallAnalyse;
+
+use App\Models\Mall\MallMaster;
+
+use App\Models\StApp;
+
+use App\Http\Controllers\Controller;
+
+class mallController extends Controller
+{
+
+    /**
+     * 商管家门店分析列表
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function mallList( Request $request )
+    {
+
+        $startDate = $request->input('startDate');
+        $endDate = $request->input('endDate');
+        $app_id = $request->input('app_id');
+        $mall_name = $request->input('mall_id');
+
+        $where = [];
+
+        if ( !empty( $app_id ) ) {
+            $where[] = ['ssma.app_id' , '=' , $app_id] ;
+        }
+
+        if ( !empty( $mall_name ) ) {
+
+            $where[] = ['mm.mallName','LIKE','%'.trim($mall_name).'%'] ;
+        }
+
+        if ( !empty( $startDate ) ) {
+            $where[] = ['ssma.cal_date','>=',$startDate];
+        }
+
+        if ( !empty( $endDate ) ) {
+            $where[] = ['ssma.cal_date','<=',$endDate];
+        }
+
+        $mall_data = DB::table('st_stat_mall_analyse as ssma')
+            ->Join('mall_master as mm','ssma.mall_id','=','mm.mallID')
+            ->select(DB::raw('mm.mallName,ssma.total_user_fee,ssma.total_mall_fee,SUM(ssma.activity_expense+ssma.service_expense+ssma.app_expense) AS expense,(ssma.total_user_fee/ssma.total_sale_bill_num) AS bill_money,ssma.total_sale_bill_num'))
+            ->where($where)
+            ->orderBy($request->input('sort'), $request->input('order'))
+            ->groupBy('mall_id')
+            ->paginate($request->input('limit'))
+            ->toArray();
+
+        //返回数组
+        $return = [
+            'total' => $mall_data['total'],
+            'rows' => []
+        ];
+
+        if ( $mall_data['data'] ) {
+
+            foreach( $mall_data['data'] as $row ) {
+
+                $return['rows'][] = [
+                    'mall_name' => $row->mallName,
+                    'total_user_fee' => $row->total_user_fee,
+                    'expense' => $row->expense,
+                    'total_mall_fee' => $row->total_mall_fee,
+                    'total_sale_bill_num' => $row->total_sale_bill_num,
+                    'bill_money' => round( $row->bill_money,2)
+                ];
+
+            }
+        }
+
+
+        return response()->json($return);
+
+    }
+
+    /**
+     * 商管家门店分析导出
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function export( Request $request )
+    {
+
+        $startDate = $request->input('startDate');
+        $endDate = $request->input('endDate');
+        $app_id = $request->input('app_id');
+        $mall_name = $request->input('mall_id');
+        $exportIndex = $request->input('exportIndex','');
+
+        if ( empty( $exportIndex ) ) {
+            return response()->json(['code'=>10000,'message'=>'缺少导出索引']);
+        }
+
+        //实例大数据导出类
+        $multi_data_obj = new MultiDataExport();
+
+        //导出条件
+        $sql = '';
+
+        if ( !empty( $app_id ) ) {
+            $sql .= ' AND ssma.app_id = '.$app_id;
+        }
+        if ( !empty( $startDate ) ) {
+            $sql .= ' AND ssma.cal_date >= '."'$startDate'";
+        }
+        if ( !empty( $endDate ) ) {
+            $sql .= ' AND ssma.cal_date <= '."'$endDate'";
+        }
+        if ( !empty( $mall_name ) ) {
+            $sql .= ' AND mm.mallName LIKE ? ' . '%'.trim($mall_name).'%';
+        }
+
+        if( $sql ) {
+            $sql = ' WHERE '.substr($sql , 4 );
+        }
+
+        $search_sql = "SELECT  
+                        mm.mallName AS 门店,
+                        ssma.total_user_fee AS 营业额,
+                         (IF( ROUND((ssma.activity_expense+ssma.service_expense+ssma.app_expense),2)>0,ROUND((ssma.activity_expense+ssma.service_expense+ssma.app_expense),2),0)) AS 支出,
+                        ssma.total_mall_fee AS 预计收入,
+                        ssma.total_sale_bill_num AS 订单数,
+                        (IF( ROUND((ssma.total_user_fee/ssma.total_sale_bill_num),2)>0,ROUND((ssma.total_user_fee/ssma.total_sale_bill_num),2),0)) AS 客单价
+                        FROM st_stat_mall_analyse ssma LEFT JOIN mall_master mm ON ssma.mall_id = mm.mallID ".$sql.' GROUP BY mall_id';
+
+        /**
+         * ==========================
+         * 组装参数，生成导出数据
+         * ==========================
+         */
+
+        $title = '商管家门店分析导出';
+
+        $args_array = array(
+            'creator' => 'system',
+            'title' => $title. date('YmdHis'),
+            'exportIndex' => $exportIndex,
+            'sql' => $search_sql
+        );
+
+        $export_data = $multi_data_obj->add( $args_array );
+
+        return response()->json($export_data);
+
+    }
+
+    /**
+     * 门店结算分析
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function balanceList( Request $request )
+    {
+
+        $startDate = $request->input('startDate');
+        $endDate = $request->input('endDate');
+        $app_id = $request->input('app_id');
+
+        $where = [];
+
+        if ( !empty( $app_id ) ) {
+            $where[] = ['app_id' , '=' , $app_id] ;
+        }
+
+        if ( !empty( $startDate ) ) {
+            $where[] = ['cal_date','>=',$startDate];
+        }
+
+        if ( !empty( $endDate ) ) {
+            $where[] = ['cal_date','<=',$endDate];
+        }
+
+        $mall_data = StStatMallSettleAccounts::where($where)
+            ->orderBy($request->input('sort'), $request->input('order'))
+            ->groupBy('mall_id')
+            ->paginate($request->input('limit'))
+            ->toArray();
+
+        //返回数组
+        $return = [
+            'total' => $mall_data['total'],
+            'rows' => []
+        ];
+
+        if ( $mall_data['data'] ) {
+
+            foreach( $mall_data['data'] as $row ) {
+
+                $mall_name = '';
+                if ( !empty( $row['mall_id'] ) ) {
+                    $mall_master = MallMaster::find( $row['mall_id'] );
+                    if ( $mall_master ) {
+                        $mall_name = $mall_master->mallName;
+                    }
+                }
+
+                $app_name = '';
+                if ( !empty( $row['app_id'] ) ) {
+
+                    $app_data = StApp::getCache( $row['app_id'] );
+
+                    if ( !$app_data ) {
+                        $app = StApp::find( $row['app_id'] );
+                        if ( $app ) {
+                            $app_name = $app->name;
+                        }
+                    } else {
+                        $app_name = $app_data['name'];
+                    }
+                }
+
+                $return['rows'][] = [
+                    'mall_name' => $mall_name,
+                    'app_name' => $app_name,
+                    'toal_goods_money' => $row['toal_goods_money'],
+                    'toal_mall_discount_money' => $row['toal_mall_discount_money'],
+                    'toal_app_discount_money' => $row['toal_app_discount_money'],
+                    'total_income' => $row['total_income'],
+                    'total_return_money' => $row['total_return_money'],
+                    'total_package_money' => $row['total_package_money'],
+                    'bill_money' => $row['total_income']-$row['total_return_money'],
+                ];
+
+            }
+        }
+
+
+        return response()->json($return);
+
+    }
+
+    /**
+     *  门店结算分析导出
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function balanceExport( Request $request )
+    {
+
+        $startDate = $request->input('startDate');
+        $endDate = $request->input('endDate');
+        $app_id = $request->input('app_id');
+        $exportIndex = $request->input('exportIndex','');
+
+        if ( empty( $exportIndex ) ) {
+            return response()->json(['code'=>10000,'message'=>'缺少导出索引']);
+        }
+
+        //实例大数据导出类
+        $multi_data_obj = new MultiDataExport();
+
+        //导出条件
+        $sql = '';
+
+        if ( !empty( $app_id ) ) {
+            $sql .= ' AND ssma.app_id = '.$app_id;
+        }
+        if ( !empty( $startDate ) ) {
+            $sql .= ' AND ssma.cal_date >= '."'$startDate'";
+        }
+        if ( !empty( $endDate ) ) {
+            $sql .= ' AND ssma.cal_date <= '."'$endDate'";
+        }
+
+        if( $sql ) {
+            $sql = ' WHERE '.substr($sql , 4 );
+        }
+
+        $search_sql = "SELECT  
+                        CONCAT(mm.mallName) AS 门店,
+                        CONCAT(sa.name) AS 渠道,
+                        ssma.toal_goods_money AS 商品金额,
+                        ssma.toal_mall_discount_money AS 商家优惠,
+                        ssma.toal_app_discount_money AS 平台优惠,
+                        ssma.total_income AS 收入,
+                        ssma.total_return_money AS 退货,
+                        ssma.total_package_money AS 包装,
+                        (IF( ROUND((ssma.total_income-ssma.total_return_money),2)>0,ROUND((ssma.total_income-ssma.total_return_money),2),0)) AS 实际结算
+                        FROM st_stat_mall_settle_accounts ssma LEFT JOIN mall_master mm ON ssma.mall_id = mm.mallID LEFT JOIN st_app sa ON ssma.app_id = sa.id ".$sql.' GROUP BY mall_id';
+
+
+        /**
+         * ==========================
+         * 组装参数，生成导出数据
+         * ==========================
+         */
+
+        $title = '商管家门店结算分析导出';
+
+        $args_array = array(
+            'creator' => 'system',
+            'title' => $title. date('YmdHis'),
+            'exportIndex' => $exportIndex,
+            'sql' => $search_sql
+        );
+
+        $export_data = $multi_data_obj->add( $args_array );
+
+        return response()->json($export_data);
+    }
+
+}

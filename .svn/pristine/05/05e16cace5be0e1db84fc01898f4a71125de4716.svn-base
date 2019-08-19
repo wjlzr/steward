@@ -1,0 +1,838 @@
+@extends('admin.layout')
+@section('css')
+    <link  rel="stylesheet" href="/css/admin/index/mall.css?v=2018011214">
+@endsection
+
+
+@section('content')
+
+    <div class="main">
+        <!--紧急通知-->
+        <div class="main-notice">
+            <a href="javascript:;"><span id="urgent_message">紧急通知：艺术家合作卡发布疯狂星期五，清洁用品2件5折！414乐视超级电视最高直降980家装节钜惠，3件8.8折！</span></a>
+            <span class="icon-cancel"><img src="/images/admin/icon/icon-cancel.png"> </span>
+        </div>
+
+        <!--各数据统计-->
+        <div class="main-info-box">
+            <div class="info-choose">
+                <ul>
+                    <li class="active"><a href="javascript:;">今日</a></li>
+                    <li><a href="javascript:;">昨日</a></li>
+                    <li><a href="javascript:;">近7日</a></li>
+                    <li><a href="javascript:;">近30天</a></li>
+                </ul>
+            </div>
+            <div class="main-show">
+                <div class="shop-logo" style="background-image: url(/images/admin/icon/logo.png)"></div>
+                <div class="shop-name">上海宝虹中心店</div>
+                <ul class="shop-info-list">
+                    <li>
+                        <a href="javascript:;">
+                            <div class="title-info">总营业额（元）</div>
+                            <div class="today-number total_sales">0.00</div>
+                            <div class="tom-number yes_total_sales">昨日  <span>11</span>元</div>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="javascript:;">
+                            <div class="title-info">包装收入（元）</div>
+                            <div class="today-number package_sales">0.00</div>
+                            <div class="tom-number yes_package_sales">昨日  <span>111</span>元</div>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="javascript:;">
+                            <div class="title-info">预计收入（元）</div>
+                            <div class="today-number expect_sales">0.00</div>
+                            <div class="tom-number yes_expect_sales">昨日  <span>111</span>单</div>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="javascript:;">
+                            <div class="title-info">有效订单数</div>
+                            <div class="today-number valid_orders">0</div>
+                            <div class="tom-number yes_valid_orders">昨日  <span>11</span>单</div>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="javascript:;">
+                            <div class="title-info">总订单数</div>
+                            <div class="today-number total_orders">0</div>
+                            <div class="tom-number yes_total_orders">昨日  <span>11</span>单</div>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="javascript:;">
+                            <div class="title-info">客单价</div>
+                            <div class="today-number avg_price">0.00</div>
+                            <div class="tom-number yes_avg_price">昨日  <span>123</span>元</div>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+            <ul class="order-flex-5">
+                <li>
+                    <a href="javascript:;">
+                        <div class="flex-img flex-1">
+                            <img src="/images/admin/index/order-1.png">
+                        </div>
+                        <div class="flex-num new_orders">
+                            <p>新订单</p>
+                            <p>11</p>
+                        </div>
+                    </a>
+                </li>
+                <li>
+                    <a href="javascript:;">
+                        <div class="flex-img flex-2">
+                            <img src="/images/admin/index/order-2.png">
+                        </div>
+                        <div class="flex-num wait_send_orders">
+                            <p>待发配送</p>
+                            <p>22</p>
+                        </div>
+                    </a>
+                </li>
+                <li>
+                    <a href="javascript:;">
+                        <div class="flex-img flex-3">
+                            <img src="/images/admin/index/order-3.png">
+                        </div>
+                        <div class="flex-num abnormal_orders">
+                            <p>异常单</p>
+                            <p>1</p>
+                        </div>
+                    </a>
+                </li>
+                <li>
+                    <a href="javascript:;">
+                        <div class="flex-img flex-4">
+                            <img src="/images/admin/index/order-4.png">
+                        </div>
+                        <div class="flex-num remind_orders">
+                            <p>催单</p>
+                            <p>22</p>
+                        </div>
+                    </a>
+                </li>
+                <li>
+                    <a href="javascript:;">
+                        <div class="flex-img flex-5">
+                            <img src="/images/admin/index/order-5.png">
+                        </div>
+                        <div class="flex-num refund_orders">
+                            <p>退单</p>
+                            <p>2</p>
+                        </div>
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+        <!--热销排行-->
+        <div class="chart-z-list chart-list">
+            <div class="chart-z chart-list-1">
+                <div class="chart-title">
+                    <span><img src="/images/admin/index/hot-1.png" alt=""></span>
+                    <span class="chart-info">热销商品排名</span>
+                </div>
+                <div class="chart-table">
+                    <table>
+                        <thead>
+                        <tr>
+                            <td>排行</td>
+                            <td class="td-name">商品名称</td>
+                            <td>总金额</td>
+                            <td>总数量</td>
+                            <td>均单价</td>
+                        </tr>
+                        </thead>
+                        <tbody id="selling-goods">
+                        <tr>
+                            <td><span class="first">1</span></td>
+                            <td class="td-name"><p>乐事薯片 600克</p></td>
+                            <td>1853.4 </td>
+                            <td>34</td>
+                            <td>13</td>
+                        </tr>
+                        <tr>
+                            <td><span class="second">2</span></td>
+                            <td class="td-name"><p>乐事薯片 600克</p></td>
+                            <td>1853.4 </td>
+                            <td>34</td>
+                            <td>13</td>
+                        </tr>
+                        <tr>
+                            <td><span class="third">3</span></td>
+                            <td class="td-name"><p>乐事薯片 600克</p></td>
+                            <td>1853.4 </td>
+                            <td>34</td>
+                            <td>13</td>
+                        </tr>
+                        <tr>
+                            <td><span>4</span></td>
+                            <td class="td-name"><p>乐事薯片 600克</p></td>
+                            <td>1853.4 </td>
+                            <td>34</td>
+                            <td>13</td>
+                        </tr>
+                        <tr>
+                            <td><span>5</span></td>
+                            <td class="td-name"><p>乐事薯片 600克</p></td>
+                            <td>1853.4 </td>
+                            <td>34</td>
+                            <td>13</td>
+                        </tr>
+                        <tr>
+                            <td><span>6</span></td>
+                            <td class="td-name"><p>乐事薯片 600克</p></td>
+                            <td>1853.4 </td>
+                            <td>34</td>
+                            <td>13</td>
+                        </tr>
+                        <tr>
+                            <td><span>7</span></td>
+                            <td class="td-name"><p>乐事薯片 600克</p></td>
+                            <td>1853.4 </td>
+                            <td>34</td>
+                            <td>13</td>
+                        </tr>
+                        <tr>
+                            <td><span>8</span></td>
+                            <td class="td-name"><p>乐事薯片 600克</p></td>
+                            <td>1853.4 </td>
+                            <td>34</td>
+                            <td>13</td>
+                        </tr>
+                        <tr>
+                            <td><span>9</span></td>
+                            <td class="td-name"><p>乐事薯片 600克</p></td>
+                            <td>1853.4 </td>
+                            <td>34</td>
+                            <td>13</td>
+                        </tr>
+                        <tr>
+                            <td><span>10</span></td>
+                            <td class="td-name"><p>乐事薯片 600克</p></td>
+                            <td>1853.4 </td>
+                            <td>34</td>
+                            <td>13</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="chart-z chart-list-2">
+                <div class="chart-title">
+                    <span><img src="/images/admin/index/hot-2.png" alt=""></span>
+                    <span class="chart-info">热销分类排名</span>
+                </div>
+                <div class="chart-table">
+                    <table>
+                        <thead>
+                        <tr>
+                            <td>排行</td>
+                            <td class="td-name">分类名称</td>
+                            <td>总金额</td>
+                            <td>总数量</td>
+                            <td>均单价</td>
+                        </tr>
+                        </thead>
+                        <tbody id="selling-mall">
+                        <tr>
+                            <td><span class="first">1</span></td>
+                            <td class="td-name"><p>酒水饮料</p></td>
+                            <td>1853.4 </td>
+                            <td>34</td>
+                            <td>13</td>
+                        </tr>
+                        <tr>
+                            <td><span class="second">2</span></td>
+                            <td class="td-name"><p>护肤彩妆</p></td>
+                            <td>1853.4 </td>
+                            <td>34</td>
+                            <td>13</td>
+                        </tr>
+                        <tr>
+                            <td><span class="third">3</span></td>
+                            <td class="td-name"><p>个人护理</p></td>
+                            <td>1853.4 </td>
+                            <td>34</td>
+                            <td>13</td>
+                        </tr>
+                        <tr>
+                            <td><span>4</span></td>
+                            <td class="td-name"><p>母婴用品</p></td>
+                            <td>1853.4 </td>
+                            <td>34</td>
+                            <td>13</td>
+                        </tr>
+                        <tr>
+                            <td><span>5</span></td>
+                            <td class="td-name"><p>个人护理</p></td>
+                            <td>1853.4 </td>
+                            <td>34</td>
+                            <td>13</td>
+                        </tr>
+                        <tr>
+                            <td><span>6</span></td>
+                            <td class="td-name"><p>个人护理</p></td>
+                            <td>1853.4 </td>
+                            <td>34</td>
+                            <td>13</td>
+                        </tr>
+                        <tr>
+                            <td><span>7</span></td>
+                            <td class="td-name"><p>个人护理</p></td>
+                            <td>1853.4 </td>
+                            <td>34</td>
+                            <td>13</td>
+                        </tr>
+                        <tr>
+                            <td><span>8</span></td>
+                            <td class="td-name"><p>个人护理</p></td>
+                            <td>1853.4 </td>
+                            <td>34</td>
+                            <td>13</td>
+                        </tr>
+                        <tr>
+                            <td><span>9</span></td>
+                            <td class="td-name"><p>个人护理</p></td>
+                            <td>1853.4 </td>
+                            <td>34</td>
+                            <td>13</td>
+                        </tr>
+                        <tr>
+                            <td><span>10</span></td>
+                            <td class="td-name"><p>个人护理</p></td>
+                            <td>1853.4 </td>
+                            <td>34</td>
+                            <td>13</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="chart-z chart-list-3">
+                <div class="chart-title">
+                    <span><img src="/images/admin/index/hot-3.png" alt=""></span>
+                    <span class="chart-info">渠道占比</span>
+                </div>
+                <div class="change-type">
+                    <span class="cur-type sale">销售额</span>
+                    <span class="bill">订单数</span>
+                </div>
+                <div id="pro" class="proportion" style="height: 300px;">
+                    <ul class="pro-list">
+                        <li>
+                            <span style="background: #00b7ee;"></span>微电汇
+                        </li>
+                        <li>
+                            <span style="background: #00b7ee;"></span>饿了么
+                        </li>
+                        <li>
+                            <span style="background: #ff6d8f;"></span>百度外卖
+                        </li>
+                        <li>
+                            <span style="background: #00dba9;"></span>京东到家
+                        </li>
+                        <li>
+                            <span style="background: #ff9b12;"></span>美团
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!--营收排名\订单效率-->
+        <div class="chart-z-list" style="overflow: hidden;">
+            <div class="chart-z">
+                <div class="chart-title">
+                    <span><img src="/images/admin/index/chart-1.png" alt=""></span>
+                    <span class="chart-info">营收排名</span>
+                </div>
+                <div class="chart-box" id="chart-revenue" style="height:300px;background:#fff !important;"></div>
+            </div>
+            <div class="chart-z chart-second">
+                <div class="chart-title">
+                    <span><img src="/images/admin/index/chart-2.png" alt=""></span>
+                    <span class="chart-info">订单效率</span>
+                </div>
+                <div class="chart-box" id="chart-effic" style="height:300px;background:#fff !important;"></div>
+            </div>
+        </div>
+
+        <!--新手上路\产品动态-->
+        <div class="chart-z-list">
+            <div class="chart-z">
+                <div class="chart-title border-b">
+                    <span class="chart-info">新手上路</span>
+                    <div class="sel-day-btn">
+                        <a href="javascript:;"  class="more">更多</a>
+                    </div>
+                </div>
+                <div class="chart-box">
+                    <ul class="news-list guide-list">
+
+                    </ul>
+                </div>
+            </div>
+            <div class="chart-z">
+                <div class="chart-title border-b">
+                    <span class="chart-info">产品动态</span>
+                    <div class="sel-day-btn">
+                        <a href="javascript:;" class="more">更多</a>
+                    </div>
+                </div>
+                <div class="chart-box">
+                    <ul class="news-list movement-list">
+
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+@endsection
+<script src="/libs/echarts/echarts.js"> </script>
+@section('js')
+    <script>
+
+        $(function(){
+
+            index.mall_data();
+
+            index.index(1);
+
+            index.yesterday(2);
+
+            index.channel(1,1);
+
+            index.order_status(1);
+
+            index.selling_goods(1);
+
+            index.selling_category(1);
+
+            index.sales_rank(1);
+
+            index.effic_rank(1);
+
+            E.ajax({
+                type : 'get',
+                url : '/admin/cms/article/search',
+                data : { category_id : 35 , page : "0" ,page_size: 5 },
+                dataType :'json',
+                success :function (obj) {
+                    var html = '';
+                    if ( obj.code == 200 ){
+
+                        $.each( obj.data.data ,function( k , v ){
+                            if( k > 4 ){
+                                return false;
+                            }
+                            html += '<li><a href="http://www.ebsig.com/steward/article/detail/'+ v.article_id+'">'+ v.article_title+'</a><span>'+  v.createTime+'</span></li>';
+                        } );
+
+                        $('.guide-list').append(html).parent().parent().show();
+                    }
+                }
+            });
+
+            E.ajax({
+                type : 'get',
+                url : '/admin/cms/article/search',
+                data : { category_id : 36 ,page : "0" ,page_size : 5},
+                dataType :'json',
+                success :function (obj) {
+                    var html = '';
+                    if ( obj.code == 200 ){
+
+                        $.each( obj.data.data ,function( k , v ){
+                            if( k > 4 ){
+                                return false;
+                            }
+                            html += '<li><a href="http://www.ebsig.com/steward/article/detail/'+ v.article_id+'">'+ v.article_title+'</a><span>'+ v.createTime+'</span></li>';
+                        } );
+
+                        $('.movement-list').append(html).parent().parent().show();
+                    }
+                }
+            });
+
+            $(document).on('click','.yes_day',function(){
+                $(this).addClass('active');
+                $(this).siblings().removeClass('active');
+                $(this).attr('data-id',2);
+                $(this).siblings().attr('data-id',0);
+                index.selection(2);
+                $('.sale').addClass('cur-type');
+                $('.bill').removeClass('cur-type');
+                index.channel(2,1);
+            }).on('click','.day',function(){
+                $(this).addClass('active');
+                $(this).siblings().removeClass('active');
+                $(this).attr('data-id',2);
+                $(this).siblings().attr('data-id',0);
+                index.selection(1);
+                $('.sale').addClass('cur-type');
+                $('.bill').removeClass('cur-type');
+                index.channel(1,1);
+            }).on('click','.seven_day',function(){
+                $(this).addClass('active');
+                $(this).siblings().removeClass('active');
+                $(this).attr('data-id',3);
+                $(this).siblings().attr('data-id',0);
+                index.selection(3);
+                $('.sale').addClass('cur-type');
+                $('.bill').removeClass('cur-type');
+                index.channel(3,1);
+            }).on('click','.thirty_day',function(){
+                $(this).addClass('active');
+                $(this).siblings().removeClass('active');
+                $(this).attr('data-id',4);
+                $(this).siblings().attr('data-id',0);
+                index.selection(4);
+                $('.sale').addClass('cur-type');
+                $('.bill').removeClass('cur-type');
+                index.channel(4,1);
+            }).on('click','.sale',function(){
+                $(this).addClass('cur-type');
+                $('.bill').removeClass('cur-type');
+                var day_id = 0;
+                $('.info-choose ul li').each(function(k,v){
+                    if ($(this).attr('data-id') != 0) {
+                        day_id = $(this).attr('data-id');
+                    }
+                });
+                index.channel(day_id,1);
+            }).on('click','.bill',function(){
+                $(this).addClass('cur-type');
+                $('.sale').removeClass('cur-type');
+                var day_id = 0;
+                $('.info-choose ul li').each(function(k,v){
+                    if ($(this).attr('data-id') != 0) {
+                        day_id = $(this).attr('data-id');
+                    }
+                });
+                index.channel(day_id,2);
+            });
+
+        });
+
+        var index = {
+
+            app: [],
+
+            app_data: {},
+
+            selection:function(data_type) {
+
+                index.index(data_type);
+
+                index.order_status(data_type);
+
+                index.selling_goods(data_type);
+
+                index.selling_category(data_type);
+
+                index.sales_rank(data_type);
+
+                index.effic_rank(data_type);
+            },
+
+            mall_data:function() {
+
+                E.ajax({
+                    type : 'get',
+                    url : '/ajax/index/mall_data',
+                    dataType : 'json' ,
+                    data : {} ,
+                    success : function (obj){
+                        if (obj.code == 200) {
+                            $('.shop-name').html(obj.data.name);
+                            $('.shop-logo').css('background-image','url('+obj.data.logo+')');
+                        }
+                    }
+                });
+            },
+
+            //销售概况
+            index:function(data_type){
+
+                E.ajax({
+                    type : 'get',
+                    url : '/ajax/index/sales_profile',
+                    dataType : 'json' ,
+                    data : {
+                        'date_type':data_type
+                    } ,
+                    success : function (obj){
+                        if (obj.code == 200) {
+                            $('.total_sales').html(obj.data.total_sales+'.00');
+                            $('.package_sales').html(obj.data.package_sales+'.00');
+                            $('.expect_sales').html(obj.data.expect_sales+'.00');
+                            $('.valid_orders').html(obj.data.valid_orders);
+                            $('.total_orders').html(obj.data.total_orders);
+                            $('.avg_price').html(obj.data.avg_price+'.00');
+                        }
+                    }
+                });
+            },
+
+            //昨日销售概况
+            yesterday:function (date_type) {
+
+                E.ajax({
+                    type: 'get',
+                    url: '/ajax/index/sales_profile',
+                    dataType: 'json',
+                    data: {
+                        'date_type': date_type
+                    },
+                    success: function (obj) {
+                        if (obj.code == 200) {
+                            $('.yes_total_sales').find('span').eq(0).html(obj.data.total_sales);
+                            $('.yes_package_sales').find('span').eq(0).html(obj.data.package_sales);
+                            $('.yes_expect_sales').find('span').eq(0).html(obj.data.expect_sales);
+                            $('.yes_valid_orders').find('span').eq(0).html(obj.data.valid_orders);
+                            $('.yes_total_orders').find('span').eq(0).html(obj.data.total_orders);
+                            $('.yes_avg_price').find('span').eq(0).html(obj.data.avg_price);
+                        }
+                    }
+                });
+            },
+
+            //订单状态
+            order_status:function (date_type) {
+
+                E.ajax({
+                    type: 'get',
+                    url: '/ajax/index/order_status_count',
+                    dataType: 'json',
+                    data: {
+                        'date_type': date_type
+                    },
+                    success: function (obj) {
+                        if (obj.code == 200) {
+                            $('.new_orders').find('p').eq(1).html(obj.data.new_orders);
+                            $('.wait_send_orders').find('p').eq(1).html(obj.data.wait_send_orders);
+                            $('.abnormal_orders').find('p').eq(1).html(obj.data.abnormal_orders);
+                            $('.remind_orders').find('p').eq(1).html(obj.data.remind_orders);
+                            $('.refund_orders').find('p').eq(1).html(obj.data.refund_orders);
+                        }
+                    }
+                });
+            },
+
+            //热销商品
+            selling_goods:function(mall_id,date_type){
+
+                E.ajax({
+                    type : 'get',
+                    url : '/ajax/index/hot_sell_goods_rank',
+                    dataType : 'json' ,
+                    data : {
+                        mall_id:mall_id,
+                        date_type:date_type
+                    } ,
+                    success : function (obj){
+                        if (obj.code == 200) {
+                            var html = '';
+                            $.each(obj.data,function(k,v){
+                                html += '<tr>';
+                                if (k == 0) {
+                                    html += '<td><span class="first">1</span></td>';
+                                }else if(k == 1){
+                                    html += '<td><span class="second">2</span></td>';
+                                }else if(k == 2) {
+                                    html += '<td><span class="third">3</span></td>';
+                                }
+                                html += '<td class="td-name"><p>'+v.goods_name+'</p></td>';
+                                html += '<td>'+v.total_money+'</td>';
+                                html += '<td>'+v.total_number+'</td>';
+                                html += '<td>'+v.avg_price+'</td>';
+                                html += '</tr>';
+                            });
+                            $('#selling-goods').html(html);
+                        }
+                    }
+                });
+            },
+
+            //热销分类排行
+            selling_category:function(mall_id,date_type){
+
+                E.ajax({
+                    type : 'get',
+                    url : '/ajax/index/hot_sale_category_rank',
+                    dataType : 'json' ,
+                    data : {
+                        mall_id:mall_id,
+                        date_type:date_type
+                    } ,
+                    success : function (obj){
+                        if (obj.code == 200) {
+                            var html = '';
+                            $.each(obj.data,function(k,v){
+                                html += '<tr>';
+                                if (k == 0) {
+                                    html += '<td><span class="first">1</span></td>';
+                                }else if(k == 1){
+                                    html += '<td><span class="second">2</span></td>';
+                                }else if(k == 2) {
+                                    html += '<td><span class="third">3</span></td>';
+                                }
+                                html += '<td class="td-name"><p>'+v.category_name+'</p></td>';
+                                html += '<td>'+v.total_money+'</td>';
+                                html += '<td>'+v.total_number+'</td>';
+                                html += '<td>'+v.avg_price+'</td>';
+                                html += '</tr>';
+                            });
+                            $('#selling-mall').html(html);
+                        }
+                    }
+                });
+            },
+
+            channel:function(date_type,type) {
+
+                E.ajax({
+                    type : 'get',
+                    url : '/ajax/index/app_orders_sales',
+                    dataType : 'json' ,
+                    data : {
+                        date_type:date_type
+                    } ,
+                    success : function (obj){
+                        if (obj.code == 200) {
+                            if (type == 1) {
+                                $.each(obj.data.sales,function(k,v){
+                                    index.app.push(v.name);
+                                });
+                                index.app_data = JSON.stringify(obj.data.sales);
+                                index.my_chart(index.app,index.app_data);
+                            }else{
+                                $.each(obj.data.orders,function(k,v){
+                                    index.app.push(v.name);
+                                });
+                                index.app_data = JSON.stringify(obj.data.orders);
+                                index.my_chart(index.app,index.app_data);
+                            }
+                        }
+                    }
+                });
+            },
+
+            sales_rank:function(date_type) {
+
+                E.ajax({
+                    type : 'get',
+                    url : '/ajax/index/sales_rank',
+                    dataType : 'json' ,
+                    data : {
+                        date_type:date_type
+                    },
+                    success : function (obj){
+                        if (obj.code == 200) {
+                            var revenue_chart = echarts.init(document.getElementById('chart-revenue'));
+                            index.chart(revenue_chart,[obj.data.low,obj.data.avg,obj.data.this,obj.data.high]);
+                        }
+                    }
+                });
+            },
+
+            effic_rank:function(date_type) {
+
+                E.ajax({
+                    type : 'get',
+                    url : '/ajax/index/order_efficiency_rank',
+                    dataType : 'json' ,
+                    data : {
+                        date_type:date_type
+                    },
+                    success : function (obj){
+                        if (obj.code == 200) {
+                            var effic_chart = echarts.init(document.getElementById('chart-effic'));
+                            index.chart(effic_chart,[obj.data.low,obj.data.avg,obj.data.this,obj.data.high]);
+                        }
+                    }
+                });
+            },
+
+            my_chart:function(app,app_data){
+
+                app_data = JSON.parse(app_data);
+
+                //渠道占比饼图
+                var piechart = echarts.init(document.getElementById('pro'));
+                option = {
+                    title : {
+                        text: '',
+                        subtext: '',
+                        x:'center'
+                    },
+                    tooltip : {
+                        trigger: 'item',
+                        formatter: "{a} <br/>{b} : {c} ({d}%)"
+                    },
+                    legend: {
+                        orient: 'vertical',
+                        left: 'left',
+                        data: app
+                    },
+                    series : [
+                        {
+                            name: '',
+                            type: 'pie',
+                            radius : '70%',
+                            center: ['50%', '70%'],
+                            label: {
+                                normal: {
+                                    show: false
+                                }
+                            },
+                            data:app_data,
+                            itemStyle: {
+                                emphasis: {
+                                    shadowBlur: 10,
+                                    shadowOffsetX: 0,
+                                    shadowColor: 'rgba(0, 0, 0, 0.5)'
+                                }
+                            }
+                        }
+                    ]
+                };
+                piechart.setOption(option);
+                index.app.length = 0;
+                index.app_data.length = 0;
+            },
+
+            //柱状图
+            chart:function(obj,data){
+
+                obj.showLoading();
+                obj.setOption({
+                    title:{},
+                    tooltip: {},
+                    xAxis:{
+                        data:['最低','平均','本店','最高']
+                    },
+                    yAxis:[{
+                        splitLine : {
+                            show:false
+                        }
+                    }],
+                    series:[{
+                        name:'',
+                        type:'bar',
+                        data:data
+                    }]
+                });
+                obj.hideLoading();
+            }
+        }
+
+    </script>
+@endsection

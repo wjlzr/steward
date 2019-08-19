@@ -1,0 +1,50 @@
+<?php
+namespace App\Service\Wm\Ele\Request;
+
+use App\Models\Wm\WmShop;
+use App\Service\Wm\ShopFactoryInterface;
+
+class EleShopRequest implements ShopFactoryInterface
+{
+
+    /**
+     * EleGoodsRequest constructor.
+     * @param $curl
+     */
+    public function __construct($curl)
+    {
+        $this->curl = $curl;
+    }
+
+    /**
+     * 获取已授权店铺列表
+     * @remark：传参数组固定传入，
+     * 各平台可以根据实际情况决定是否使用
+     * @param $args = [
+     *      'page' => int 当前页码
+     *      'page_size' => 每页条数 (默认20)
+     * ]
+     * @return mixed
+     */
+    public function get_shop_list($args_data)
+    {
+        return $this->curl->call('eleme.user.getUser', []);
+    }
+
+    /**
+     * 获取店铺相关信息
+     * @param $args = [
+     *      'mall_code' => string 商户门店编号
+     * ]
+     * @return mixed
+     */
+    public function get_shop($args_data)
+    {
+
+        if (!isset($args_data['shop_id']) || empty($args_data['shop_id'])) {
+            return $this->curl->response('外卖店铺id不能为空');
+        }
+        return $this->curl->call('eleme.shop.getShop', ['shopId' => app_to_int($args_data['shop_id'])]);
+
+    }
+}

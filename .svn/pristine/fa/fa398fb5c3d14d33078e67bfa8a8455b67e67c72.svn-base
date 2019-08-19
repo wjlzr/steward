@@ -1,0 +1,322 @@
+<?php
+
+namespace App\Services\Order;
+
+use App\Models\Order\StOrder;
+use App\Models\Order\StOrderGoods;
+use App\Models\Order\StOrderApply;
+use App\Models\Order\StOrderTrace;
+use App\Models\StApp;
+
+use App\Services\Wm\FieldsService;
+
+
+class SearchService
+{
+
+    /**
+     * 订单列表查询
+     * @param int $list_type
+     * @param int $mall_id 门店id
+     * @param int $page_size 分页
+     * @param int $app_id 应用id
+     * @return array
+     */
+    public function index($list_type = 1, $mall_id = 0, $page_size = 10, $app_id = 0) {
+
+        $where = [ 'hang_up' => 0 ];
+
+        if ($mall_id != 0) {
+            $where['mall_id'] = $mall_id;
+        }
+
+        if ($app_id != 0) {
+            $where['app_id'] = $app_id;
+        }
+
+        switch($list_type) {
+
+            case 0: //全部订单
+                $st_order_obj = StOrder::where($where);
+                break;
+
+            case 1: //待接单订单
+                $where['status'] = 0;
+                $st_order_obj = StOrder::where($where);
+                break;
+
+            case 2: //待发货订单
+                $st_order_obj = StOrder::where($where)->whereIn('status', [1, 7, 8]);
+                break;
+
+            case 3: //配送中订单
+                $st_order_obj = StOrder::where($where)->whereIn('status', [2, 3]);
+                break;
+
+            case 4:
+                break;
+
+            case 5: //异常订单
+                $where['hang_up'] = 1;
+                $st_order_obj = StOrder::where($where);
+                break;
+
+            case 6: //催单
+                $where['apply'] = 3;
+                $st_order_obj = StOrder::where($where);
+                break;
+
+            case 7: //退单
+                $st_order_obj = StOrder::where($where)->whereIn('apply', [1, 2]);
+                break;
+
+            case 8: //已完成
+                $where['status'] = 4;
+                $st_order_obj = StOrder::where($where);
+                break;
+
+            case 9: //已取消
+                $where['status'] = 5;
+                $st_order_obj = StOrder::where($where);
+                break;
+
+            default:
+                $st_order_obj = null;
+                break;
+
+        }
+
+        if (!isset($st_order_obj) || is_null($st_order_obj)) {
+            return  [
+                'total' => 0, 'data' => []
+            ];
+        } else {
+
+            $st_order = $st_order_obj->orderBy('id', 'desc')
+                ->paginate($page_size)
+                ->toArray();
+
+            $st_order['data'] = $this->order_deal($st_order['data']);
+            return $st_order;
+
+        }
+
+    }
+
+    /**
+     * 订单列表搜索
+     * @param $args
+     * @return mixed
+     */
+    public function search($args) {
+
+        $page_size = isset($args['page_size'])
+            ? $args['page_size']
+            : 10;
+        $where = [];
+
+        if (isset($args['order_id']) && !empty($args['order_id'])) {
+            $where[] = ['order_id', $args['order_id']];
+        }
+
+        if (isset($args['app_id']) && ebsig_is_int($args['app_id'])) {
+            $where[] = ['app_id', $args['app_id']];
+        }
+
+        if (isset($args['mall_id']) && ebsig_is_int($args['mall_id'])) {
+            $where[] = ['mall_id', $args['mall_id']];
+        }
+
+        if (isset($args['mobile']) && !empty($args['mobile'])) {
+            $where[] = ['mobile', $args['mobile']];
+        }
+
+        if (isset($args['status']) && ebsig_is_int($args['status'])) {
+            $where[] = ['status', $args['status']];
+        }
+
+        $st_order = StOrder::where($where)
+            ->orderBy('id', 'desc')
+            ->paginate($page_size)
+            ->toArray();
+
+        $st_order['data'] = $this->order_deal($st_order['data']);
+
+        return $st_order;
+
+    }
+
+
+    /**
+     * 订单详情信息
+     * @param $order_id
+     * @return array
+     */
+    public function detail($order_id) {
+
+        $st_order = StOrder::find($order_id);
+        if (!$st_order) {
+            return ['code'=>404, 'message'=>'订单信息没有找到'];
+        }
+
+        $order_goods = StOrderGoods::where('order_id', $st_order->id)->get();
+        if ($order_goods->count() <= 0) {
+            return ['code'=>404, 'message'=>'订单商品没有找到'];
+        }
+
+        $st_app = StApp::find($st_order->app_id);
+        if (!$st_app) {
+            return ['code'=>404, 'message'=>'应用平台没有找到'];
+        }
+
+        $order_trace = StOrderTrace::where('order_id', $st_order->id)->get();
+        if ($order_trace->count() <= 0) {
+            $order_trace = [];
+        }
+
+        $order_data = [
+            'order_id' => app_to_string($st_order->id),
+            'created_at' => app_to_string(date('m-d H:i', strtotime($st_order->created_at))),
+            'status' => app_to_int($st_order->status),
+            'status_name' => FieldsService::$OrderFields['status'][$st_order->status],
+            'total_fee' => app_to_string($st_order->total_fee),
+            'user_fee' => app_to_string($st_order->user_fee),
+            'package_fee' => app_to_string($st_order->package_fee),
+            'send_fee' => app_to_string($st_order->freight),
+            'mall_fee' => app_to_string($st_order->mall_fee),
+            'discount_fee' => app_to_string($st_order->discount_fee),
+            'total_goods_number' => app_to_string($st_order->total_goods_number),
+            'deliver_name' => app_to_string($st_order->deliver_name),
+            'deliver_mobile' => app_to_string($st_order->deliver_mobile),
+            'deliver_address' => app_to_string($st_order->deliver_address),
+            'mall_id' => app_to_int($st_order->mall_id),
+            'mall_name' => app_to_string($st_order->mall_name),
+            'mall_code' => app_to_string($st_order->mall_code),
+            'send_time' => app_to_string($st_order->send_time),
+            'send_type' => app_to_int($st_order->send_type),
+            'remark' => app_to_string($st_order->remark),
+            'cancel_reason' => FieldsService::$OrderFields['cancel_reason'][$st_app->id],
+            'app_logo' => app_to_string($st_app->logo),
+            'express' => []
+        ];
+
+        $order_data['accept_at'] = !empty($st_order->accept_at)
+            ? app_to_string(date('m-d H:i', strtotime($st_order->accept_at)))
+            : '';
+
+        $order_data['send_logo'] =  $st_order->send_type == 2
+            ? '/images/admin/send/order-icon2.png'
+            : '/images/admin/send/order-icon6.png';
+
+        if ( $st_order->apply > 0 ) {
+            $st_order_apply = StOrderApply::find($st_order->apply_id);
+            $order_data['apply_reason'] = !empty($st_order_apply->reason)
+                ? app_to_string($st_order_apply->reason)
+                : '';
+            if ($st_order->apply == 3) {
+                $order_data['remind_reply'] = FieldsService::$OrderFields['remind_reply'][$st_app->id];
+                $order_data['remind_time'] = $st_order_apply->created_at;
+                $order_data['remind_number'] = StOrderApply::where([
+                    'order_id' => $st_order->id,
+                    'type' => 3
+                ])->count();
+            }
+        }
+
+        foreach ( $order_goods as $g ) {
+            $order_data['goods'][] = [
+                'goods_name' => app_to_string($g->goods_name),
+                'goods_number' => app_to_int($g->goods_number),
+                'goods_price' => app_to_string($g->goods_price),
+                'total_price' => app_to_string($g->goods_price * $g['goods_number']),
+                'sku' => app_to_string($g->sku),
+                'goods_image' => app_to_string($g->goods_image)
+            ];
+        }
+
+        foreach ( $order_trace as $t)  {
+            $order_data['trace'][] = [
+                'created_at' => app_to_string($t->created_at),
+                'creator' => app_to_string($t->creator),
+                'content' => app_to_string($t->content)
+            ];
+        }
+
+        return ['code' => 200, 'data' => $order_data];
+
+    }
+
+    /**
+     * 订单列表数据处理
+     * @param array $order_list 订单数据列表
+     * @return array
+     */
+    private function order_deal($order_list) {
+
+        $result_order_list = [];
+
+        foreach($order_list as $data) {
+
+            $st_app = StApp::find($data['app_id']);
+
+            $order_data = [
+                'order_id' => app_to_string($data['id']),
+                'created_at' => app_to_string(date('m-d H:i', strtotime($data['created_at']))),
+                'status' => app_to_int($data['status']),
+                'status_name' => FieldsService::$OrderFields['status'][$data['status']],
+                'total_fee' => app_to_string($data['total_fee']),
+                'user_fee' => app_to_string($data['user_fee']),
+                'package_fee' => app_to_string($data['package_fee']),
+                'send_fee' => app_to_string($data['freight']),
+                'mall_fee' => app_to_string($data['mall_fee']),
+                'discount_fee' => app_to_string($data['discount_fee']),
+                'total_goods_number' => app_to_string($data['total_goods_number']),
+                'deliver_name' => app_to_string($data['deliver_name']),
+                'deliver_mobile' => app_to_string($data['deliver_mobile']),
+                'deliver_address' => app_to_string($data['deliver_address']),
+                'mall_id' => app_to_int($data['mall_id']),
+                'mall_name' => app_to_string($data['mall_name']),
+                'mall_code' => app_to_string($data['mall_code']),
+                'send_time' => app_to_string($data['send_time']),
+                'send_type' => app_to_int($data['send_type']),
+                'remark' => app_to_string($data['remark']),
+                'app_logo' => app_to_string($st_app->logo),
+                'express' => []
+            ];
+
+            $order_data['accept_at'] = !empty($data['accept_at'])
+                ? app_to_string(date('m-d H:i', strtotime($data['accept_at'])))
+                : '';
+
+            $order_data['send_logo'] =  $data['send_type'] == 2
+                ? '/images/admin/send/order-icon2.png'
+                : '/images/admin/send/order-icon6.png';
+
+            if ( $data['apply'] > 0 ) {
+
+                $st_order_apply = StOrderApply::find($data['apply_id']);
+
+                $order_data['apply_reason'] = !empty($st_order_apply->reason)
+                    ? app_to_string($st_order_apply->reason)
+                    : '';
+
+                if ($data['apply'] == 3) {
+                    $order_data['remind_reply'] = FieldsService::$OrderFields['remind_reply'][$st_app->id];
+                    $order_data['remind_time'] = $st_order_apply->created_at;
+                    $order_data['remind_number'] = StOrderApply::where([
+                        'order_id' => $data['id'],
+                        'type' => 3
+                    ])->count();
+                }
+
+            }
+
+            $result_order_list[] = $order_data;
+
+        }
+
+        return $result_order_list;
+
+    }
+
+}

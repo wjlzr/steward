@@ -1,0 +1,413 @@
+<?php
+
+namespace App\Http\Controllers\Receive;
+
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+
+use App\Models\Order\StOrder;
+use App\Models\StApp;
+use App\Models\StAppLog;
+use App\Services\Order\OrderEditService;
+use Wm;
+
+class EleMeController extends Controller
+{
+
+    private $config;
+
+    private $curl;
+
+    public function __construct()
+    {
+        $class_name = str_replace('Controller', '', str_replace(__NAMESPACE__.'\\', '', __CLASS__));
+        $this->curl = Wm::curl_client($class_name);
+        $this->config = $this->curl->config;
+    }
+
+
+    /**
+     * 消息推送统一入口
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function index(Request $request)
+    {
+
+        $request_at = $request->input('request_at');
+        $content = $request->input();
+
+        if (!isset($content['message'])) {
+            return StAppLog::responseLog($content, ['message'=>'ok'], $request_at, $this->config['appId']);
+        }
+
+        $params = json_decode($content['message'], true);
+
+        if ($content['type'] != 10) {
+            $order = StOrder::where('app_order_id', $params['orderId'])
+                            ->first();
+            if (!$order) {
+                $return = ['code'=>404, 'message'=>'订单信息没有找到'];
+                return StAppLog::responseLog($content, $return, $request_at, $this->config['appId']);
+            }
+            $params['orderId'] = $order->id;
+        }
+
+        switch (true) {
+
+            //订单生效
+            case $content['type'] == 10:
+                $res = $this->create($params);
+                break;
+
+            //商户接单
+            case $content['type'] == 12:
+                $res = $this->receive($params['orderId'], $params['role']);
+                break;
+
+            //订单被取消
+            case $content['type'] == 14:
+                $res = $this->cancel($params['orderId']);
+                break;
+
+            //订单被完结
+            case $content['type'] == 18:
+                $res = $this->status($params['orderId']);
+                break;
+
+            //用户申请取消单
+            case $content['type'] == 20:
+                $res = $this->applyRefund($params['orderId'], $params['reason'], 1);
+                break;
+
+            //用户取消取消单申请
+            case $content['type'] == 21:
+                $res = $this->cancelApplyRefund($params['orderId'], 1);
+                break;
+
+            //商品拒绝取消单
+            case $content['type'] == 22:
+                $res = $this->disAgreeRefund($params, 1);
+                break;
+
+            //商户同意取消单
+            case $content['type'] == 23:
+                $res = $this->agreeRefund($params['orderId']);
+                break;
+
+            //用户申请退单
+            case $content['type'] == 30:
+                $res = $this->applyRefund($params['orderId'], $params['reason'], 2);
+                break;
+
+            //用户取消退单申请
+            case $content['type'] == 31:
+                $res = $this->cancelApplyRefund($params['orderId'], 2);
+                break;
+
+            //商户拒绝退单
+            case $content['type'] == 32:
+                $res = $this->disAgreeRefund($params['orderId'], 2);
+                break;
+
+            //商户同意退单
+            case $content['type'] == 33:
+                $res = $this->agreeRefund($params['orderId']);
+                break;
+
+            //催单
+            case $content['type'] == 45:
+                $res = $this->remind($params['orderId'], $params['remindId']);
+                break;
+
+            //运单状态变更消息
+            case $content['type'] == 55:
+                $res = $this->delivery($params['orderId']);
+                break;
+
+            default:
+                return response()->json(['message'=>'ok']);
+                break;
+
+        }
+
+        if ($res['code'] != 200) {
+            return StAppLog::responseLog($content, $res, $request_at, $this->config['appId']);
+        }
+
+        return response()->json(['message'=>'ok']);
+
+    }
+
+
+    /**
+     * 创建订单
+     * @param $args_data
+     * @return array
+     */
+    private function create($args_data)
+    {
+
+        if (!isset($args_data['groups'])) {
+            return ['code' => 400, 'message' => '订单信息没有获取到'];
+        }
+
+        $deliveryGeo = explode(',', $args_data['deliveryGeo']);
+
+        $send_time = '尽快送达';
+        if (isset($args_data['deliverTime']) && !empty($args_data['deliverTime'])) {
+            $send_time = str_replace('T', ' ', $args_data['deliverTime']);
+            $send_time = date('m-d H:i', strtotime($send_time));
+        }
+
+        $order_goods = [];
+
+        foreach ($args_data['groups'] as $group) {
+
+            if ($group['type'] == 'extra') {
+                continue;
+            }
+
+            $goods_from = $group['type'] == 'discount' ? 2 : 1;
+
+            foreach ($group['items'] as $item) {
+                $spec_name = isset($item['newSpecs'][0]['value'])
+                    ? $item['newSpecs'][0]['value']
+                    : '';
+                $order_goods[] = [
+                    'goods_name' => $item['name'] . ' ' . $spec_name,
+                    'goods_number' => $item['quantity'],
+                    'goods_from' => $goods_from,
+                    'price' => $item['price'],
+                    'sku' => $item['extendCode']
+                ];
+            }
+        }
+
+        $app = StApp::where('alias', $this->config['alias'])->first();
+
+        $order_data = [
+            'operator' => 'ele-api',
+            'app_id' => $app->id,
+            'order_id' => $args_data['id'],
+            'day_sequence' => $args_data['daySn'],
+            'order_fee' => $args_data['originalPrice'],
+            'user_fee' => $args_data['totalPrice'],
+            'mall_fee' => $args_data['income'],
+            'service_fee' => $args_data['serviceFee'],
+            'mall_act_fee' => $args_data['shopPart'],
+            'app_act_fee' => $args_data['elemePart'],
+            'discount_fee' => $args_data['activityTotal'],
+            'card_fee' => $args_data['hongbao'],
+            'package_fee' => $args_data['packageFee'],
+            'freight_fee' => $args_data['deliverFee'],
+            'mall_code' => $args_data['openId'],
+            'send_time' => $send_time,
+            'deliver_lng' => $deliveryGeo[0],
+            'deliver_lat' => $deliveryGeo[1],
+            'deliver_name' => $args_data['consignee'],
+            'deliver_mobile' => $args_data['phoneList'][0],
+            'deliver_address' => $args_data['deliveryPoiAddress'],
+            'deliver_fee' => $args_data['deliverFee'],
+            'invoice' => 0,
+            'taxer_id' => '',
+            'remark' => $args_data['description'],
+            'goods' => $order_goods,
+            'app_order_json' => json_encode($args_data),
+        ];
+
+        if (isset($args_data['invoiced']) && $args_data['invoiced']) {
+            $order_data['invoice'] = 1;
+            $order_data['invoice_title'] = $args_data['invoice'];
+            $order_data['taxer_id'] = $args_data['taxpayerId'];
+        }
+
+        $res = Wm::create_order($order_data);
+        if ($res['code'] != 200) {
+            return ['code' => 400, 'message' => '订单详情保存失败'];
+        }
+
+        return ['code' => 200, 'message' => 'ok'];
+
+    }
+
+
+    /**
+     * 商户接单
+     * @param $order_id
+     * @param $role
+     * @return array
+     */
+    private function receive($order_id, $role)
+    {
+
+        $role_array = [
+            1 => '下单用户',
+            2 => '饿了么系统',
+            3 => '饿了么商户',
+            4 => '饿了么客服',
+            5 => '饿了么开放平台系统',
+            6 => '饿了么短信系统',
+            7 => '饿了么无线打印机系统',
+            8 => '饿了么风控系统',
+            9 => '饿了么订单完结'
+        ];
+
+        $operator = isset($role_array[$role])
+            ? $role_array[$role]
+            : 'ele-push';
+
+        $order_edit = new OrderEditService();
+        $order_result = $order_edit->receive($order_id, $operator, 0);
+        return $order_result;
+
+    }
+
+
+    /**
+     * 订单被取消
+     * @param $order_id
+     * @return array
+     */
+    private function cancel($order_id)
+    {
+
+        $order_edit = new OrderEditService();
+        $order_result = $order_edit->cancel($order_id, 'push', '平台推送取消接口', 'ele-push', 0);
+        return $order_result;
+
+    }
+
+
+    /**
+     * 订单被完结
+     * @param $order_id
+     * @return array|mixed
+     */
+    private function status($order_id)
+    {
+
+        $order_edit = new OrderEditService();
+        $order_result = $order_edit->complete($order_id, 'ele-push', 0);
+        return $order_result;
+
+    }
+
+
+    /**
+     * 用户申请取消单/退单
+     * @param $order_id
+     * @param $reason
+     * @param $type
+     * @return array
+     */
+    private function applyRefund($order_id, $reason, $type)
+    {
+
+        $order_edit = new OrderEditService();
+        $order_result = $order_edit->applyRefund($order_id, 'ele-push', $reason, $type);
+        return $order_result;
+
+    }
+
+
+    /**
+     * 用户取消取消单/退单申请
+     * @param $order_id
+     * @param $type
+     * @return array
+     */
+    private function cancelApplyRefund($order_id, $type)
+    {
+
+        $order_edit = new OrderEditService();
+        $order_result = $order_edit->cancelApplyRefund($order_id, 'ele-push', $type);
+        return $order_result;
+
+    }
+
+
+    /**
+     * 商户同意取消单/退单
+     * @param $order_id
+     * @return array
+     */
+    private function agreeRefund($order_id)
+    {
+
+        $order_edit = new OrderEditService();
+        $order_result = $order_edit->agreeRefund($order_id, 'ele-push', 0);
+        return $order_result;
+
+    }
+
+
+    /**
+     * 商户拒绝取消单/退单
+     * @param $order_id
+     * @param $apply_type
+     * @return array
+     */
+    private function disAgreeRefund($order_id, $apply_type)
+    {
+
+        $reply_message = $apply_type == 1
+            ? '平台推送拒绝取消单'
+            : '平台推送拒绝退单';
+
+        $order_edit = new OrderEditService();
+        $order_result = $order_edit->disagreeRefund($order_id, $reply_message, 'ele-push', 0);
+        return $order_result;
+
+    }
+
+
+    /**
+     * 用户催单
+     * @param $order_id
+     * @param $remind_id
+     * @return array
+     */
+    private function remind($order_id, $remind_id)
+    {
+
+        $order_edit = new OrderEditService();
+        $order_result = $order_edit->applyRemind($order_id, $remind_id, 'ele-push');
+        return $order_result;
+
+    }
+
+
+    /**
+     * 订单发货
+     * @param $order_id
+     * @return array
+     */
+    private function delivery($order_id)
+    {
+
+        $order_edit = new OrderEditService();
+        $order_result = $order_edit->delivery($order_id, 'ele-push', 0);
+        return $order_result;
+
+    }
+
+
+    /**
+     * 授权回调
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function call(Request $request)
+    {
+
+        $code = $request->input('code');
+        if (empty($code)) {
+            return response()->json(['code'=>400, 'message'=>'缺少参数：code']);
+        }
+        $token_result = $this->curl->get_access_token($code);
+        return response()->json($token_result);
+
+    }
+
+}

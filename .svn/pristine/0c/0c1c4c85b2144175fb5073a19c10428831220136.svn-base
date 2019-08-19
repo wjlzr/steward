@@ -1,0 +1,148 @@
+<?php
+
+namespace App\Services\Wm\BdFood;
+
+class Curl
+{
+
+    public $config;
+
+    public function call($args_data , $api_name)
+    {
+
+        $http_data = [
+            'cmd' => $api_name,
+            'source' => $this->config['appKey'],
+            'version' => $this->config['version'],
+            'ticket' => $this->ticket(),
+            'timestamp' => time(),
+            'encrypt' => $this->config['encrypt'],
+            'body' => json_encode($args_data)
+        ];
+
+        //生成签名
+        $http_data['sign'] = $this->sign($http_data);
+
+        $result_data = $this ->post($this->config['getWay'], $http_data );
+
+        if ($result_data['code'] != 200) {
+            return $result_data;
+        }
+        if ($result_data['data']['body']['errno'] == 0) {
+            return ['code' => 200, 'message' => 'ok', 'data'=>$result_data['data']['body']['data']];
+        } else {
+            return ['code' => $result_data['data']['body']['errno'], 'message' => $result_data['data']['body']['error']];
+        }
+
+    }
+
+    /**
+     * PRC调用请求
+     * @param $url
+     * @param $data
+     * @return array
+     */
+    private function post($url, $data,$http_opts = null) {
+
+        $curl_handler = curl_init();
+
+        $options = array(
+            CURLOPT_URL => $url,
+            CURLOPT_RETURNTRANSFER => 1,
+            CURLOPT_CONNECTTIMEOUT => 15,
+            CURLOPT_HEADER	 => false,
+            CURLOPT_USERAGENT => isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.114 Safari/537.36',
+            CURLOPT_POST => TRUE,
+            CURLOPT_POSTFIELDS => $data
+        );
+
+        if (is_array($http_opts)) {
+            foreach ($http_opts as $key => $value) {
+                $options[$key] = $value;
+            }
+        }
+
+        curl_setopt_array($curl_handler, $options);
+        $curl_result = curl_exec($curl_handler); //获取URL站点内容 并打印出来
+        $curl_http_status = curl_getinfo($curl_handler,CURLINFO_HTTP_CODE); //获取最后一次收到的HTTP代码
+        $curl_http_info = curl_getinfo($curl_handler);
+
+        if ($curl_result == false) {
+            $error = curl_error($curl_handler);
+            curl_close($curl_handler);
+            return array('code' => $curl_http_status, 'message' => $error,'http_info' => $curl_http_info);
+        }
+        curl_close($curl_handler);
+
+        $encode = mb_detect_encoding($curl_result, array('ASCII', 'UTF-8','GB2312', 'GBK', 'BIG5')); //进行编码识别
+        if ($encode != 'UTF-8') {
+            $curl_result = iconv($encode, 'UTF-8', $curl_result);
+        }
+
+        $result = json_decode($curl_result, true);
+
+        if (is_null($result)) {
+            $result = $curl_result;
+        }
+
+        error_log('======//post数据');
+        error_log(var_export($result,true));
+
+        return array('code' => $curl_http_status, 'message' => 'ok', 'data' => $result,'http_info' => $curl_http_info);
+
+    }
+
+    /**
+     * 验签
+     * @param $data
+     * @return string
+     */
+    public function sign($data) {
+
+        $data['secret'] = $this->config['appSecret'];
+        ksort($data);
+        $params = [];
+        foreach($data as $key=>$val) {
+            $params[] = $key . '=' . $val;
+        }
+
+        $sign_str = implode('&', $params);
+        return strtoupper(md5($sign_str));
+
+    }
+
+    /**
+     * 生成ticket 请求流水号
+     * @return string
+     */
+    public function ticket() {
+
+        if(function_exists('com_create_guid')){
+            $uuid = trim(com_create_guid(), '{}');
+        }else{
+            mt_srand((double)microtime()*10000);
+            $charid = strtoupper(md5(uniqid(rand(), true)));
+            $hyphen = chr(45);
+            $uuid = substr($charid, 0, 8) . $hyphen
+                . substr($charid, 8, 4) . $hyphen
+                . substr($charid, 12, 4) . $hyphen
+                . substr($charid, 16, 4) . $hyphen
+                . substr($charid, 20, 12);
+        }
+        return strtoupper($uuid);
+
+    }
+
+    /**
+     * 信息返回
+     * @param $message
+     * @param int $code
+     * @param array $data
+     * @return array
+     */
+    public function response($message, $code = 400, $data = [])
+    {
+        return ['code'=>$code, 'message'=>$message, 'data'=>$data];
+    }
+
+}

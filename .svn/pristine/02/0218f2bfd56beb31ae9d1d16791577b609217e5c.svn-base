@@ -1,0 +1,80 @@
+<?php
+
+namespace App\Services\Mall;
+
+
+use App\Models\Mall\StMall;
+
+
+class MallSearchService
+{
+
+
+    /**
+     * 门店列表数据搜索
+     * @param $args
+     * @return array
+     */
+    public function search($args)
+    {
+
+        $page_size = isset($args['page_size'])
+            ? $args['page_size']
+            : 10;
+
+        $where = [];
+
+        if (isset($args['status']) && in_array($args['status'], [0, 1])) {
+            $where[] = ['status', $args['status']];
+        }
+
+        if (isset($args['province_id']) && ebsig_is_int($args['province_id'])) {
+            $where[] = ['province_id', $args['province_id']];
+        }
+
+        if (isset($args['city_id']) && ebsig_is_int($args['city_id'])) {
+            $where[] = ['city_id', $args['city_id']];
+        }
+
+        if (isset($args['county_id']) && ebsig_is_int($args['county_id'])) {
+            $where[] = ['county_id', $args['county_id']];
+        }
+
+        $mall_list = StMall::where($where)
+                        ->orderBy('id', 'desc')
+                        ->paginate($page_size)
+                        ->toArray();
+
+        $result_mall = [
+            'total' => $mall_list['total'],
+            'page' => $mall_list['current_page'],
+            'list' => []
+        ];
+
+        foreach($mall_list['data'] as $mall) {
+
+            $result_mall['list'][] = [
+                'id' => app_to_int($mall['id']),
+                'name' => app_to_string($mall['name']),
+                'code' => app_to_string($mall['code']),
+                'province' => app_to_string($mall['province']),
+                'city' => app_to_string($mall['city']),
+                'county' => app_to_string($mall['county']),
+                'province_id' => app_to_int($mall['province_id']),
+                'city_id' => app_to_int($mall['city_id']),
+                'county_id' => app_to_int($mall['county_id']),
+                'address' => app_to_string($mall['address']),
+                'latitude' => app_to_string($mall['latitude']),
+                'longitude' => app_to_string($mall['longitude']),
+                'mobile' => app_to_string($mall['mobile']),
+                'status' => app_to_int($mall['status']),
+                'logo' => app_to_string($mall['logo']),
+            ];
+
+        }
+
+        return $result_mall;
+
+    }
+
+}

@@ -1,0 +1,214 @@
+/*公共*/
+a {
+    text-decoration: none;
+    color: #000
+}
+* {
+    margin: 0;
+    padding: 0
+}
+/*订单*/
+.word-color{
+    color: #5f8af7;
+}
+.order-list li{
+    border: 1px solid #eee;
+    margin-top:16px;
+    cursor: pointer;
+    -webkit-border-radius: 10px;
+    -moz-border-radius: 10px;
+    border-radius: 10px;
+    overflow:hidden
+}
+.order-list li.hover:hover{
+    background:#fbfbfb;
+}
+.order-list li .order-status {
+    background: #fbfbfb;
+    line-height: 40px;
+    padding: 0 20px;
+    height: 40px;
+    margin-bottom: 5px;
+    overflow: hidden;
+}
+.order-top-left{
+    white-space: nowrap;
+    overflow: hidden;
+    float: left;
+    width: 80%;
+    text-overflow: ellipsis;
+}
+.order-top-left span{
+    display: inline-block;
+    zoom:1;
+    *display: inline;
+    margin-right:5px;
+}
+.order-top-left p.text{
+    display: inline-block;
+    margin: 0 10px;
+    zoom:1;
+    *display: inline;
+}
+.order-top-left p.text .order-no{
+    font-style: normal;
+    color: #6598f1;
+}
+.order-top-right{
+    float: right;
+}
+.order-top-right.active{
+    color:#00a0e9
+}
+.order-info{
+    padding: 10px 20px;
+    overflow: hidden;
+    zoom:1
+}
+.left-info{
+    float: left;
+}
+.right-info{
+    float: right;
+    height: auto;
+    margin-top: 10px;
+    text-align: right;
+}
+.right-info .order-fee span{
+    margin-left: 1em;
+}
+.right-info .shop-number {
+    padding-right: 3em;
+}
+.right-info>button{
+    margin-left:23px;
+}
+.left-info p{
+    font-size: 14px;
+    /*margin: 6px 0;*/
+    line-height:30px;
+}
+.left-info p span{
+    margin-right: 10px;
+}
+
+.left-info p .order-num{
+    font-size: 12px;
+    color: #fb9340;
+}
+.left-info .focus-th{
+    font-size: 14px;
+    color: #898787;
+}
+.left-info .notice{
+    font-size: 14px;
+    color: #828080;
+    display: inline-block;
+    line-height: 24px;
+    padding: 0 40px 0 0;
+    *zoom:1;
+    *display: inline;
+    /*width:200px;*/
+    /*-ms-text-overflow: ellipsis;*/
+    /*text-overflow: ellipsis;*/
+    /*overflow: hidden;*/
+    /*white-space: nowrap;*/
+}
+.left-info .order-copy{
+    color: #6598f1;
+}
+.right-info>div{
+    line-height: 30px;
+    height:30px;
+}
+.right-info .payment span{
+    color: #6598f1;
+}
+.submit-btn{
+    margin-top: 25px;
+    zoom:1;
+    float: right;
+}
+.submit-btn select{
+    position: relative;
+    zoom:1;
+    margin-left:23px;
+    *left:23px;
+}
+select{
+    position:relative;
+    top:2px;
+}
+.submit-btn .reminder{
+    margin-top:5px !important;
+}
+.submit-btn .refund{
+    margin-top: 10px !important;
+    width: auto;
+}
+.submit-btn button{
+    *vertical-align: baseline;
+    margin-left:23px;
+}
+
+.btn-color{
+    border: 1px solid #5f8af7;
+    color: #5f8af7;
+}
+.position-page{
+    margin:10px 0;
+}
+@media only screen and (max-width: 800px){
+    .left-info{  float: none; width: 100%;  }
+}
+.order-operation-btn-color-class {
+    border-color: #1c7fe3;
+    color : #1c7fe3;
+}
+.notice-mark{
+    color: #898787;
+    margin:10px 0 20px;
+}
+.detail-bot{
+    border-top:1px solid #eee;
+    padding: 25px 0;
+    margin:0 20px;
+    overflow: hidden;
+}
+.detail-bot .notice{
+    line-height:30px;
+    margin-right: 20px;
+}
+.order-tile{
+    overflow: hidden;
+    margin-bottom:20px;
+}
+.order-titl-list li {
+    float: left;
+    margin-right:48px;
+}
+.order-titl-list li span{
+    padding-bottom: 13px;
+    *display: inline;
+    display: inline-block;
+    zoom:1
+}
+.order-titl-list li span.cur{
+    color:#00a0e9;
+    border-bottom:2px solid #00a0e9;
+}
+.order-titl-list li span em{
+    padding-left:10px;
+    font-style: normal;
+}
+.fnw{
+    font-size:18px;
+    color:#000;
+    font-style: normal;
+}
+.fnc{
+    font-size:18px;
+    color:#ff0000;
+    font-style: normal;
+}
+

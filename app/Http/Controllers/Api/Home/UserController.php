@@ -1,0 +1,133 @@
+<?php
+
+namespace App\Http\Controllers\Api\Home;
+
+use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
+
+use App\Models\User\StUser;
+use App\Models\User\StUserDevices;
+use App\Models\Mall\StMall;
+use App\Services\User\UserSearchService;
+use App\Services\User\UserEditService;
+
+
+class UserController extends Controller
+{
+
+
+    //用户登录接口
+    public function login(Request $request)
+    {
+
+        $mobile = $request->input('mobile');
+        $device = $request->input('device', '');
+        $device_type = $request->input('device_type', 0);
+
+        if ( empty($mobile) ) {
+            return response()->json(['code'=>400, 'message'=>'手机号码不能为空']);
+        } else if ( !isMobile($mobile) ) {
+            return response()->json(['code'=>400, 'message'=>'手机号格式错误']);
+        }
+
+        if (empty($device) || !ebsig_is_int($device_type)) {
+            return response()->json(['code'=>400, 'message'=>'缺少设备符号或设备类型']);
+        }
+
+        if (!ebsig_is_int($device_type, 2) || !in_array($device_type, [0, 1, 2])) {
+            return response()->json(['code'=>400, 'message'=>'设备类型错误']);
+        }
+
+        $user = StUser::where('mobile', $mobile)->first();
+        if (!$user) {
+            return response()->json(['code'=>404, 'message'=>'用户信息没有找到']);
+        } else if ($user->status == 0) {
+            return response()->json(['code'=>404, 'message'=>'当前用户已禁用']);
+        }
+
+        if ($user->type == 2) {
+            $mall = StMall::find($user->mall_id);
+            if (!$mall) {
+                return response()->json(['code'=>404, 'message'=>'门店信息没有找到']);
+            }
+        } else {
+            $mall_list_array = [];
+            $mall_array = StMall::get();
+            if ($mall_array->count() > 0) {
+                foreach($mall_array as $m) {
+                    $mall_list_array[] = [
+                        'mall_id' => app_to_int($m->id),
+                        'mall_name' => app_to_string($m->name),
+                        'mall_code' => app_to_string($m->code)
+                    ];
+                }
+            }
+        }
+
+        $user_devices_search = StUserDevices::where([
+            'device'=>$device,
+            'type'=>$device_type
+        ])->first();
+        if ($user_devices_search) {
+            $user_devices = StUserDevices::find($user_devices_search->id);
+        } else {
+            $user_devices = new StUserDevices();
+            $user_devices->device = $device;
+            $user_devices->type = $device_type;
+            $user_devices->creator = $user->name;
+            $user_devices->work_state = $user->type == 2 ? 1 : 0;
+        }
+        $user_devices->user_id = $user->id;
+        $user_devices->save();
+
+        $return_result = [
+            'user_id' => app_to_int($user->id),
+            'user_name' => app_to_string($user->name),
+            'full_name' => app_to_string($user->full_name),
+            'user_type' => app_to_int($user->type),
+            'mall_id' => isset($mall) ? app_to_int($mall->id) : 0,
+            'mall_name' => isset($mall) ? app_to_string($mall->name) : '',
+            'device_work_state' => app_to_int($user_devices->work_state),
+            'service_phone' => ['400-878-5919']
+        ];
+
+        return response()->json(['code' => 200, 'message' => '登录成功', 'data' => $return_result]);
+
+    }
+
+
+    //查询用户详细信息
+    public function get($id)
+    {
+
+        $user_search = new UserSearchService();
+        $user_result = $user_search->get($id);
+        return response()->json($user_result);
+
+    }
+
+
+    //用户新增/修改
+    public function edit(Request $request)
+    {
+
+        $user_edit = new UserEditService();
+        $user_result = $user_edit->edit($request->input());
+        return response()->json($user_result);
+
+    }
+
+
+    //修改用户密码
+    public function editPwd(Request $request)
+    {
+
+        $user_edit = new UserEditService();
+        $user_result = $user_edit->editPwd($request->input());
+        return response()->json($user_result);
+
+    }
+
+
+}
+

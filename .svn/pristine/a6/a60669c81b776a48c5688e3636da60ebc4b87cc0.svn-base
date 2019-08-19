@@ -1,0 +1,128 @@
+<?php
+namespace App\Services\Wm\EleMe\Request;
+
+use App\Services\Wm\ShopFactoryInterface;
+
+class EleMeShopRequest implements ShopFactoryInterface
+{
+
+    /**
+     * EleGoodsRequest constructor.
+     * @param $curl
+     */
+    public function __construct($curl)
+    {
+        $this->curl = $curl;
+    }
+
+    /**
+     * 获取已授权店铺列表
+     * @remark：传参数组固定传入，
+     * 各平台可以根据实际情况决定是否使用
+     * @param $args = [
+     *      'page' => int 当前页码
+     *      'page_size' => 每页条数 (默认20)
+     * ]
+     * @return mixed
+     */
+    public function get_shop_list($args_data)
+    {
+        return $this->curl->call('eleme.user.getUser', []);
+    }
+
+    /**
+     * 获取店铺相关信息
+     * @param $args = [
+     *      'mall_code' => string 商户门店编号
+     * ]
+     * @return mixed
+     */
+    public function get_shop($args_data)
+    {
+
+        if (!isset($args_data['shop_id']) || empty($args_data['shop_id'])) {
+            return $this->curl->response('平台店铺id不能为空');
+        }
+        return $this->curl->call('eleme.shop.getShop', ['shopId' => app_to_int($args_data['shop_id'])]);
+
+    }
+
+    /**
+     * 更新店铺信息
+     * @param $args_data
+     * @return mixed
+     */
+    public function edit_shop($args_data)
+    {
+
+        $properties = [];
+
+        if (!isset($args_data['mall_id']) || empty($args_data['mall_id'])) {
+            return $this->curl->response('店铺id不能为空');
+        }
+
+        //店铺名称
+        if (isset($args_data['name']) && !empty($args_data['name'])) {
+            $properties['name'] = $args_data['name'];
+        }
+
+        //门店号
+        if (isset($args_data['mall_code']) && !empty($args_data['mall_code'])) {
+            $properties['openId'] = $args_data['mall_code'];
+        }
+
+        //店铺简介
+        if (isset($args_data['description']) && !empty($args_data['description'])) {
+            $properties['description'] = $args_data['description'];
+        }
+
+        //店铺地址
+        if (isset($args_data['address']) && !empty($args_data['address'])) {
+            $properties['addressText'] = $args_data['address'];
+        }
+
+        //联系电话
+        if (isset($args_data['phone']) && !empty($args_data['phone'])) {
+            $properties['phone'] = $args_data['phone'];
+        }
+
+        //营业时间
+        if (isset($args_data['business_time']) && !empty($args_data['business_time'])) {
+            $properties['openTime'] = $args_data['business_time'];
+        }
+
+        //配送费
+        if (isset($args_data['send_fee']) && !empty($args_data['send_fee'])) {
+            $properties['agentFee'] = $args_data['send_fee'];
+        }
+
+        //是否支持开发票 0不支持 1支持
+        if (isset($args_data['invoice']) && in_array($args_data['invoice'],[0,1])) {
+            $properties['invoice'] = $args_data['invoice'];
+        }
+
+        //支持的最小发票金额
+        if (isset($args_data['min_invoice']) && !empty($args_data['min_invoice'])) {
+            $properties['invoiceMinAmount'] = $args_data['min_invoice'];
+        }
+
+        //是否营业 1表示营业，0表示不营业
+        if (isset($args_data['status']) && in_array($args_data['status'],[0,1])) {
+            $properties['isOpen'] = $args_data['status'];
+        }
+
+        //订单打包费
+        if (isset($args_data['packing_fee']) && !empty($args_data['packing_fee'])) {
+            $properties['packingFee'] = $args_data['packing_fee'];
+        }
+
+        //店铺公告信息
+        if (isset($args_data['promotion_info']) && !empty($args_data['promotion_info'])) {
+            $properties['promotionInfo'] = $args_data['promotion_info'];
+        }
+
+        return $this->curl->call('eleme.shop.updateShop', ['shopId' => app_to_int($args_data['mall_id']), 'properties' => $properties]);
+
+    }
+    
+}

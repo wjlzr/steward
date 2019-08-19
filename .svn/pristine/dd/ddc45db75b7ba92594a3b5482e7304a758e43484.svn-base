@@ -1,0 +1,139 @@
+<?php
+
+namespace App\Services\Index;
+
+use App\Models\Order\StOrder;
+use DB;
+
+
+class IndexSearchService
+{
+
+
+    /**
+     * 门店订单状态数量统计
+     * @param int $date
+     * @param int $mall_id
+     * @return array
+     */
+    public function orderStatusCount($date = 0, $mall_id = 0)
+    {
+
+        $where = $this->where($date, $mall_id);
+
+        $new_orders = 0;
+        $wait_deliver_orders = 0;
+        $send_orders = 0;
+        $wait_send_orders = 0;
+        $finish_orders = 0;
+
+        $abnormal_orders = StOrder::where($where)
+                ->where('hang_up',1)
+                ->count();
+
+        $status_orders = DB::table('st_order')
+            ->select('status', DB::raw('COUNT(id) as count'))
+            ->where($where)
+            ->where('hang_up', 0)
+            ->groupBy('status')
+            ->get();
+
+
+        foreach($status_orders as $orders) {
+
+            //待接单
+            if ($orders->status == 0) {
+                $new_orders += $orders->count;
+            }
+
+            //待发货
+            if (in_array($orders->status, [1, 7, 8])) {
+                $wait_deliver_orders += $orders->count;
+            }
+
+            //配送中
+            if (in_array($orders->status, [2, 3])) {
+                $send_orders += $orders->count;
+            }
+
+            //待发配送
+            if (in_array($orders->status, [1, 2, 3, 7, 8])) {
+                $wait_send_orders += $orders->count;
+            }
+
+            //已完成
+            if ($orders->status == 4) {
+                $finish_orders += $orders->count;
+            }
+
+        }
+
+        $remind_orders = StOrder::where($where)
+                ->where(['hang_up'=>0,'apply' => 3])
+                ->count();
+
+        $refund_orders = StOrder::where($where)
+                ->where('hang_up',0)
+                ->whereIn('apply',[1, 2])
+                ->count();
+
+        $return_result = [
+            'new_orders' => app_to_int($new_orders),
+            'wait_deliver_orders' => app_to_int($wait_deliver_orders),
+            'send_orders' => app_to_int($send_orders),
+            'wait_send_orders' => app_to_int($wait_send_orders),
+            'abnormal_orders' => app_to_int($abnormal_orders),
+            'remind_orders' => app_to_int($remind_orders),
+            'refund_orders' => app_to_int($refund_orders),
+            'finish_orders' => app_to_int($finish_orders)
+        ];
+
+        return $return_result;
+
+    }
+
+
+    /**
+     * 查询条件处理
+     * @param int $date_type 0、无日期 1、今天 2、昨天 3、近7天 4、近30天
+     * @param int $mall_id
+     * @param string $table
+     * @return array
+     */
+    private function where($date_type = 1, $mall_id = 0, $table = '')
+    {
+
+        $table  = !empty($table)
+            ? $table . '.'
+            : '';
+
+        $str_time = '';
+
+        if ($date_type == 1) {
+            $str_time = time();
+        } else if ($date_type == 2) {
+            $str_time = strtotime('-1 day');
+        } else if ($date_type == 3) {
+            $str_time = strtotime('-7 day');
+        } else if ($date_type == 4) {
+            $str_time = strtotime('-30 day');
+        }
+
+        $where = [];
+
+        if (!empty($mall_id)) {
+            $where[] = [ $table . 'mall_id', $mall_id];
+        }
+
+        if (!empty($str_time)) {
+            $where = [
+                [$table . 'created_at', '>=', date('Y-m-d 00:00:00', $str_time)],
+                [$table . 'created_at', '<=', date('Y-m-d H:i:s')]
+            ];
+        }
+
+        return $where;
+
+    }
+
+}

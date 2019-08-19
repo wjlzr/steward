@@ -1,0 +1,27 @@
+<?php
+
+/*
+|--------------------------------------------------------------------------
+| Develop Routes
+|--------------------------------------------------------------------------
+|
+| Here is where you can register web routes for your application. These
+| routes are loaded by the RouteServiceProvider within a group which
+| contains the "web" middleware group. Now create something great!
+|
+*/
+
+Route::get('login', 'Eoa\LoginController@login');
+
+Route::middleware(['develop.service'])->group( function() {
+
+    //代码发布
+    Route::get('eoa/release', 'Eoa\ReleaseController@index'); //发布列表
+    Route::get('ajax/release/search', 'Eoa\ReleaseController@search'); //查询发布列表
+    Route::get('ajax/release/revision/list', 'Eoa\ReleaseController@getRevisions'); //获取待发布的svn版本列表
+    Route::get('ajax/release/files/{id}', 'Eoa\ReleaseController@getFiles'); //获取发布文件
+    Route::get('ajax/released/files/{id}', 'Eoa\ReleaseController@getReleasedFiles'); //获取已发布文件
+    Route::get('ajax/release/do/{id}', 'Eoa\ReleaseController@release'); //发布文件
+    Route::get('ajax/release/delete/{id}', 'Eoa\ReleaseController@delete'); //删除发布计划
+
+});

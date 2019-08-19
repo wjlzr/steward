@@ -1,0 +1,78 @@
+.orange {
+    color: #ff9709;
+}
+.pr0 {
+    padding-right: 0;
+}
+.form-group {
+    overflow: hidden;
+    margin-bottom: 0;
+    padding: 20px 0;
+    border-top: 1px solid #eee;
+}
+
+.form-group:first-child {
+    border-top: none;
+}
+.form-group>.col-sm-12>.control-label {
+    line-height: 80px;
+}
+
+.form-group .logo-img {
+    width: 80px;
+    height: 80px;
+    background-repeat: no-repeat;
+    background-position: center center;
+    background-size: cover;
+}
+.form-group .add-img {
+    margin: 23px 0 0 35px;
+}
+.platf-list .col-sm-1,.platf-list .col-sm-2,.platf-list .col-sm-3,.platf-list .col-sm-4,.platf-list .col-sm-5 {
+    padding-left: 0;
+    padding-right: 0;
+}
+.platf-list .control-label {
+    line-height: 34px;
+    font-weight: normal;
+    margin-bottom: 0;
+}
+.platf-list li {
+    position: relative;
+    padding-left: 35px;
+}
+.platf-list li .check-box {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    margin-top: -11px;
+    z-index: 2;
+}
+.platf-list li .platform-infor {
+    border-bottom: 1px solid #eee;
+    overflow: hidden;
+    padding: 15px 0;
+}
+.platform-infor .platf {
+    overflow: hidden;
+}
+.platform-infor .platf-logo {
+    display: block;
+    float: left;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    overflow: hidden;
+    background-position: center center;
+    background-size: cover;
+}
+.platform-infor .platf-name {
+    float: left;
+    line-height: 32px;
+    margin: 0 0 0 10px;
+    color: #666;
+}
+.btn-box {
+    margin: 20px auto;
+    text-align: center;
+}

@@ -1,0 +1,87 @@
+<?php
+
+namespace App\Http\Middleware;
+
+use Closure;
+use App\Models\StApp;
+use App\Models\Log\StAppReceiveLog;
+
+
+class ReceiveService
+{
+
+    /**
+     * Handle an incoming request.
+     * @param  \Illuminate\Http\Request  $request
+     * @param  \Closure  $next
+     * @return mixed
+     */
+    public function handle($request, Closure $next)
+    {
+
+        $start_time = microtime(true);
+        $request_data = $request->input();
+
+        $app_log_id = $this->addLog($request_data, 0);
+
+        $_url_array = explode('/', ltrim($request_data['_url'], '/'));
+        $app = StApp::find($_url_array[2]);
+        if (!$app) {
+            $return_data = response()->json(['code'=>404, 'message'=>'应用没有找到']);
+            $this->updateLog($app_log_id, $return_data, $start_time);
+            return $return_data;
+        }
+
+        $request->offsetSet('_app', $app);
+        $return_data = $next($request);
+
+        $this->updateLog($app_log_id, $return_data, $start_time);
+        return $return_data;
+
+    }
+
+
+    /**
+     * 请求日志记录
+     * @param $request_data
+     * @param $app_id
+     * @return mixed
+     */
+    private function addLog($request_data, $app_id)
+    {
+
+        $app_receive_log = new StAppReceiveLog();
+        $app_receive_log->app_id = $app_id;
+        $app_receive_log->request_data = json_encode($request_data);
+        $app_receive_log->save();
+
+        return $app_receive_log->id;
+
+    }
+
+
+    /**
+     * 请求返回日志记录
+     * @param $log_id
+     * @param $return_data
+     * @param $start_time
+     * @param int $app_id
+     */
+    private function updateLog($log_id, $return_data, $start_time, $app_id = 0)
+    {
+
+        $end_time = microtime(true);
+
+        $app_receive_log = StAppReceiveLog::find($log_id);
+        $app_receive_log->return_data = $return_data;
+        if (!empty($app_id)) {
+            $app_receive_log->app_id = $app_id;
+        }
+        $app_receive_log->exec_time = ($end_time - $start_time) * 1000;
+
+        $app_receive_log->save();
+
+    }
+
+
+}

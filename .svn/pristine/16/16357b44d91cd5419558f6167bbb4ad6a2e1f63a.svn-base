@@ -1,0 +1,150 @@
+<?php
+
+namespace App\Models\Common;
+
+use App\Models\Export\Export;
+use App\Http\Controllers\Common\EConfig;
+use App\Http\Controllers\Common\ebsigHttp;
+
+/**
+ * 大数据导出类
+ */
+class MultiDataExport
+{
+
+    /**
+     * 生成导出数据
+     * @param array $args_data
+     * @return mixed
+     */
+    public function add( $args_data ) {
+
+        if (!isset($args_data['creator'], $args_data['title'], $args_data['sql'],$args_data['exportIndex'])
+            || empty($args_data['creator'])  || empty($args_data['sql'])) {
+            return array('code' => 100001, 'message' => '参数错误');
+        }
+
+        if (empty($args_data['title'])) {
+            return array('code' => 100002, 'message' => '标题不能为空');
+        }
+        if ( !ebsig_is_int( $args_data['exportIndex'] ) ) {
+            return array('code' => 100002, 'message' => '缺少导出索引');
+        }
+
+        //获取系统配置信息
+        $sys_config = EConfig::getConfig(1);
+
+        $creator = $args_data['creator'];
+        $title = $args_data['title'];
+        $filename = makeUuid() . '.csv';
+        $exportIndex = $args_data['exportIndex'];
+        $down_path = '/storage/download/'  . date('Ym') . '/' . $filename;
+        $sql = $args_data['sql'];
+
+        $export_id = Export::insertGetId([
+            'updated_at' => date('Y-m-d H:i:s'),
+            'creator' => $creator,
+            'createTime' => date('Y-m-d H:i:s'),
+            'exportIndex' => $exportIndex,
+            'title' => $title,
+            'fileName' => $filename,
+            'downUrl' => $sys_config['domain_name'].$down_path,
+            'endTime' => null,
+            'status' => 1,
+            'error_msg' => '',
+        ]);
+
+        //解密字段
+        $decrypt_cols = '';
+        if ( isset( $args_data['decrypt_cols'] ) && !empty( $args_data['decrypt_cols'] ) ) {
+            $decrypt_cols = $args_data['decrypt_cols'];
+        }
+
+        //记录操作日志
+        $debug = '';
+        if ( isset( $args_data['debug'] ) && !empty( $args_data['debug'] ) ) {
+            $debug = $args_data['debug'];
+        }
+
+        //调用大数据导出
+        $res = $this->export($export_id, $sql, $down_path , $decrypt_cols , $debug );
+        if ($res['code'] != 200) {
+            return array('code' => 100004, 'message' => '导出失败');
+        }
+
+        return array('code' => 200, 'message' => 'ok', 'data' => array('export_id' => $export_id));
+
+    }
+
+
+
+    /**
+     * 更新导出状态
+     * @param int $export_id 导出id
+     * @param int $status 状态 2、成功 3、失败
+     * @param string $error_message 失败信息
+     * @return bool
+     */
+    public function upload($export_id, $status, $error_message = null) {
+
+        $export_data = Export::where('exportID',$export_id)->count();
+
+        if ( !$export_data ) {
+            return false;
+        }
+
+        Export::where('exportID',$export_id)->update([
+            'endTime'=> date('Y-m-d H:i:s'),
+            'status' => $status,
+            'error_msg' => $error_message
+        ]);
+
+        return true;
+
+    }
+
+    
+
+    /**
+     * 提交大数据导出
+     * @param int $export_id 导出id
+     * @param string $sql 大数据导出sql
+     * @param string $down_path 导出文件路径
+     * @param string $decrypt_cols 需解密的字段  如：$decrypt_cols='flide1,filde2'
+     * @param string $debug     操作日志
+     * @return array
+     */
+    public function export($export_id, $sql, $down_path , $decrypt_cols , $debug ) {
+
+        //实例http类
+        $http_obj = new ebsigHttp();
+
+        //获取系统配置信息
+        $sys_config = EConfig::getConfig(1);
+
+        //传参
+        $args_data = array(
+            'my_host'    => env('DB_HOST'),
+            'my_user'    => env('DB_USERNAME'),
+            'my_pass'    => env('DB_PASSWORD'),
+            'my_db'      => env('DB_DATABASE'),
+            'my_port'    => env('DB_PORT'),
+            'my_sql'     => base64_encode($sql),
+            'decrypt_cols' => $decrypt_cols,
+            'debug' => $debug,
+            'feed_url'   => $sys_config['domain_name'].'/export/notify',
+            'request_id' => $export_id,
+            'location'   => '/ebsig/inonesoft/nginx/Crm'.$down_path
+        );
+
+        $res = $http_obj->post($sys_config['multi_service_url'] . '/export' , http_build_query($args_data));
+        if ($res['code'] == 200 && $res['data']['code'] == 200 ) {
+            return array('code' => 200, 'message' => '导出成功');
+        } else {
+            $this->upload($export_id, 3, print_r($res,true));
+            return array('code' => 200002, 'message' => '导出失败');
+        }
+
+    }
+
+}

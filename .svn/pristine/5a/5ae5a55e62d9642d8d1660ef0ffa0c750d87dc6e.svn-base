@@ -1,0 +1,74 @@
+<?php
+
+namespace App\Http\Middleware;
+
+use Closure;
+
+use Illuminate\Support\Facades\Redis as Redis;
+use App\Models\User\StUser;
+
+class AjaxService
+{
+    
+    /**
+     * Handle an incoming request.
+     * @param  \Illuminate\Http\Request  $request
+     * @param  \Closure  $next
+     * @return mixed
+     */
+    public function handle($request, Closure $next)
+    {
+
+        $already_authorize_uri = [
+            'ajax/login',
+            'ajax/logout',
+        ];
+
+        $http_user_agent = $request->server('HTTP_USER_AGENT');
+        if ( strpos($http_user_agent, '.NET') ) {
+            $request->offsetSet('app_client', 3);
+        } else {
+            $request->offsetSet('app_client', 0);
+        }
+
+        if (in_array($request->path(), $already_authorize_uri)) {
+            return $next($request);
+        }
+
+        $user_id = Redis::get('ST_USER_ID_' . session()->getId());
+        if (!$user_id) {
+            return response()->json([
+                'code' => 403,
+                'message' => '无访问权限！'
+            ]);
+        }
+
+        $user = StUser::find($user_id);
+        if (!$user) {
+            return response()->json([
+                'code' => 404,
+                'message' => '用户信息没有找到，无访问权限！'
+            ]);
+        }
+
+        $setting_array = [
+            'user_id' => $user->id,
+            'user_name' => $user->name,
+            'user_type' => $user->type,
+            'mall_id' => 0
+        ];
+
+        $mall_id = Redis::get('ST_MALL_ID_' . session()->getId());
+        if ($mall_id && ebsig_is_int($mall_id)) {
+            $setting_array['mall_id'] = $mall_id;
+        }
+
+        foreach($setting_array as $key=>$val) {
+            $request->offsetSet($key, $val);
+        }
+
+        return $next($request);
+
+    }
+    
+}

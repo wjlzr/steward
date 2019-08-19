@@ -1,0 +1,409 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Models\Mall\StOrder;
+use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Redis as Redis;
+
+use App\Models\User\StUser;
+use App\Models\Mall\StMall;
+
+
+class IndexController extends Controller
+{
+
+    //主框架
+    public function main(Request $request)
+    {
+
+        $menus = [
+            [
+                'icon' => '/images/admin/icon/index.png',
+                'name' => '首页',
+                'sub' => [
+                    [
+                        'name' => '首页',
+                        'link' => '/admin/index'
+                    ]
+                ]
+            ],
+            [
+                'icon' => '/images/admin/icon/order.png',
+                'name' => '订单中心',
+                'sub' => [
+                    [
+                        'name' => '订单助手',
+                        'link' => '/admin/order/list/1'
+                    ],
+                    [
+                        'name' => '订单查询',
+                        'link' => '/admin/order/list/2'
+                    ]
+                ],
+                'permission' => '1,2'
+            ],
+            [
+                'icon' => '/images/admin/icon/menu.png',
+                'name' => '商品管理',
+                'sub' => [
+                    [
+                        'name' => '商家商品',
+                        'link' => '/admin/order/list/1'
+                    ],
+                    [
+                        'name' => '商品分类',
+                        'link' => '/admin/category'
+                    ],
+                    [
+                        'name' => '商品同步',
+                        'link' => '/admin/order/list/2'
+                    ],
+                    [
+                        'name' => '门店商品',
+                        'link' => '/admin/order/list/2'
+                    ],
+                    [
+                        'name' => '异常商品',
+                        'link' => '/admin/order/list/2'
+                    ]
+                ],
+                'permission' => '1'
+            ]
+        ];
+
+        $user_id = Redis::get('ST_USER_ID_' . session_id());
+        $st_user = StUser::find($user_id);
+
+        $return_data = [
+            'left_menus' => $menus,
+            'user_name' => $st_user->name,
+            'domain_name' => $request->getSchemeAndHttpHost(),
+            'pc_client' => 0
+        ];
+
+        $permission = [$st_user->type];
+        foreach($menus as $key=>$m) {
+            if (isset($m['permission']) && !array_intersect(explode(',', $m['permission']), $permission)) {
+                unset($return_data['left_menus'][$key]);
+                continue;
+            }
+            if (isset($m['sub']) && !empty($m['sub'])) {
+                foreach($m['sub'] as $k=>$sub) {
+                    if (isset($sub['permission']) && !array_intersect(explode(',', $sub['permission']), $permission))
+                        unset($return_data['left_menus'][$key]['sub'][$k]);
+                }
+            }
+        }
+
+        if ($st_user->type == 2) {
+            $st_mall = StMall::where('status', 1)->get();
+            if ($st_mall->count() > 0) {
+                foreach($st_mall as $mall) {
+                    $return_data['mall'][] = [
+                        'mall_id' => $mall->id,
+                        'mall_name' => $mall->name,
+                        'mall_code' => $mall->code
+                    ];
+                }
+            }
+        }
+
+        return view('admin/main', $return_data);
+
+    }
+
+    //首页页面
+    public function index()
+    {
+
+        $user_id = Redis::get('ST_USER_ID_' . session_id());
+        $st_user = StUser::find($user_id);
+
+        $data = [
+            'user_id' => $st_user->id,
+            'user_name' => $st_user->name
+        ];
+
+        if ($st_user->type == 1) {
+            return $this->home($data);
+        } else if ($st_user->type == 2) {
+            $data['mall_id'] = $st_user->mall_id;
+            return $this->mall($data);
+        }
+
+    }
+
+
+    //总账号首页
+    private function home($data) {
+
+        return view('admin/index/home', []);
+
+    }
+
+    //门店账号首页
+    private function mall($data) {
+
+        $user_id = $data['user_id'];
+        $st_user = StUser::find( $user_id );
+
+        $mall_id = $st_user -> mall_id ;
+        $st_mall = StMall::find( $mall_id );
+
+
+        //查询今日
+        $where = [
+            ['mall_id', $mall_id],
+            ['created_at', '>=', date('Y-m-d 00:00:00')],
+            ['created_at', '<=', date('Y-m-d H:i:s')]
+        ];
+
+        //今日营业额
+
+        $finish_price = StOrder::where($where)
+                                ->where('status',4)
+                                ->sum('user_fee');
+
+        //今日总订单
+        $all_bill = StOrder::where($where) -> count();
+
+        //今日客单价
+        $one_price = StOrder::where($where)
+                            ->where('status',4)
+                            ->avg('user_fee');
+
+        //新订单
+        $bill_new = StOrder::where([
+                            ['mall_id',$mall_id],
+                            ['status' , 0 ] ,
+                            ['hang_up' , 0 ]
+                        ])
+                        ->count();
+
+        //代发配送
+        $bill_ready = StOrder::where([
+                                    ['mall_id',$mall_id],
+                                    ['hang_up' , 0 ]
+                                ])
+                                ->whereNotIn('status',[4,5])
+                                ->count();
+
+        //异常单
+        $bill_hangup = StOrder::where([
+                                    ['mall_id',$mall_id],
+                                    ['hang_up' , 1 ]
+                                ])
+                                ->count();
+
+        //退单
+        $bill_return = StOrder::where([
+                                    ['hang_up' , 0 ],
+                                    ['mall_id' ,$mall_id ] ,
+                                ])
+                                ->whereIn('apply', [1, 2])
+                                ->count();
+
+        //催单
+        $bill_remind = StOrder::where([
+                                    ['hang_up' , 0 ],
+                                    ['mall_id' ,$mall_id ] ,
+                                    ['apply' , 3 ]
+                                ])
+                                ->count();
+
+        //查询昨日
+        $where = [
+            ['mall_id', $mall_id],
+            ['created_at', '>=', date('Y-m-d 00:00:00',strtotime('-1 day'))],
+            ['created_at', '<=', date('Y-m-d 59:59:59',strtotime('-1 day'))]
+        ];
+
+        //昨日营业额
+        $yes_finish_price = StOrder::where($where)
+                                    ->where('status',4)
+                                    ->sum('user_fee');
+
+        //昨日总订单
+        $yes_all_bill = StOrder::where($where) -> count();
+
+        //昨日客单价
+        $yes_one_price = StOrder::where($where)
+                                    ->where('status',4)
+                                    ->avg('user_fee');
+
+        //今日营收排名
+        $shop = 0;
+        $shop_array = [];
+
+        $where = [
+            ['status', 4],
+            ['created_at', '>=', date('Y-m-d 00:00:00')],
+            ['created_at', '<=', date('Y-m-d H:i:s')]
+        ];
+
+        $revenue_data = DB::table('st_order')->select('mall_id',DB::raw('SUM(user_fee) as item'))
+                                ->where($where)
+                                ->groupBy('mall_id')
+                                ->get();
+
+        if(!$revenue_data -> isEmpty()){
+            foreach($revenue_data as $revenue){
+                if($revenue['mall_id'] == $mall_id)
+                    $shop = $revenue['item'];
+                $shop_array[] = $revenue['item'];
+            }
+
+            $min_revenue = min($shop_array);
+            $max_revenue = max($shop_array);
+            $avg_revenue = round(array_sum($shop_array)/count($shop_array), 2);
+            $shop_revenue = $shop;
+        }else{
+            $min_revenue = 0;
+            $max_revenue = 0;
+            $avg_revenue = 0;
+            $shop_revenue = 0;
+        }
+
+        //昨日营收排名
+        $yes_shop = 0;
+        $yes_shop_array = [];
+
+        $where = [
+            ['status', 4],
+            ['created_at', '>=', date('Y-m-d 00:00:00',strtotime('-1 day'))],
+            ['created_at', '<=', date('Y-m-d 23:59:59',strtotime('-1 day'))]
+        ];
+
+        $revenue_data = DB::table('st_order')->select('mall_id',DB::raw('SUM(user_fee) as item'))
+                                ->where($where)
+                                ->groupBy('mall_id')
+                                ->get();
+
+        if(!$revenue_data -> isEmpty()){
+            foreach($revenue_data as $revenue){
+                if($revenue['mall_id'] == $mall_id)
+                    $yes_shop = $revenue['item'];
+                $yes_shop_array[] = $revenue['item'];
+            }
+
+            $yes_min_revenue = min($yes_shop_array);
+            $yes_max_revenue = max($yes_shop_array);
+            $yes_avg_revenue = round(array_sum($yes_shop_array)/count($yes_shop_array), 2);
+            $yes_shop_revenue = $yes_shop;
+        }else{
+            $yes_min_revenue = 0;
+            $yes_max_revenue = 0;
+            $yes_avg_revenue = 0;
+            $yes_shop_revenue = 0;
+        }
+
+        //今日订单效率
+        $shopEffic = 0;
+        $shopEffic_array = [];
+
+        $res_count = DB::table('st_order')->select('mall_id',DB::raw('AVG(updated_at-created_at) as t'))
+                                ->where([
+                                    ['status', 0 ],
+                                    ['created_at', '>=' , date('Y-m-d 00:00:00')],
+                                    ['created_at', '<=' , date('Y-m-d H:i:s')]
+                                ])
+                                ->whereRaw('updated_at>=created_at')
+                                ->groupBy('mall_id')
+                                ->orderBy('t','desc')
+                                ->get();
+        if($res_count -> isEmpty()){
+            $min_effic = 0;
+            $max_effic = 0;
+            $avg_effic = 0;
+            $shop_effic = 0;
+        }else{
+            foreach ($res_count as $count){
+                if($count['mall_id'] == $mall_id)
+                    $shopEffic = $count['t'];
+                $shopEffic_array[] = $count['t'];
+            }
+
+            $max_effic = round(min($shopEffic_array));
+            $min_effic = round(max($shopEffic_array));
+            $avg_effic = round(array_sum($shopEffic_array)/count($shopEffic_array));
+            $shop_effic = round($shopEffic);
+        }
+
+        //昨日订单效率
+        $yes_shopEffic = 0;
+        $yes_shopEffic_array = [];
+
+        $res_count =  DB::table('st_order')->select('mall_id',DB::raw('AVG(updated_at-created_at) as t'))
+                                ->where([
+                                    ['status', 0 ],
+                                    ['created_at', '>=' , date('Y-m-d 00:00:00',strtotime('-1 day'))],
+                                    ['created_at', '<=' , date('Y-m-d 59:59:59',strtotime('-1 day'))]
+                                ])
+                                ->whereRaw('updated_at>=created_at')
+                                ->groupBy('mall_id')
+                                ->orderBy('t','desc')
+                                ->get();
+
+        if($res_count -> isEmpty()){
+            $yes_min_effic = 0;
+            $yes_max_effic = 0;
+            $yes_avg_effic = 0;
+            $yes_shop_effic = 0;
+        }else{
+            foreach ($res_count as $count){
+                if($count['mall_id'] == $mall_id)
+                    $yes_shopEffic = $count['t'];
+                $yes_shopEffic_array[] = $count['t'];
+            }
+
+            $yes_max_effic = round(min($yes_shopEffic_array));
+            $yes_min_effic = round(max($yes_shopEffic_array));
+            $yes_avg_effic = round(array_sum($yes_shopEffic_array)/count($yes_shopEffic_array));
+            $yes_shop_effic = round($yes_shopEffic);
+        }
+
+        //返回数据数组
+        $result_data = array(
+            'logo' => $st_mall->logo,  //店铺logo
+            'mall_name' => $st_mall -> name,  //店铺名
+            'finish_price' => $finish_price ? round($finish_price,2) : '0.00',  //今日营业额
+            'all_bill' => $all_bill ? $all_bill : 0 ,  //今日订单数
+            'one_price' => $one_price ? round($one_price,2) :'0.00',  //今日客单价
+            'yes_finish_price' => $yes_finish_price ? round($yes_finish_price,2) : '0.00',  //昨日营业额
+            'yes_all_bill' => $yes_all_bill ? $yes_all_bill : 0 ,  //昨日订单数
+            'yes_one_price' => $yes_one_price ? round($yes_one_price,2) :'0.00',  //昨日客单价
+
+            'bill_new' => $bill_new,       //新订单
+            'bill_ready' => $bill_ready,   //待发配送订单
+            'bill_hangup' => $bill_hangup, //异常单
+            'bill_return' => $bill_return, //退单
+            'bill_remind' => $bill_remind, //催单
+
+            'min_revenue' => $min_revenue,      //今日最低营收
+            'max_revenue' => $max_revenue,      //今日最高营收
+            'avg_revenue' => $avg_revenue,      //今日平均营收
+            'shop_revenue' => $shop_revenue,    //今日本店营收
+            'yes_min_revenue' => $yes_min_revenue, //昨日最低营收
+            'yes_max_revenue' => $yes_max_revenue, //昨日最高营收
+            'yes_avg_revenue' => $yes_avg_revenue, //昨日平均营收
+            'yes_shop_revenue' => $yes_shop_revenue, //昨日本店营收
+
+            'min_effic' => $min_effic,     //今日最低效率
+            'max_effic' => $max_effic,     //今日最高效率
+            'avg_effic' => $avg_effic,      //今日平均效率
+            'shop_effic' => $shop_effic,    //今日本店效率
+            'yes_min_effic' => $yes_min_effic,  //昨日最低效率
+            'yes_max_effic' => $yes_max_effic,  //昨日最高效率
+            'yes_avg_effic' => $yes_avg_effic,   //昨日平均效率
+            'yes_shop_effic' => $yes_shop_effic, //昨日本店效率
+        );
+
+        return view('admin/index/mall', $result_data );
+
+    }
+
+
+}

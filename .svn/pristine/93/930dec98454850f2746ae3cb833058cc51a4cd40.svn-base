@@ -1,0 +1,121 @@
+<?php
+namespace App\Services\Queue\Src;
+
+
+class GoMq
+{
+
+    private static $format = 'json';
+    private static $queueId = 11;
+    private static $userId = 'a5d76b232175css2783de13d4c5bc8fd';
+
+
+    /**
+     * 推送消息
+     * @param $push_array
+     * @return array
+     */
+    public static function async($push_array)
+    {
+
+        if (!isset($push_array) || !is_array($push_array)) {
+            return ['code' => 400 , 'message' => '参数格式错误'];
+        }
+
+        if (!isset($push_array['call_url'])) {
+            return ['code' => 400 , 'message' => '参数错误'];
+        }
+
+        switch ( self::$format ) {
+            case 'json' :
+                $msg = $msg=json_encode( $push_array );
+                break;
+            default :
+                return ['code' => 400, 'message' => '未知的消息封装格式'];
+                break;
+        }
+
+        //创建socket
+        $socket=socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
+        if ($socket == false) {
+            return ['code' => 404, 'message' => 'socket创建失败'];
+        }
+
+        //连接队列服务
+        $connect=socket_connect($socket, env('GOMQ_ADDR'), env('GOMO_PORT'));
+        if ($connect == false ) {
+            return ['code' => 404, 'message' => '连接队列服务失败'];
+        }
+
+        //设置socket超时
+        $set_timeout = socket_set_option( $socket, SOL_SOCKET,SO_RCVTIMEO, ['sec'=>1000, 'usec'=>100000] );
+        if ($set_timeout == false) {
+            socket_close($socket);
+            return ['code' => 400, 'message' => '设置连接超时失败'];
+        }
+
+        $send_msg_len = strlen($msg) + 1;
+        $send_msg=pack('C', 1) . pack('S', self::$queueId) .pack('a32', self::$userId) .  pack('a' . $send_msg_len, $msg);
+
+        $msg_len=strlen($send_msg);
+        $i=0;
+        $send_status=FALSE;
+        $send_byte=0;
+        $reset_count=3;
+
+        //将二进制数据写入到socket中，如果写入字节数小于发送的长度，则默认允许3次重新写入剩余长度
+        while ($i < $reset_count) {
+            $send_byte+=socket_write($socket,$send_msg);
+            if ($send_byte == FALSE) {
+                socket_close($socket);
+                return ['code' => 400,'message' => 'socket 写入失败'];
+            }
+            if ($send_byte < $msg_len) {
+                $send_msg=substr($send_msg,$send_byte);
+            }
+            if ($send_byte == $msg_len) {
+                $send_status = TRUE;
+                break;
+            }
+            $i++;
+        }
+
+        if ($send_status === FALSE) {
+            socket_close($socket);
+            return ['code' => 400,'message' => '消息长度发送异常'];
+        }
+
+        //读取消息投递状态,返回1BYTE 状态标识
+        $msg_status='';
+        $msg_read_len=socket_recv($socket,$msg_status,1,0);
+        if ($msg_read_len != 1 ) {
+            socket_close($socket);
+            return ['code' => 400,'message' => '读取消息异常'];
+        }
+        $msg_send_status_ary=unpack('C', $msg_status);
+
+        // 0 : 投递成功  1 : 消息协议错误 2 : 队列不存在 3 : 未知错误
+        // 0 : 投递成功  1 : 消息协议错误 2 : 队列不存在 3 : 未知错误
+        socket_close($socket);
+        switch ($msg_send_status_ary[1]) {
+            case 0 :
+                return ['code' => 200,'message' => '消息投递成功'];
+                break;
+            case 1 :
+                return ['code' => 400 ,'message' => '消息协议错误'];
+                break;
+            case 2 :
+                return ['code' => 404 ,'message' => '队列不存在'];
+                break;
+            case 3 :
+                return ['code' => 500 ,'message' => '未知错误'];
+                break;
+            default:
+                return ['code' => 500 ,'message' => '未知错误'];
+                break;
+        }
+
+    }
+
+
+}

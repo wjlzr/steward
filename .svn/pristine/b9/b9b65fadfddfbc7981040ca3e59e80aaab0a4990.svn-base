@@ -1,0 +1,276 @@
+@extends('admin.layout')
+@section('css')
+<link rel="stylesheet" href="/css/admin/index.css?v=20180104">
+@endsection
+
+@section('content')
+    <div class="main">
+        <div class="main-notice" style="display: none;">
+            <a href="javascript:;"><span id="urgent_message"></span></a>
+            <span class="icon-cancel"><img src="/images/admin/icon/icon-cancel.png"> </span>
+        </div>
+        <div class="main-info-box">
+            <div class="main-show">
+                <div class="shop-logo"><img src="{{ $logo or '' }}"></div>
+                <div style="float: left;line-height: 80px;margin-left: 10px;">{{ $mall_name or ''}}</div>
+                <ul class="shop-info-list">
+                    <li>
+                        <a href="javascript:;">
+                            <div class="title-info">今日营业额</div>
+                            <div class="today-number">{{ $finish_price or ''}}</div>
+                            <div class="tom-number">昨日  <span>{{ $yes_finish_price or '' }}</span>元</div>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="javascript:;">
+                            <div class="title-info">今日订单数</div>
+                            <div class="today-number">{{ $all_bill or ''}}</div>
+                            <div class="tom-number">昨日  <span>{{ $yes_all_bill or ''}}</span>单</div>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="javascript:;">
+                            <div class="title-info">今日客单价</div>
+                            <div class="today-number">{{ $one_price or ''}}</div>
+                            <div class="tom-number">昨日  <span>{{ $yes_one_price  or ''}}</span>元</div>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+            <ul class="order-flex-5">
+                <li>
+                    <a href="/admin/order/list/1?anchor=1">
+                        <p><img src="/images/admin/icon/i-order.png"></p>
+                        <p>新订单</p>
+                        <p>{{ $bill_new or ''}}</p>
+                    </a>
+                </li>
+                <li>
+                    <a href="/admin/order/list/1?anchor=2">
+                        <p><img src="/images/admin/icon/i_gwc.png"></p>
+                        <p>待发配送</p>
+                        <p>{{ $bill_ready or ''}}</p>
+                    </a>
+                </li>
+                <li>
+                    <a href="/admin/order/list/1?anchor=4">
+                        <p><img src="/images/admin/icon/i_error.png"></p>
+                        <p>异常单</p>
+                        <p>{{ $bill_hangup or ''}}</p>
+                    </a>
+                </li>
+                <li>
+                    <a href="/admin/order/list/1?anchor=5">
+                        <p><img src="/images/admin/icon/i-cuidan.png"></p>
+                        <p>催单</p>
+                        <p>{{ $bill_remind or ''}}</p>
+                    </a>
+                </li>
+                <li>
+                    <a href="/admin/order/list/1?anchor=6">
+                        <p><img src="/images/admin/icon/i_back.png"></p>
+                        <p>退单</p>
+                        <p>{{ $bill_return or ''}}</p>
+                    </a>
+                </li>
+            </ul>
+        </div>
+        <div class="chart-z-list" style="overflow: hidden">
+            <div class="chart-z">
+                <div class="chart-title">
+                    <span class="chart-info">营收排名</span>
+                    <div class="sel-day-btn">
+                        <span class="curn" id="today_revenue" style="cursor: pointer;">今日</span>
+                        <span id="yes_revenue" style="cursor: pointer;">昨日</span>
+                    </div>
+                </div>
+                <div class="chart-box" id="chart-revenue" style="height:300px;background:#fff !important;"></div>
+            </div>
+            <div class="chart-z chart-second">
+                <div class="chart-title">
+                    <span class="chart-info">订单效率</span>
+                    <div class="sel-day-btn">
+                        <span class="curn" id="today_effic" style="cursor: pointer;">今日</span>
+                        <span id="yes_effic" style="cursor: pointer;">昨日</span>
+                    </div>
+                </div>
+                <div class="chart-box" id="chart-effic" style="height:300px;background:#fff !important;"></div>
+            </div>
+        </div>
+        <div class="chart-z-list">
+            <div class="chart-z" style="display: none;">
+                <div class="chart-title">
+                    <span class="chart-info">新手上路</span>
+                    <div class="sel-day-btn">
+                        <a href="/admin/article?category_id=35"  class="more">更多</a>
+                    </div>
+                </div>
+                <div class="chart-box">
+                    <ul class="news-list guide-list"></ul>
+                </div>
+            </div>
+            <div class="chart-z"  style="display: none;">
+                <div class="chart-title">
+                    <span class="chart-info">产品动态</span>
+                    <div class="sel-day-btn">
+                        <a href="/admin/article?category_id=36" class="more">更多</a>
+                    </div>
+                </div>
+                <div class="chart-box">
+                    <ul class="news-list movement-list"></ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    </div>
+@endsection
+@section('js')
+    <script src="/libs/echarts/echarts.js"></script>
+    <script>
+
+        $(function(){
+
+            //营收数据
+            var min_revenue = '{{ $min_revenue or ''}}';
+            var max_revenue = '{{ $max_revenue or ''}}';
+            var avg_revenue = '{{ $avg_revenue or ''}}';
+            var shop_revenue = '{{ $shop_revenue or ''}}';
+            var revenue_arr = [min_revenue,avg_revenue,shop_revenue,max_revenue];
+
+            var yes_min_revenue = '{{ $yes_min_revenue or '' }}';
+            var yes_max_revenue = '{{ $yes_max_revenue or ''}}';
+            var yes_avg_revenue = '{{ $yes_avg_revenue or ''}}';
+            var yes_shop_revenue = '{{ $yes_shop_revenue or ''}}';
+            var yes_revenue_arr = [yes_min_revenue,yes_avg_revenue,yes_shop_revenue,yes_max_revenue];
+
+            //订单效率数据
+            var min_effic = '{{ $min_effic or ''}}';
+            var max_effic = '{{ $max_effic or ''}}';
+            var avg_effic = '{{ $avg_effic or ''}}';
+            var shop_effic = '{{ $shop_effic or ''}}';
+            var effic_arr = [min_effic,avg_effic,shop_effic,max_effic];
+
+            var yes_min_effic = '{{ $yes_min_effic or '' }}';
+            var yes_max_effic = '{{ $yes_max_effic or ''}}';
+            var yes_avg_effic = '{{ $yes_avg_effic or ''}}';
+            var yes_shop_effic = '{{ $yes_shop_effic or ''}}';
+            var yes_effic_arr = [yes_min_effic,yes_avg_effic,yes_shop_effic,yes_max_effic];
+
+            var revenue_chart = echarts.init(document.getElementById('chart-revenue'));
+            var effic_chart = echarts.init(document.getElementById('chart-effic'));
+
+            my_chart(revenue_chart, {name:'营业额',data:revenue_arr});
+            my_chart(effic_chart, {name:'效率/s',data:effic_arr});
+
+            $(document).on('click','#today_revenue',function(){   //今日营业额
+
+                my_chart(revenue_chart, {name:'营业额',data:revenue_arr});
+                $('#today_revenue').addClass('curn');
+                $('#yes_revenue').removeClass('curn');
+
+            }).on('click','#yes_revenue',function(){        //昨日营业额
+
+                my_chart(revenue_chart, {name:'营业额',data:yes_revenue_arr});
+                $('#yes_revenue').addClass('curn');
+                $('#today_revenue').removeClass('curn');
+
+            }).on('click','#today_effic',function(){      //今日订单效率
+
+                my_chart(effic_chart, {name:'效率/s',data:effic_arr});
+                $('#today_effic').addClass('curn');
+                $('#yes_effic').removeClass('curn');
+
+            }).on('click','#yes_effic',function(){       //昨日订单效率
+
+                my_chart(effic_chart, {name:'效率/s',data:yes_effic_arr});
+                $('#yes_effic').addClass('curn');
+                $('#today_effic').removeClass('curn');
+
+            }).on('click', '.icon-cancel img', function(){
+                $(this).parents('.main-notice').hide();
+            });
+
+            E.ajax({
+               type : 'get',
+                url : '/admin/article/search',
+                data : { category_id : 35 , page : "0" ,page_size: 5 },
+                dataType :'json',
+                success :function (obj) {
+                    var html = '';
+                    if ( obj.code == 200 ){
+
+                        $.each( obj.data.data ,function( k , v ){
+                            if( k > 4 ){
+                                return false;
+                            }
+                            html += '<li><a href="http://www.ebsig.com/steward/article/detail/'+ v.article_id+'">'+ v.article_title+'</a><span>'+  v.createTime+'</span></li>';
+                        } );
+
+                        $('.guide-list').append(html).parent().parent().show();
+                    }
+                }
+            });
+
+            E.ajax({
+                type : 'get',
+                url : '/admin/article/search',
+                data : { category_id : 36 ,page : "0" ,page_size : 5},
+                dataType :'json',
+                success :function (obj) {
+                    var html = '';
+                    if ( obj.code == 200 ){
+
+                        $.each( obj.data.data ,function( k , v ){
+                            if( k > 4 ){
+                                return false;
+                            }
+                            html += '<li><a href="http://www.ebsig.com/steward/article/detail/'+ v.article_id+'">'+ v.article_title+'</a><span>'+ v.createTime+'</span></li>';
+                        } );
+
+                        $('.movement-list').append(html).parent().parent().show();
+                    }
+                }
+            });
+
+            E.ajax({
+                type : 'get',
+                url : '/admin/article/search',
+                data : { category_id : 37 ,page : "0" ,page_size : 1 ,sort : 'sortOrder'},
+                dataType :'json',
+                success :function (obj) {
+                    if (obj.code == 200) {
+                        $('#urgent_message').html('紧急通知：' + obj.data[0].article_title).parent().show();
+                    }
+                }
+            });
+        });
+
+        function my_chart(obj, data) {
+
+            obj.showLoading();
+            obj.setOption({
+                title:{},
+                tooltip: {},
+                legend:{
+                    data:[data.name]
+                },
+                xAxis:{
+                    data:['最低','平均','本店','最高']
+                },
+                yAxis:[{
+                    splitLine : {
+                        show:false
+                    }
+                }],
+                series:[{
+                    name:data.name,
+                    type:'bar',
+                    data:data.data
+                }]
+            });
+            obj.hideLoading();
+
+        }
+
+    </script>
+@endsection

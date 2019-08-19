@@ -1,0 +1,226 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+
+use App\Models\Mall\StAppMall;
+use App\Models\Mall\StMall;
+use App\Models\StApp;
+use App\Models\StRegion;
+use Wm;
+
+
+class InitialController extends Controller
+{
+
+
+    //初始化门店数据
+    public function mall()
+    {
+
+        $st_app = StApp::where('enable',1)->get();
+
+        if( !$st_app -> isEmpty()){
+
+            foreach ( $st_app as $app ){
+
+                switch( $app -> id ){
+                    case '1' :
+
+                        break;
+                    case '2' :  //饿了么
+
+                        $args_data = [
+                            'page' => 0 ,
+                            'page_size' => 20
+                        ];
+
+                        $res = Wm::send('EleMe.Shop.get_shop_list',$args_data);
+
+                        if( $res['code'] != 200 ){
+                            return response()->json(['code' => 10001,'message' => $res['message']]);
+                        }
+
+                        foreach ( $res['data']['authorizedShops'] as $shop ){
+
+                            $args = [
+                                'shop_id' => $shop['id']
+                            ];
+
+                            $mall_data = Wm::send('eleme.shop.get_shop',$args);
+
+                            if( $res['code'] != 200 ){
+                                return response()->json(['code' => 10002,'message' => $res['message']]);
+                            }
+
+                            $st_mall = StMall::where('code',$mall_data['data']['openId'])->first();
+
+                            if( !$st_mall ){
+
+                                $province_id = '';
+                                $city_id = '';
+                                $county_id = '';
+
+                                $province_data = StRegion::where([['name','like',$mall_data['data']['provinceName'].'%'],['level',1]] )->first();
+                                $city_data = StRegion::where([['name','like',$mall_data['data']['cityName'].'%'],['level',2]] )->first();
+                                $county_data = StRegion::where([['name','like',$mall_data['data']['districtName'].'%'],['level',3]] )->first();
+
+                                if( $province_data ){
+                                    $province_id = $province_data ->id ;
+                                }
+
+                                if( $city_data ){
+                                    $city_id = $city_data -> id ;
+                                }
+
+                                if( $county_data ){
+                                    $county_id = $county_data -> id ;
+                                }
+
+                                //营业时间
+                                $business_time_type = 1;
+
+                                $business_time = implode(',',$mall_data['data']['servingTime']);
+
+                                if( strpos($business_time , '00:00:00-23:59:59')){
+                                    $business_time_type = 0 ;
+                                }
+
+                                $st_mall = new StMall();
+                                $st_mall -> creator = 'system';
+                                $st_mall -> name = $mall_data['data']['name'];
+                                $st_mall -> code = $mall_data['data']['openId'];
+                                $st_mall -> province = $mall_data['data']['provinceName'];
+                                $st_mall -> city = $mall_data['data']['cityName'];
+                                $st_mall -> county = $mall_data['data']['districtName'];
+                                $st_mall -> province_id = $province_id;
+                                $st_mall -> city_id = $city_id;
+                                $st_mall -> county_id = $county_id;
+                                $st_mall -> address = $mall_data['data']['addressText'];
+                                $st_mall -> latitude = $mall_data['data']['latitude'];
+                                $st_mall -> longitude = $mall_data['data']['longitude'];
+                                $st_mall -> phone = implode(',',$mall_data['data']['phones']);
+                                $st_mall -> mobile = $mall_data['data']['mobile'];
+                                $st_mall -> business_time_type = $business_time_type;
+                                $st_mall -> business_time = $business_time;
+                                $st_mall -> status = $mall_data['data']['isOpen'];
+                                $st_mall -> logo = $mall_data['data']['imageUrl'];
+                                $st_mall -> shar_rate = 1;
+                                $st_mall ->save();
+
+                                $st_app_mall = StAppMall::where([['mall_code',$mall_data['data']['openId']],['app_id',2]])->first();
+
+                                if( !$st_app_mall ){
+
+                                    $st_app_mall = new StAppMall();
+                                    $st_app_mall -> creator = 'system';
+                                    $st_app_mall -> mall_id = $st_mall -> id;
+                                    $st_app_mall -> mall_name = $st_mall -> name;
+                                    $st_app_mall -> mall_code = $st_mall -> code ;
+                                    $st_app_mall -> status = $st_mall -> status ;
+                                    $st_app_mall -> online_status = 0 ;
+                                    $st_app_mall -> app_id = 2 ;
+                                    $st_app_mall -> o_mall_id = $mall_data['data']['id'];
+                                    $st_app_mall ->save();
+                                }
+                            }
+                        }
+
+                        break;
+                    case '3' :
+
+                        break;
+                    case '4' :
+
+                        break;
+                }
+            }
+        }
+
+        return response()->json(['code'=>200, 'message'=>'ok']);
+
+    }
+
+
+    /**
+     * 根据区域名称查询区域Id
+     * @param $name
+     * @param $p_id
+     * @param int $level
+     * @return array|int
+     */
+    private function regionIdByName($name, $p_id, $level = 1) {
+
+        if (empty($name)) {
+            return 0;
+        }
+
+        if ($level == 1) {
+            if (mb_strrpos($name, '省')) {
+                $name = mb_substr($name, 0, mb_strrpos($name, '省')).'%';
+            }
+        } else if ($level == 2) {
+            if (mb_strrpos($name, '市')) {
+                $name = mb_substr($name, 0, mb_strrpos($name, '市')).'%';
+            }
+        } else {
+            if (mb_strrpos($name, '县')) {
+                $name = mb_substr($name, 0, mb_strrpos($name, '县')).'%';
+            } else if (mb_strrpos($name, '区')) {
+                $name = mb_substr($name, 0, mb_strrpos($name, '区')).'%';
+            }
+        }
+
+        if ($p_id > 0) {
+            $region = StRegion::where(['p_id'=>$p_id, 'level'=>$level])
+                ->where('name', 'like', $name)
+                ->first();
+        } else {
+            $region = StRegion::where('level', $level)
+                ->where('name', 'like', $name)
+                ->first();
+        }
+
+        return $region ? [$region->id, $region->name] : 0;
+
+    }
+
+
+    //初始化商品分类数据
+    public function category()
+    {
+
+        return response()->json(['code'=>200, 'message'=>'ok']);
+
+    }
+
+
+    //初始化商品数据
+    public function goods()
+    {
+
+        return response()->json(['code'=>200, 'message'=>'ok']);
+
+    }
+
+
+    //初始化商品价格
+    public function price()
+    {
+
+        return response()->json(['code'=>200, 'message'=>'ok']);
+
+    }
+
+
+    //初始化商品库存
+    public function store()
+    {
+
+        return response()->json(['code'=>200, 'message'=>'ok']);
+
+    }
+
+
+}

@@ -1,0 +1,289 @@
+<?php
+
+namespace App\Http\Controllers\Admin\Analyse;
+
+use Illuminate\Http\Request;
+use App\Models\Common\MultiDataExport;
+use DB;
+use App\Http\Controllers\Controller;
+
+class BillSaleController extends Controller
+{
+
+    public function report(Request $request)
+    {
+
+        $startDate = $request->input('startDate');
+        $endDate = $request->input('endDate');
+        $mall_id = $request->input('mall_id');
+        $where = [];
+
+        if ( !empty($mall_id) ) {
+            $where[] = ['mall_id',$mall_id];
+        }
+
+        if ( !empty( $startDate ) ) {
+            $where[] = ['cal_date','>=',$startDate];
+        }
+
+        if ( !empty( $endDate ) ) {
+            $where[] = ['cal_date','<=',$endDate];
+        }
+
+        $data = DB::table('st_stat_mall_analyse')
+            ->leftJoin('st_app','st_app.id','=','st_stat_mall_analyse.app_id')
+            ->select(DB::raw('cal_date,app_id,name,SUM(total_user_fee) AS total_user_fee, SUM(total_mall_fee) AS total_mall_fee ,
+            SUM(total_sale_bill_num) AS total_sale_bill_num,SUM(total_cancel_bill_num) AS total_cancel_bill_num'))
+            ->where($where)
+            ->groupBy('cal_date','app_id')
+            ->orderBy('cal_date','ASC')
+            ->get();
+
+        $return_array = array(
+            'total' => array(),
+            'report' => array()
+        );
+
+        if ( empty($data) ) {
+            return response()->json($return_array);
+        }
+
+
+        $total_array = array(
+            'total_money' => 0,
+            'total_income' => 0,
+            'useful_bill' => 0,
+            'cust_price' => 0
+        );
+        $report_array = array();
+
+        foreach ( $data as $d ) {
+
+            if ( !isset($report_array[$d->cal_date]) ) {
+                $report_array[$d->cal_date] = [];
+            }
+            if (!isset($report_array[$d->cal_date][$d->app_id])) {
+                $report_array[$d->cal_date][$d->app_id] = array(
+                    'title' => $d->name,
+                    'num_1' => round($d->total_user_fee,2),
+                    'num_2' => round($d->total_mall_fee,2),
+                    'num_3' => $d->total_sale_bill_num-$d->total_cancel_bill_num
+                );
+
+                $total_array['total_money'] += round($d->total_user_fee,2);
+                $total_array['total_income'] += round($d->total_mall_fee,2);
+                $total_array['useful_bill'] += $d->total_sale_bill_num-$d->total_cancel_bill_num;
+
+            }
+
+        }
+
+        if ( $total_array['useful_bill']>0 ) {
+            $total_array['cust_price'] = round(($total_array['total_money']/$total_array['useful_bill']),2);
+        }
+
+        $return_array['total'] = $total_array;
+        $return_array['report'] = $report_array;
+
+        return response()->json($return_array);
+
+    }
+
+    public function saleList(Request $request)
+    {
+
+        $startDate = $request->input('startDate');
+        $endDate = $request->input('endDate');
+        $mall_id = $request->input('mall_id');
+        $pageIndex = $request->input('page',1);
+        $pageSize = $request->input('limit',10);
+
+        $where = [];
+
+        if ( !empty($mall_id) ) {
+            $where[] = ['mall_id',$mall_id];
+        }
+
+        if ( !empty( $startDate ) ) {
+            $where[] = ['cal_date','>=',$startDate];
+        }
+
+        if ( !empty( $endDate ) ) {
+            $where[] = ['cal_date','<=',$endDate];
+        }
+
+        $total = DB::table('st_stat_mall_analyse')
+            ->select(DB::raw('DISTINCT(cal_date)'))
+            ->where($where)
+            ->get()->toArray();
+
+        $data = DB::table('st_stat_mall_analyse')
+            ->select(DB::raw('DISTINCT(cal_date)'))
+            ->where($where)
+            ->orderBy('cal_date','DESC')
+            ->paginate($pageSize)
+            ->toArray();
+
+        if ( !count($total) ) {
+            return response()->json([]);
+        }
+
+        $page_link = '';
+        if ( count($total) ) {
+            $page_link = page($pageIndex, count($total), $pageSize, 'javascript:void(0)', 'admin.page');
+        }
+
+        $result_array = array(
+            'link'  =>  (string)$page_link,
+            'total' => count($total),
+            'data'  => array()
+        );
+
+        $rows = array();
+
+        foreach ($data['data'] as $d) {
+
+            $date_index = $d->cal_date;
+
+            $solo_data = DB::table('st_stat_mall_analyse')
+                ->leftJoin('st_app','st_app.id','=','st_stat_mall_analyse.app_id')
+                ->select(DB::raw('app_id,name,SUM(total_user_fee) AS total_user_fee,SUM(total_mall_fee) AS total_mall_fee, SUM(total_goods_num) AS total_goods_num ,
+                    SUM(total_sale_bill_num) AS total_sale_bill_num,SUM(total_cancel_bill_num) AS total_cancel_bill_num'))
+                ->where($where)
+                ->where('cal_date',$date_index)
+                ->groupBy('app_id')
+                ->get();
+
+            if (empty($solo_data)) {
+                continue;
+            }
+
+            foreach ( $solo_data as $s ) {
+
+                if ( !isset($rows[$date_index]) ) {
+                    $rows[$date_index] = [];
+                }
+
+                if ( !isset($rows[$date_index]['全部']) ) {
+                    $rows[$date_index]['全部'] = array(
+                        'sale_money' => 0,
+                        'expect_income' => 0,
+                        'bill_num' => 0,
+                        'cust_price' => 0
+                    );
+                }
+
+                if ( !isset($rows[$date_index][$s->name]) ) {
+                    $rows[$date_index][$s->name] = array(
+
+                        'sale_money' => $s->total_user_fee,
+                        'sale_rate' => 0,
+                        'expect_income' => $s->total_mall_fee,
+                        'income_rate' => 0,
+                        'bill_num' => $s->total_sale_bill_num-$s->total_cancel_bill_num,
+                        'bill_rate' => 0,
+                        'cust_price' => ($s->total_sale_bill_num-$s->total_cancel_bill_num)>0 ? round(($s->total_user_fee/($s->total_sale_bill_num-$s->total_cancel_bill_num)),2) : 0,
+                    );
+                }
+
+                $rows[$date_index]['全部']['bill_num'] += $s->total_sale_bill_num-$s->total_cancel_bill_num;
+                $rows[$date_index]['全部']['sale_money'] += $s->total_user_fee;
+                $rows[$date_index]['全部']['expect_income'] += $s->total_mall_fee;
+
+            }
+
+            if ( $rows[$date_index]['全部']['bill_num']>0 ) {
+                $rows[$date_index]['全部']['cust_price'] = round(($rows[$date_index]['全部']['sale_money']/$rows[$date_index]['全部']['bill_num']),2);
+            }
+
+            //计算渠道订单数比例&销售额比例
+            foreach ( $rows[$date_index] as $k=> $v ) {
+
+                if ( $k != '全部' && $rows[$date_index]['全部']['bill_num']>0 ) {
+                    $rows[$date_index][$k]['bill_rate'] = number_format($rows[$date_index][$k]['bill_num']/$rows[$date_index]['全部']['bill_num'],4,'.','')*100;
+                    $rows[$date_index][$k]['bill_rate'] = $rows[$date_index][$k]['bill_rate'].'%';
+                }
+
+                if ( $k != '全部' && $rows[$date_index]['全部']['sale_money']>0 ) {
+                    $rows[$date_index][$k]['sale_rate'] = number_format($rows[$date_index][$k]['sale_money']/$rows[$date_index]['全部']['sale_money'],4,'.','')*100;
+                    $rows[$date_index][$k]['sale_rate'] = $rows[$date_index][$k]['sale_rate'].'%';
+                }
+
+                if ( $k != '全部' && $rows[$date_index]['全部']['expect_income']>0 ) {
+                    $rows[$date_index][$k]['income_rate'] = number_format($rows[$date_index][$k]['expect_income']/$rows[$date_index]['全部']['expect_income'],4,'.','')*100;
+                    $rows[$date_index][$k]['income_rate'] = $rows[$date_index][$k]['income_rate'].'%';
+                }
+
+            }
+
+        }
+
+        $result_array['data'] = $rows;
+
+        return response()->json($result_array);
+
+    }
+
+    public function export(Request $request) {
+
+        $startDate = $request->input('startDate');
+        $endDate = $request->input('endDate');
+        $mall_id = $request->input('mall_id');
+        $exportIndex = $request->input('exportIndex','');
+
+        if ( empty( $exportIndex ) ) {
+            return response()->json(['code'=>10000,'message'=>'缺少导出索引']);
+        }
+
+        //实例大数据导出类
+        $multi_data_obj = new MultiDataExport();
+
+        //导出条件
+        $sql = '';
+
+        if ( !empty( $app_id ) ) {
+            $sql .= ' AND mall_id = '.$mall_id;
+        }
+        if ( !empty( $startDate ) ) {
+            $sql .= ' AND cal_date >= '."'$startDate'";
+        }
+        if ( !empty( $endDate ) ) {
+            $sql .= ' AND cal_date <= '."'$endDate'";
+        }
+
+        if( $sql ) {
+            $sql = ' WHERE '.substr($sql , 4 );
+        }
+
+        $search_sql = "SELECT cal_date AS '日期',
+                                name AS '渠道',
+                                SUM(total_user_fee) AS '总营业额（元）',
+                                SUM(total_mall_fee) AS '预计收入（元）',
+                                SUM(total_sale_bill_num-total_cancel_bill_num) AS '有效订单数（单）',
+                                (IF(SUM(total_sale_bill_num-total_cancel_bill_num)>0,(SUM(total_user_fee)/SUM(total_sale_bill_num-total_cancel_bill_num)),0)) AS '客单价（元）'
+                                FROM st_stat_mall_analyse a LEFT JOIN st_app b
+                                ON a.app_id = b.id ".$sql.' GROUP BY cal_date,app_id';
+
+
+        /**
+         * ==========================
+         * 组装参数，生成导出数据
+         * ==========================
+         */
+
+        $title = '商管云销售分析导出';
+
+        $args_array = array(
+            'creator' => 'system',
+            'title' => $title. date('YmdHis'),
+            'exportIndex' => $exportIndex,
+            'sql' => $search_sql
+        );
+
+        $export_data = $multi_data_obj->add( $args_array );
+
+        return response()->json($export_data);
+
+    }
+
+}

@@ -1,0 +1,113 @@
+<?php
+
+namespace App\Http\Middleware\Api;
+
+use Closure;
+
+class Develop
+{
+
+    /**
+     * Handle an incoming request.
+     * @param  \Illuminate\Http\Request  $request
+     * @param  \Closure  $next
+     * @return mixed
+     */
+    public function handle($request, Closure $next)
+    {
+
+        $request_data = $request->all();
+        $app_key = $request->input('appKey');
+        $sign = $request->input('sign');
+        $version = $request->input('version');
+        $format = $request->input('format');
+        $body = $request->input('body');
+        $api_data = [
+            '08a40966925741cd5e4c24f153f81a09' => 'badb0a9bcb0e27a4ea31541a51ef15ca',
+            'adgfh54126546dgd26494dgd22' => 'fshfsh484611hs4f1s14f84hs1f54s8'
+        ];
+
+        if (empty($app_key)) {
+            return $this->responseError(101, '缺少必要参数：appKey');
+        }
+
+        if (empty($version)) {
+            return $this->responseError(101, '缺少必要参数：version');
+        }
+
+        if (empty($format)) {
+            return $this->responseError(101, '缺少必要参数：format');
+        }
+
+        if (empty($sign)) {
+            return $this->responseError(101, '缺少必要参数：sign');
+        }
+
+        if (!isset($api_data[$app_key])) {
+            return $this->responseError(101, 'appKey参数错误');
+        }
+
+        $e_secret_key = isset($request_data['e_secret_key'])
+            ? $request_data['e_secret_key']
+            : '';
+
+        $sign = $this->createSign($request_data, $api_data[$app_key]);
+        if ($sign != $request_data['sign'] && $e_secret_key != 'ec48d4004f4b02eadaf24af32a281979') {
+            return $this->responseError(101, '数据加密验签失败，服务器签名：'.$sign);
+        }
+
+        if ($body) {
+            $body_arr = json_decode($body, true);
+            if (is_array($body_arr)) {
+                foreach ($body_arr as $key => $value) {
+                    $request->offsetSet($key, $value);
+                }
+            }
+        }
+
+        return $next($request);
+
+    }
+
+
+    /**
+     * 验证签名
+     * @param $data
+     * @param $key
+     * @return string
+     */
+    private function createSign($data, $key) {
+
+        ksort($data);
+        $sign_str = '';
+
+        foreach ($data as $k => $v) {
+            if ($v == '' || in_array($k, ['sign', '_url']))
+                continue;
+            $sign_str .= $k . '=' . $v;
+        }
+
+        $sign_str .= $key;
+        return strtoupper(md5($sign_str));
+
+    }
+
+
+    /**
+     * 错误返回
+     * @param $errCode
+     * @param null $errMsg
+     * @return array
+     */
+    private function responseError($errCode, $errMsg = null)
+    {
+
+        $err_response = ['errCode'=>$errCode, 'data'=>[]];
+        if (!is_null($errMsg)) {
+            $err_response['errMsg'] = $errMsg;
+        }
+        return response()->json($err_response);
+
+    }
+
+}

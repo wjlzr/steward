@@ -1,0 +1,125 @@
+@extends('admin.layout')
+
+@section('css')
+    <link rel="stylesheet" href="/css/admin/login.css?v=20180104000">
+@endsection
+
+@section('content')
+    <div style="display: none;">登录页</div>
+    <header class="login-header">
+        <div class="login-logo"><img src="/images/admin/login-logo.png"></div>
+        <div class="login-right">
+            <a href="javascript:;"><img src="/images/admin/icon/phone.png"></a>
+            <a href="javascript:;"><span>下载手机版商管家</span></a>
+        </div>
+    </header>
+    <div class="login-banner">
+        <div class="item-box">
+            <div class="login-box">
+                <div class="login-title">用户登录</div>
+                <div class="form">
+                    <div class="input-box">
+                        <input type="text" value="" id="login_name" placeholder="请输入用户名"/>
+                    </div>
+                    <div class="input-box">
+                        <input type="password" value="" id="password" placeholder="请输入密码"/>
+                    </div>
+                    <div class="input-box yzm">
+                        <input type="text"  placeholder="请输入验证码" class="yzm-input" />
+                        <div class="yzm-img"><img class="img-code" src="/kit/captcha"></div>
+                    </div>
+                    <div class="input-box">
+                        <p><input type="checkbox"><span>自动登录</span></p>
+                        <p><input type="checkbox"><span>记住用户名</span></p>
+                        <a href="javascript:;" class="forget-link">忘记密码？</a>
+                    </div>
+                    <button class="btn-login">登录</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="fot">Copyright © 2006-2017 上海志承软件有限公司 版权所有</div>
+@endsection
+
+@section('js')
+
+    <script type="text/javascript">
+
+        //登录
+        function login() {
+
+            var login_name = $.trim($('#login_name').val());
+            var password = $.trim($('#password').val());
+            var yzm = $.trim($('.yzm-input').val());
+
+            if ( E.isEmpty(login_name) ) {
+                layer.alert('请输入用户名',{icon:2});
+                $('#login_name').focus();
+                return false;
+            }
+
+            if ( E.isEmpty(password) ) {
+                layer.alert('请输入密码',{icon:2});
+                $('#password').focus();
+                return false;
+            } else if(!E.isPwd(password)) {
+                layer.alert('请输入正确的密码',{icon:2});
+                $('#password').focus();
+                return false;
+            }
+
+            if ( E.isEmpty(yzm) ) {
+                layer.alert('请输入正确的验证码',{icon:2});
+                $('.yzm-input').focus();
+                return false;
+            }
+
+            var layer_index = layer.load();
+            $.ajax({
+                type: 'GET',
+                url:'/admin/login/do',
+                data:{
+                    mobile : login_name,
+                    password : password,
+                    yzm : yzm
+                },
+                dataType: 'json',
+                success: function(obj) {
+                    layer.close(layer_index);
+                    if (obj.code == 200) {
+                        self.location = '/admin';
+                    }else{
+                        layer.alert(obj.message,{icon:2},function(){
+                            $('#login_name').focus();
+                            layer.closeAll();
+                        });
+                    }
+                }
+            });
+
+        }
+
+        $(function(){
+
+            $('#login_name').focus();
+
+            $('.img-code').click(function(){
+                var yzm_src = '/kit/captcha?code=' + Math.ceil(Math.random()*10000);
+                $(this).attr('src', yzm_src);
+            });
+
+            $('button').click(function(){
+                login();
+            });
+
+            $(document).keypress(function(e) {
+                if(e.which == 13) {
+                    login();
+                }
+            });
+
+        });
+
+    </script>
+@endsection
+

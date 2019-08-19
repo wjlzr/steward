@@ -1,0 +1,95 @@
+<?php
+
+namespace App\Services\Analyse;
+
+
+class BusinessService
+{
+
+    /**
+     * 营业分析
+     * @param $args = [
+     *      'mall_id' => int 门店ID
+     *      'app_id' => int 应用ID
+     *      'start_date' => string 开始日期
+     *      'end_date' => string 结束日期
+     * ]
+     * @return array = [
+     *      'turnover_board' => [
+     *          'turnover' => [
+     *              'turnover' => string 营业额
+     *              'front_turnover' => string 前几日营业额：昨日/前日/前7日/前30日
+     *              'goods_sell' => string 商品销售
+     *              'pack_income' => string 包装收入
+     *              'send_income' => string 配送收入
+     *          ],
+     *          'pay' => [
+     *              'pay' => string 总支出金额
+     *              'front_pay' => string 前几日总支出
+     *              'act_subsidy' => string 活动补贴
+     *              'service_cost' => string 服务费,即平台收取费用
+     *          ],
+     *          'income' => [
+     *             'income' => string 净收入
+     *             'front_income' => string 前几日净收入
+     *          ]
+     *      ]，
+     *      'orders_data' => [
+     *          'valid' => [
+     *              'valid' => int 有效订单数
+     *              'front_valid' => int 前几日有效订单数
+     *              'avg_price' => string 平均客单价
+     *          ],
+     *          'invalid' => [
+     *              'invalid' => int 无效订单数
+     *              'front_invalid' => int 前几日无效订单数
+     *              'loss' => string 预计损失金额
+     *          ]
+     *      ]
+     * ]
+     */
+    public function business($args)
+    {
+
+        $return_result = [
+            'turnover_board' => [
+                'turnover' => [
+                    'turnover' => '',
+                    'front_turnover' => '',
+                    'goods_sell' => '',
+                    'pack_income' => '',
+                    'send_income' => '',
+                ],
+                'pay' => [
+                    'pay' => '',
+                    'front_pay' => '',
+                    'act_subsidy' => '',
+                    'service_cost' => '',
+                ],
+                'income' => [
+                    'income' => '',
+                    'front_income' => '',
+                ]
+            ],
+
+
+            'orders_data' => [
+                'valid' => [
+                    'valid' => 0,
+                    'front_valid' => 0,
+                    'avg_price' => '',
+                ],
+                'invalid' => [
+                    'invalid' => 0,
+                    'front_invalid' => 0,
+                    'loss' => '',
+                ]
+            ]
+        ];
+
+        return $return_result;
+
+    }
+
+
+}

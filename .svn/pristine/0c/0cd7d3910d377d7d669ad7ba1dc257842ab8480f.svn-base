@@ -1,0 +1,88 @@
+<?php
+
+namespace App\Services\Analyse;
+
+
+class GoodsService
+{
+
+
+    /**
+     * 商品分析
+     * @param $args = [
+     *      'mall_id' => int 门店ID
+     *      'app_id' => int 应用ID
+     *      'goods_name' => string 商品名称(模糊匹配)
+     *      'start_date' => string 开始日期
+     *      'end_date' => string 结束日期
+     * ]
+     * @return array = [
+     *      'code' => string 商家编码/条形码
+     *      'goods_name' => string 商品名称
+     *      'sales_number' => int 销量
+     *      'sales_fee' => string 销售额
+     *      'unit_price' => string 均单价
+     * ]
+     */
+    public function goods($args)
+    {
+
+        $return_result = [
+            'code' => '',
+            'goods_name' => '',
+            'sales_number' => 0,
+            'sales_fee' => '',
+            'unit_price' => '',
+        ];
+        return $return_result;
+
+    }
+
+
+    /**
+     * 商品类别分析
+     * @param $args = [
+     *      'mall_id' => int 门店ID
+     *      'app_id' => int 应用ID
+     *      'category_id' => int 商品分类ID(多级分类下，必须传最小一级分类ID，否则无效)
+     *      'start_date' => string 开始日期
+     *      'end_date' => string 结束日期
+     * ]
+     * @return array = [
+     *      'one_category_name' => string 一级分类名称 【必须】
+     *      'two_category_name' => string  二级分类名称 【必须】(没有返回空字符串)
+     *      'three_category_name' => string 三级分类名称 【必须】(没有返回空字符串)
+     *      'sales_number' => int 销量【必须】
+     *      'sales_fee' => string 销售额【必须】
+     *      'app' => [
+     *          [
+     *              'app_name' => string 应用名称
+     *              'sales_number' => int 应用销量
+     *              'sales_fee' => string 应用销售额
+     *          ]
+     *      ]
+     * ]
+     */
+    public function category($args)
+    {
+
+        $return_result = [
+            'one_category_name' => '',
+            'two_category_name' => '',
+            'three_category_name' => '',
+            'sales_number' => 0,
+            'sales_fee' => '',
+            'app' => [
+                [
+                    'app_name' => '',
+                    'sales_number' => 0,
+                    'sales_fee' => '',
+                ]
+            ]
+        ];
+        return $return_result;
+
+    }
+
+
+}

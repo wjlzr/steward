@@ -1,0 +1,262 @@
+/*公共*/
+a {
+    text-decoration: none;
+    color: #000
+}
+* {
+    margin: 0;
+    padding: 0
+}
+/*订单*/
+em,i{
+    font-style: normal;
+}
+.order-list-detail li{
+    cursor: normal;
+    border:none;
+    font-size:14px;
+    color: #313131;
+}
+.top-item{
+    margin-bottom:10px;
+}
+.top-item span.order-num{
+    margin-left:10px;
+}
+.order-detail-content{
+    overflow: hidden;
+    zoom:1;
+    margin-top:30px;
+}
+.shop-list{
+    width: 67%;
+    float: left;
+    margin:0 1% 0;
+    border:1px solid #eee;
+    -webkit-border-radius: 10px;
+    -moz-border-radius: 10px;
+    border-radius: 10px;
+    padding-bottom:25px;
+    overflow: hidden;
+}
+.shop-list .goods-list{
+    padding-left:20px;
+    background:#fbfbfb
+}
+.cart-list{
+    float: left;
+    width:26%;
+    *width: 26%;
+    margin: 0 2% 40px;
+}
+.body-title{
+    border-bottom: 1px solid #eee;
+    line-height: 40px;
+}
+
+.order-title p span{
+    font-size: 14px;
+}
+.order-title p:first-child{
+    width: 60%;
+    text-align: left;
+}
+.shop-tab{
+    overflow: auto;
+}
+.shop-tab li{
+    border-bottom:1px solid #eee;
+    height: 100px;
+    padding: 0 20px;
+    white-space: nowrap;
+    min-width: 800px;
+}
+.shop-tab>li:first-child{
+    height: 40px;
+    line-height: 40px;
+}
+.shop-tab li .top-th{
+    width:10%;
+    display: inline-block;
+    text-align: center;
+    min-width: 80px;
+}
+.shop-tab li .top-th:first-child{
+    width: 55%;
+    text-align: left;
+}
+.list-shop-li{
+    width:10%;
+    height:100px;
+    line-height:100px;
+    display: inline-block;
+    text-align: center;
+    min-width: 80px;
+    zoom:1;
+    *display: inline;
+}
+.list-shop-li:first-child{
+    width:55%;
+    text-align: left;
+}
+.goods-item{
+    float: left;
+    width: 60%;
+    line-height:100px;
+}
+.goods-name{
+    height:100px;
+    overflow: hidden;
+    white-space: normal;
+    margin-left:5px;
+}
+.goods-item:first-child{
+    width:80px;
+}
+.list-shop-li:first-child .goods-name{
+    line-height:25px;
+    vertical-align: middle;
+    display: inline-block;
+    zoom:1;
+    *display: inline;
+    display: table;
+}
+.goods-item span{
+    /*line-height: 25px;*/
+    vertical-align: middle;
+    display: inline-block;
+    zoom:1;
+    *display: inline;
+}
+.goods-name-spec{
+    display: table-cell !important;
+}
+.total{
+    float: right;
+    width:220px;
+    margin-top:20px;
+    padding-right: 40px;
+}
+.total p{
+    line-height: 20px;
+    text-align: right;
+    margin-top:35px;
+}
+.total .text{
+    float: left;
+}
+.total .value{
+    top:0;
+    right:0;
+    line-height:20px;
+    margin:0;
+    padding:0;
+}
+.distru-box{
+    padding: 10px 0 0;
+}
+.distru-box p{
+    line-height: 26px;
+
+}
+.distru-box p .phone, .distru-box p .name{
+    font-size:14px;
+}
+.distru-box span{
+    margin-right: 10px;
+}
+.gray-text-sm{
+    color: #999;
+    font-size: 12px;
+}
+.logistics{
+    padding:20px 0;
+}
+.logistics-list{
+    position: relative;
+}
+.logistics-list li{
+    padding: 10px 0;
+    position: relative;
+}
+.logistics-list li .border-line-top{
+    border-left:1px solid #eee;
+    width:1px;
+    height:50%;
+    position: absolute;
+    top:0;
+    left:10px;
+}
+.logistics-list li .border-line-bot{
+    border-left:1px solid #eee;
+    width:1px;
+    height:50%;
+    position: absolute;
+    bottom:0;
+    left:10px;
+}
+.logistics-list li .circle{
+    font-size:60px;
+    line-height:30px;
+    position: absolute;
+    top:0;
+    left: 5px;
+    background: url("/images/admin/circle.png") no-repeat center center;
+    -webkit-background-size: 6px;
+    background-size: 6px;
+    width:12px;
+    height:100%;
+    z-index:1000;
+}
+.logistics-list li.on .circle{
+    font-size:60px;
+    line-height:30px;
+    position: absolute;
+    top:0;
+    left: 5px;
+    background: url("/images/admin/circle-light.png") no-repeat center center;
+    -webkit-background-size: 12px;
+    background-size: 12px;
+    width:12px;
+    height:100%;
+    z-index:1000;
+}
+.logistics-list li.on .active{
+    color: #5f8af7;
+}
+.logistics-list li.on .border-line-bot{
+    border-left:none;
+}
+.logistics-list li:first-child .border-line-top{
+    border-left:none;
+}
+/*.logistics-list>li+li .border-line-top{*/
+    /*top:-50%;*/
+/*}*/
+/*.logistics-list>li+li .border-line-bot{*/
+    /*top:0;*/
+/*}*/
+.text-box{
+    margin-left: 25px;
+    line-height:22px;
+}
+.mid-info{
+    float: left;
+    padding-left: 50px;
+}
+.mid-info p{
+    color: #666;
+    line-height:30px;
+}
+.detail-mark{
+    line-height:30px;
+}
+.detail-lh{
+    line-height:30px;
+    color:#313131 !important;
+}
+.detail-th{
+    border-bottom:1px solid #eee;
+    overflow: hidden;
+    margin:10px 0 20px
+}

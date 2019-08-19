@@ -1,0 +1,25 @@
+<?php
+
+namespace App\Http\Controllers\Api\Analyse;
+
+use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
+
+use App\Services\Analyse\GoodsService;
+
+
+class GoodsController extends Controller
+{
+
+    //销售分析接口
+    public function goods(Request $request)
+    {
+
+        $goods_service = new GoodsService();
+        $goods_result = $goods_service->sell($request->input());
+        return response()->json(['code'=>200, 'data'=>$goods_result]);
+
+    }
+
+
+}

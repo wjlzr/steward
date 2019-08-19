@@ -1,0 +1,59 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+
+use App\Models\StApp;
+
+
+class InitialController extends Controller
+{
+
+
+    //初始化门店数据
+    public function mall()
+    {
+
+        return response()->json(['code'=>200, 'message'=>'ok']);
+
+    }
+
+
+    //初始化商品分类数据
+    public function category()
+    {
+
+        return response()->json(['code'=>200, 'message'=>'ok']);
+
+    }
+
+
+    //初始化商品数据
+    public function goods()
+    {
+
+        return response()->json(['code'=>200, 'message'=>'ok']);
+
+    }
+
+
+    //初始化商品价格
+    public function price()
+    {
+
+        return response()->json(['code'=>200, 'message'=>'ok']);
+
+    }
+
+
+    //初始化商品库存
+    public function store()
+    {
+
+        return response()->json(['code'=>200, 'message'=>'ok']);
+
+    }
+
+
+}

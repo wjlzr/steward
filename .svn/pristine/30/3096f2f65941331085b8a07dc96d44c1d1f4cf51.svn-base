@@ -1,0 +1,1037 @@
+<?php
+
+namespace App\Http\Controllers\Api\Order;
+
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+
+use App\Services\Order\OrderSearchService;
+use App\Services\Order\OrderEditService;
+
+
+class OrderController extends Controller
+{
+
+
+    /**
+     * 订单列表接口
+     * @param Request $request
+     * @return array
+     */
+    public function index(Request $request)
+    {
+
+        $list_type = $request->input('list_type', 0);
+        $app_id = $request->input('app_id', 0);
+        $mall_id = $request->input('mall_id', 0);
+        $page_size = $request->input('page_size', 10);
+        $client = $request->input('client', 0);
+
+        $order_search = new OrderSearchService();
+        $order_result = $order_search->index($list_type, $mall_id, $page_size, $app_id, $client);
+        return response()->json([ 'code'=>200, 'message'=>'ok', 'data'=>$order_result ]);
+
+    }
+
+    //订单列表数据查询
+    public function search(Request $request)
+    {
+
+        $order_search = new OrderSearchService();
+        $order_result = $order_search->search($request->input());
+        return response()->json(['code'=>200, 'message'=>'ok', 'data'=>$order_result]);
+
+    }
+
+    //订单详情
+    public function detail($id)
+    {
+
+        $order_search = new OrderSearchService();
+        $order_result = $order_search->detail($id);
+        return response()->json($order_result);
+
+    }
+
+    /**
+     * 同意申请取消单/退单
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function agreeRefund (Request $request)
+    {
+
+        $order_id = $request->input('order_id');
+        $user_name = $request->input('user_name');
+
+        $order_edit = new OrderEditService();
+        $order_result = $order_edit->agreeRefund($order_id, $user_name);
+        return response()->json($order_result);
+
+    }
+
+    /**
+     * 不同意申请
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function disagreeRefund (Request $request)
+    {
+
+        $order_id = $request->input('order_id');
+        $user_name = $request->input('user_name');
+        $refuse_reason = $request->input('refuse_reason', '');
+
+        if (empty($refuse_reason)) {
+            return response()->json([ 'code'=>400 , 'message'=>'请填写拒绝原因']);
+        }
+
+        $order_edit = new OrderEditService();
+        $order_result = $order_edit->disagreeRefund($order_id, $refuse_reason, $user_name);
+        return response()->json($order_result);
+
+    }
+
+    /**
+     * 订单发货接口
+     * @param $request
+     * @return array
+     */
+    public function delivery(Request $request)
+    {
+
+        $bill_no = $request->input('bill_no');
+        $express_id = $request->input('express_id');
+        $user_id = Redis::get('WDH_STEWARD_USER_ID_' . session_id());
+
+        if (empty($bill_no)) {
+            return response()->json([ 'code'=>100000 , 'message'=>'缺少参数bill_no' ]);
+        }
+
+        $mall_user = MallUser::find($user_id);
+        if (!$mall_user) {
+            return response()->json(['code'=>100001, 'message'=>'营业员没有找到']);
+        }
+        $opreator = '营业员：'. $mall_user->name;
+
+        $bill_data = Bill::find($bill_no);
+        if(!$bill_data){
+            return response()->json([ 'code' => 100002 , 'message' => '订单信息不存在' ]);
+        }else if($bill_data->order_receive != 1){
+            return response()->json([ 'code' => 100002 , 'message' => '订单未接单' ]);
+        }
+
+        $error_array = [
+            2 => '订单已发货',
+            4 => '订单已完成',
+            5 => '订单已取消',
+        ];
+
+        if ( isset( $error_array[$bill_data->bill_status] ) ) {
+            return response()->json([ 'code' => 100003 , 'message' => $error_array[$bill_data->bill_status]] );
+        }else if ( $bill_data->bill_refund_status > 0 ) {
+            return response()->json([ 'code' => 100003 , 'message' => '订单已申请退款']);
+        }
+
+        $update = [
+            'bill_logistics_status' => 0,
+            'bill_status' => 2,
+            'verify_time' => date('Y-m-d H:i:s')
+        ];
+
+        if ($bill_data->ziti != 1) {
+
+            if (!in_array($express_id, ['0', 1, 2])) {
+                return response()->json([ 'code' => 400 , 'message' => '请选择配送方式' ]);
+            }
+
+            if (!in_array($express_id, ['0', 1, 2])) {
+                return response()->json([ 'code' => 100004 , 'message' => '订单配送方式错误']);
+            }
+
+            if ($express_id == 0) {
+
+                $update['bill_logistics_status'] = 0;
+                $update['bill_status'] = 2;
+                $update['verify_time'] = date('Y-m-d H:i:s');
+                $update['send_deliver_type'] = 1;
+                $update['bill_logistics_status'] = 2;
+                $update['express_company'] = '门店自配送';
+                $update['express_number'] = '';
+
+            } else {
+
+                if ($express_id == 1) {
+                    $express_company = '达达';
+                    $send_url = G_WEBSITE_DOMAINNAME.'/logistics/data/order';
+                } else {
+                    $express_company = '蜂鸟';
+                    $send_url = G_WEBSITE_DOMAINNAME .'/logistics/fengniao/order';
+                }
+
+                $update['send_deliver_type'] = 2;
+                $update['bill_status'] = 2;
+                $update['verify_time'] = date('Y-m-d H:i:s');
+                $update['bill_logistics_status'] = 1;
+                $update['express_company'] = $express_company;
+
+                $goods_arr = [];
+                $goods_list = BillGoods::getGoods($bill_no);
+                if($goods_list){
+                    foreach($goods_list as $val){
+                        $goods_arr[] = [
+                            'product_code' => $val['product_code'],
+                            'goods_name' => $val['goods_name'],
+                            'goods_amount' => $val['goods_amount'],
+                            'goods_storePrice' => $val['goods_storePrice'],
+                            'goods_purchasePrice' => $val['goods_purchasePrice'],
+                        ];
+                    }
+
+                    $mall_master = MallMaster::find($bill_data->mallID);
+                    $send_request = [
+                        'goods' => $goods_arr,
+                        'is_invoiced' => $bill_data->invoice,
+                        'remark' => $bill_data->remark,
+                        'bill_no' => $bill_data->bill_no,
+                        'mallCode' => $bill_data->mallCode,
+                        'mallName' => $bill_data->mallName,
+                        'mallAddress' => $bill_data->address,
+                        'mallLng' => $mall_master->longitude,
+                        'mallLat' => $mall_master->latitude,
+                        'mallPhone' => $mall_master->phone,
+                        'bill_totalMoney' => $bill_data->bill_totalMoney,
+                        'bill_payable' => $bill_data->bill_payable,
+                        'pay_status' => $bill_data->pay_status,
+                        'pay_type' => $bill_data->pay_type,
+                        'bill_total_amount' => $bill_data->bill_total_amount,
+                        'deliver_name' => $bill_data->deliver_name,
+                        'deliver_mobile' => $bill_data->deliver_mobile,
+                        'deliver_cityid' => $bill_data->deliver_cityid,
+                        'deliver_address' => $bill_data->deliver_address,
+                    ];
+                }
+            }
+        }
+
+        try {
+
+            DB::beginTransaction();
+
+            Bill::where('bill_no', $bill_no)->update($update);
+
+            BillTrace::insert([
+                'uuid'=>makeUuid(),
+                'creator'=>$opreator,
+                'createTime'=>Carbon::now(),
+                'timeStamp'=>Carbon::now(),
+                'bill_no'=>$bill_no,
+                'bill_status'=>2,
+                'content'=>'您的订单已发货'
+            ]);
+
+            WdhService::pushBillToErp([
+                'bill_status' => 2,
+                'bill_no' => $bill_no
+            ]);
+
+            if (isset($send_request, $send_url)) {
+
+            }
+
+            if ($bill_data->billType == 21 && $bill_data->billPlatform == 31) {
+
+                $wm_bill = WmBill::where('bill_no', $bill_no)->first();
+                if (!$wm_bill) {
+                    throw new Exception('该外卖订单不存在', 404);
+                }
+
+                $p_alias = self::$wm_platform[$bill_data->billPlatform];
+                $send_result = Wm::send( $p_alias. '.order.send_out_order', $wm_bill->wm_bill_no);
+                if ($send_result['code'] != 200) {
+                    throw new Exception($send_result['message'], 400);
+                }
+
+            }
+
+            DB::commit();
+            return response()->json([ 'code' => 200 , 'message' => '订单操作成功']);
+
+        }catch (Exception $e) {
+            DB::rollBack();
+            return response()->json([ 'code'=>$e->getCode() , 'message'=>$e->getMessage()]);
+        }
+
+    }
+
+    /**
+     * 订单取消接口
+     * @param $request
+     * @return array
+     */
+    public function cancel(Request $request) {
+
+        $bill_no = $request->input('bill_no', '');
+        $reason = $request->input('reason', '');
+        $reasonId = $request->input('reasonId');
+        $user_id = Redis::get('WDH_STEWARD_USER_ID_' . session_id());
+
+        if (empty($bill_no)) {
+            return response()->json([ 'code'=>400 , 'message'=>'缺少参数bill_no' ]);
+        }
+
+        if (empty($reason)){
+            return response()->json([ 'code'=>400 , 'message'=>'取消原因不能为空' ]);
+        }
+
+        if (!isset($reasonId) || empty($reasonId)){
+            return response()->json([ 'code' => 400 , 'message' => '取消原因ID不能为空' ]);
+        }
+
+        $mall_user = MallUser::where('user_id', $user_id)->first();
+        if (!$mall_user) {
+            return response()->json(['code'=>400, 'message'=>'营业员信息没有找到']);
+        }
+
+        $opreator = $mall_user->name;
+        $error_array = [
+            2 => '订单已发货，不能再取消',
+            3 => '订单已配送，不能再取消',
+            4 => '订单已完成，不能再取消',
+            5 => '订单已取消，不能再取消'
+        ];
+
+        $bill_data = Bill::where('bill_no', $bill_no)->first();
+        if ( !$bill_data) {
+            return response()->json(['code'=>404 , 'message'=>'订单信息不存在']);
+        }
+
+        if (isset($error_array[$bill_data->bill_status])) {
+            return response()->json(['code'=>404 , 'message'=>$error_array[$bill_data->bill_status]]);
+        }
+
+        if ($bill_data->billType == 21) {
+            $wm_bill = WmBill::where('bill_no', $bill_no)->first();
+            if (!$wm_bill) {
+                return response()->json(['code'=>404 , 'message'=>'该外卖订单不存在']);
+            }
+            $send_result = Wm::send( self::$wm_platform[$bill_data->billPlatform]. '.order.cancel_order', [
+                'order_id' => $wm_bill->wm_bill_no,
+                'type' => $reasonId,
+                'remark' => $reason
+            ]);
+            if ($send_result['code'] != 200) {
+                return response()->json(['code'=>400 , 'message'=>$send_result['message']]);
+            }
+        }
+
+        $res = WdhService::cancel([
+            'bill_no' =>$bill_no,
+            'cancel_reason' =>$reason,
+            'custID' =>$opreator,
+            'bill_status' =>5
+        ]);
+
+        if ( $res['code'] != 200) {
+            return response()->json(['code'=>$res['code'] , 'message'=>$res['message']]);
+        }
+
+        return response()->json(['code'=>200 , 'message'=>'取消成功']);
+
+    }
+
+    /**
+     * 订单完成接口
+     * @param $request
+     * @return array
+     */
+    public function finish(Request $request) {
+
+        $bill_no = $request->input('bill_no');
+        $user_id = Redis::get('WDH_STEWARD_USER_ID_' . session_id());
+
+        if (empty($bill_no)) {
+            return response()->json([ 'code' => 100000 , 'message' => '缺少参数bill_no' ]);
+        }
+
+        $bill_master = Bill::find($bill_no);
+        if (!$bill_master) {
+            return response()->json([ 'code' => 100001 , 'message' => '订单信息没有找到']);
+        }
+
+        $mall_user = MallUser::find($user_id);
+        if (!$mall_user) {
+            return response()->json(['code'=>10002, 'message'=>'操作者信息没有找到']);
+        }
+
+        if ($bill_master->billType == 21) {
+            $wm_bill = WmBill::where(['bill_no'=>$bill_no])->first();
+            if (!$wm_bill) {
+                return response()->json(['code'=>404, 'message'=>'外卖订单没有找到']);
+            }
+            $result_array = Wm::send(self::$wm_platform[$bill_master->billPlatform]. '.order.delivered_order', [
+                'order_id'=>$wm_bill->wm_bill_no
+            ]);
+            if ($result_array['code'] != 200) {
+                return response()->json(['code'=>$result_array['code'], 'message'=>$result_array['message']]);
+            }
+        }
+
+        $res = WdhService::bill_finish([
+            'bill_no' => $bill_no,
+            'opreator' => $mall_user->name
+        ]);
+
+        if ( $res['code'] != 200) {
+            return response()->json([ 'code'=>100003 , 'message'=>'操作失败！']);
+        }
+
+        return response()->json([ 'code'=>200 , 'message'=>'操作成功！']);
+
+    }
+
+    /**
+     * 确认退货接口
+     * @param Request $request
+     * @return array|\Illuminate\Http\JsonResponse
+     */
+    public function receiveReturn (Request $request) {
+
+        $return_no = $request->input('return_no');
+        if (!isset($return_no) || !ebsig_is_int($return_no)) {
+            return response()->json([ 'code' => 400 , 'message' => '退货号信息不能为空' ]);
+        }
+        $opreator = $request->input('营业员：'.'employee_number','system');
+
+        //退货的在线支付数组
+        $online_pay_data = array();
+
+        //退回的积分数组
+        $points_data = array();
+
+        //退货的余额数组
+        $balance_data = array();
+
+        //货到付款退款
+        $refund_amount = 0;
+
+        try {
+
+            //查询退换货单信息
+            $return_obj = BillReturn::where(['return_no'=>$return_no])->toArray();
+
+            if (!$return_obj) {
+                throw new Exception('退货单信息没有找到', 404);
+            }
+            if ($return_obj['return_status'] == 1) {
+                throw new Exception('退货单未审核', 404);
+            }
+            if ($return_obj['return_status'] == 3) {
+                throw new Exception('退货单已完成', 404);
+            }
+            if ($return_obj['return_status'] == 4) {
+                throw new Exception('退货单未通过审核', 404);
+            }
+            if ($return_obj['return_status'] == 5) {
+                throw new Exception('退货单已退款', 404);
+            }
+
+            //查询订单主表信息
+            $bill_data = Bill::getBill($return_obj['bill_no'])->toArray();
+            if (!$bill_data) {
+                throw new Exception('订单信息没有找到', 404);
+            }
+
+            //查询订单支付信息
+            $bill_pay_data = WdhService::bill_pay($return_obj['bill_no']);
+            foreach($bill_pay_data as $pay) {
+                if ($pay['type'] == 1) {
+                    if ($bill_data['bill_status'] == 4) {
+                        $refund_amount = $return_obj['return_price'];
+                    }
+                } else if ($pay['type'] == 2) {
+                    $refund_amount = $return_obj['return_price'];
+                    $online_pay_data = $pay;
+                } else if ($pay['type'] == 4) {
+                    $balance_data = array(
+                        'amount' => $pay['pay_amount'],
+                        'remark' => '订单' . $return_obj['bill_no'] . '退货，退回余额'
+                    );
+                } else if ($pay['type'] == 5) {
+                    $points_data = array(
+                        'points' => $pay['pay_amount'],
+                        'remark' => '订单' . $return_obj['bill_no'] . '退货，退回积分'
+                    );
+                }
+            }
+
+        } catch (Exception $e) {
+
+            return return_exception($e, '退货单收货');
+        }
+
+
+        try {
+
+            DB::beginTransaction();
+
+            //更新退货单
+            BillReturn::where(['return_no'=>$return_no])->update(['return_status'=>3]);
+            if (!empty($points_data) || !empty($online_pay_data) || !empty($balance_data) || $refund_amount > 0) {
+
+                //生产已审核的退款单
+                $refund_data = array(
+                    'bill_no' => $bill_data['bill_no'],
+                    'linkMan' => $bill_data['deliver_name'],
+                    'mobile' => $bill_data['deliver_mobile'],
+                    'refund_reason_id' => 0,
+                    'refund_reason' => '订单退货',
+                    'refund_amount' => $refund_amount,
+                    'refund_source' => 1,
+                    'refund_status' => empty($online_pay_data) ? 1 : 2,
+                    'refund_type' => empty($online_pay_data) ? 1 : 2,
+                    'operator' => $opreator,
+                    'return_no' => $return_no,
+                    'refund_onlinepay_status' => empty($online_pay_data) ? 0 : 2,
+                    'confirmor' => 'system',
+                    'confirm_time'  => date('Y-m-d H:i:s',time())
+                );
+                $result_data = WdhService::refund_single($refund_data);
+                if ($result_data['code'] != 200) {
+                    throw new Exception($result_data['message'], $result_data['code']);
+                }
+
+                //退款操作
+                if (!empty($points_data) || !empty($online_pay_data) || !empty($balance_data)) {
+
+                    //$result_data = $bill_refund_obj->refund($result_data['data']['refund_no'], $bill_data['pcustID'], $bill_data['custID'], $balance_data, $points_data, $online_pay_data);
+                    if ($result_data['code'] != 200) {
+                        throw new Exception($result_data['message'], $result_data['code']);
+                    }
+                }
+            }
+
+            DB::commit();
+
+        } catch (Exception $e) {
+            DB::rollBack();
+            return return_exception($e, '新增退货');
+        }
+
+        return response()->json([ 'code' => 200 , 'message' => 'ok' ]);
+
+    }
+
+    /**
+     * 订单接单
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function receive(Request $request)
+    {
+
+        $bill_no = $request->input('bill_no');
+        $user_id = Redis::get('WDH_STEWARD_USER_ID_' . session_id());
+
+        if (empty($bill_no)) {
+            return response()->json(['code' => 100001, 'message' => '缺少参数bill_no']);
+        }
+
+        $mall_user = MallUser::find($user_id);
+        if (!$mall_user) {
+            return response()->json(['code'=>100002, 'message'=>'营业员信息没有找到']);
+        }
+
+        $bill_master = Bill::find($bill_no);
+        if (!$bill_master) {
+            return response()->json(['code'=>100003, 'message'=>'订单信息没有找到']);
+        }
+
+        if ($bill_master->order_receive == 1) {
+            return response()->json(['code' => 100004, 'message' => '订单已接单']);
+        }
+        ;
+        if ($bill_master->pay_type == 2 && $bill_master->pay_status != 1) {
+            return response()->json(['code' => 100005, 'message' => '订单未付款']);
+        }
+
+        if ($bill_master->bill_refund_status > 0) {
+            return response()->json(['code' => 100006, 'message' => '订单已申请退款']);
+        }
+
+        try {
+
+            DB::beginTransaction();
+
+            Bill::where('bill_no', $bill_master->bill_no)->update([
+                'order_receive' => 1,
+                'timeStamp' => Carbon::now()
+            ]);
+
+            BillTrace::insert([
+                'uuid'=>makeUuid(),
+                'createTime'=>Carbon::now(),
+                'timeStamp'=>Carbon::now(),
+                'creator'=>$mall_user->name,
+                'bill_no'=>$bill_no,
+                'bill_status'=>1,
+                'content'=>'您的订单已接单'
+            ]);
+
+            if ($bill_master->billType == 21) {
+                $wm_bill = WmBill::where('bill_no', $bill_master->bill_no)->first();
+                if (!$wm_bill) {
+                    return response()->json(['code' => 404, 'message' => '该订单不存在']);
+                }
+                $send_result = Wm::send(self::$wm_platform[$bill_master->billPlatform].'.order.accept_order', [
+                        'order_id'=>$wm_bill->wm_bill_no
+                ]);
+                if ($send_result['code'] != 200) {
+                    return response()->json(['code'=>400 , 'message'=>$send_result['message']]);
+                }
+            }
+
+            DB::commit();
+            return response()->json(['code' => 200, 'message' => '订单接单成功']);
+
+        }catch (Exception $e) {
+            DB::rollBack();
+            return response()->json(['code' => 100007, 'message' => '订单接单失败']);
+        }
+
+    }
+
+    /**
+     * 回复催单
+     * @param $request
+     * @return array
+     */
+    public function remindReply (Request $request) {
+
+        $reply_message = $request->input('reply_message');
+        $bill_no = $request->input('bill_no');
+        $user_id = Redis::get('WDH_STEWARD_USER_ID_' . session_id());
+
+        if (empty($bill_no)) {
+            return response()->json(['code' => 400, 'message' => '缺少参数bill_no']);
+        }
+
+        if (empty($reply_message)) {
+            return response()->json(['code' => 400, 'message' => '请选择回复内容']);
+        }
+
+        $bill_master = Bill::find($bill_no);
+        if (!$bill_master) {
+            return response()->json(['code' => 404, 'message' => '订单信息没有找到']);
+        }
+
+        $mall_user = MallUser::find($user_id);
+        if (!$mall_user) {
+            return response()->json(['code'=>404, 'message'=>'营业员信息没有找到']);
+        }
+
+        try {
+
+            DB::beginTransaction();
+
+            BillApply::where('id', $bill_master->apply_id)->update([
+                'reply' => 1,
+                'reply_message' => $reply_message
+            ]);
+
+            Bill::where('bill_no', $bill_master->bill_no)->update([
+                'apply' => 0,
+                'apply_id' => 0
+            ]);
+
+            BillTrace::insert([
+                'uuid' => makeUuid(),
+                'createTime' => Carbon::now(),
+                'creator' => $mall_user->name,
+                'timeStamp' => Carbon::now(),
+                'bill_no' => $bill_no,
+                'bill_status' => $bill_master->bill_status,
+                'content'=>'催单已回复['.$reply_message.']',
+            ]);
+
+            if ($bill_master->billType == 21) {
+                $wm_bill = WmBill::where(['bill_no'=>$bill_no])->first();
+                if (!$wm_bill) {
+                    throw new Exception('外卖订单没有找到', 404);
+                }
+                $p_alias = self::$wm_platform[$bill_master->billPlatform];
+                $result_array = Wm::send( $p_alias. '.order.reply_remind', [
+                    'remind_id' => $wm_bill->remind_id,
+                    'reply_content' => $reply_message
+                ]);
+                if ($result_array['code'] != 200) {
+                    throw new Exception($result_array['message'], 400);
+                }
+            }
+
+            DB::commit();
+            return response()->json(['code' => 200, 'message' => '回复成功']);
+
+        } catch(Exception $e) {
+            DB::rollBack();
+            return response()->json(['code' => $e->getCode(), 'message' => $e->getMessage()]);
+        }
+
+    }
+
+    /**
+     * 订单挂起
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function hang(Request $request)
+    {
+
+        $bill_no=$request->input('bill_no');
+        if ( empty($bill_no)) {
+            return response()->json(['code' => 100001, 'message' => '订单号信息不能为空']);
+        }
+
+        $bill_master = Bill::find($bill_no);
+        if (empty($bill_master)) {
+            return response()->json(['code'=>100002, 'message'=>'订单信息没有找到']);
+        }
+
+        Bill::where('bill_no', $bill_no)->update(['hang_up' => 1]);
+
+        return response()->json(['code' => 200, 'message' => '订单挂起成功']);
+
+    }
+
+    /**
+     * 订单取消挂起
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function cancelHang(Request $request)
+    {
+
+        $bill_no=$request->input('bill_no');
+        if ( empty($bill_no)) {
+            return response()->json(['code' => 100001, 'message' => '订单号信息不能为空']);
+        }
+
+        $bill_master = Bill::find($bill_no);
+        if (!$bill_master) {
+            return response()->json(['code'=>100002, 'message'=>'订单信息没有找到']);
+        }
+
+        Bill::where('bill_no', $bill_no)->update(['hang_up' => 0]);
+
+        return response()->json(['code' => 200, 'message' => '订单取消异常成功']);
+
+    }
+
+    /**
+     * 订单配货
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function packs(Request $request)
+    {
+
+        $bill_no  = $request->input('bill_no');
+        if (empty($bill_no)) {
+            return response()->json(['code' => 100001, 'message' => '缺少参数bill_no']);
+        }
+
+        $user_id = Redis::get('WDH_STEWARD_USER_ID_' . session_id());
+        $mall_user = MallUser::find($user_id);
+
+        //查询订单信息
+        $bill_master = Bill::find($bill_no);
+        if (!$bill_master) {
+            return response()->json(['code'=>100003, 'message'=>'订单信息没有找到']);
+        } else if ($bill_master['order_receive'] != 1) {
+            return response()->json(['code' => 100004, 'message' => '订单未接单']);
+        } else if ($bill_master['bill_refund_status'] > 0) {
+            return response()->json(['code' => 100005, 'message' => '订单已申请退款']);
+        }
+
+        try {
+
+            DB::beginTransaction();
+
+            BillTrace::insert([
+                'uuid' => makeUuid(),
+                'createTime' => Carbon::now(),
+                'creator' => $mall_user->name,
+                'timeStamp' => Carbon::now(),
+                'bill_no' => $bill_no,
+                'bill_status' => 7,
+                'content'=>'您的订单配货中',
+            ]);
+
+            Bill::where('bill_no',$bill_no)->update(['bill_status'=>7]);
+
+            DB::commit();
+            return response()->json(['code' => 200, 'message' => '订单配货中']);
+
+        }catch (Exception $re){
+            DB::rollBack();
+            return response()->json(['code' => 100007, 'message' => '订单配货失败']);
+        }
+
+    }
+
+    /**
+     * 配货完成
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function packsFinish(Request $request)
+    {
+
+        $bill_no  = $request->input('bill_no');
+        if (empty($bill_no)) {
+            return response()->json(['code' => 100001, 'message' => '缺少参数bill_no']);
+        }
+
+        $user_id = Redis::get('WDH_STEWARD_USER_ID_' . session_id());
+        $mall_user = MallUser::find($user_id);
+
+        $bill_master = Bill::find($bill_no);
+        if (empty($bill_master)) {
+            return response()->json(['code'=>100003, 'message'=>'订单信息没有找到']);
+        }
+
+        if($bill_master['bill_refund_status'] > 0) {
+            return response()->json(['code' => 100004, 'message' => '订单已申请退款']);
+        }
+
+        try {
+
+            DB::beginTransaction();
+
+            BillTrace::insert([
+                'uuid' => makeUuid(),
+                'createTime' => Carbon::now(),
+                'creator' => $mall_user->name,
+                'timeStamp' => Carbon::now(),
+                'bill_no' => $bill_no,
+                'bill_status' => 8,
+                'content'=>'您的订单已打包完成',
+            ]);
+
+            Bill::where('bill_no',$bill_no)->update([
+                'bill_status'=>8
+            ]);
+
+            DB::commit();
+            return response()->json(['code' => 200, 'message' => '订单配货完成']);
+
+        } catch (Exception $re) {
+            DB::rollBack();
+            return response()->json(['code' => 400, 'message' => '订单配货失败']);
+        }
+
+    }
+
+    /**
+     * 订单提醒
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function notice(Request $request) {
+
+        $mall_id = Redis::get('WDH_STEWARD_MALL_ID_' . session_id());
+        $auto_order_receive = $request->input('auto_order_receive', 0);
+
+        //订单新订单数量计算
+        $new_order = Bill::where(['mallID'=>$mall_id, 'bill_status'=>1, 'order_receive'=>0, 'hang_up'=>0])
+                            ->where('split_type', '<>', 2)
+                            ->where(function($query){
+                                $query->where('pay_type', 1)
+                                    ->orWhere(function($q){
+                                        $q->where('pay_type', 2)
+                                            ->where('pay_status', 1);
+                                    });
+                            })->get();
+
+        if ($auto_order_receive) {
+            $order_id_array = [];
+            foreach($new_order as $order) {
+                $order_id_array[] =app_to_string($order->bill_no);
+                $order->order_receive = 1;
+                $order->save();
+            }
+        }
+
+        //订单催单数量计算
+        $remind_count = Bill::where(['mallID'=>$mall_id, 'hang_up'=>0, 'apply'=>3])
+                            ->where('split_type', '<>', 2)
+                            ->where('bill_status', '<>', 5)
+                            ->where(function($query){
+                                $query->where('pay_type', 1)
+                                    ->orWhere(function($q){
+                                        $q->where('pay_type', 2)
+                                            ->where('pay_status', 1);
+                                    });
+                            })->count();
+
+        //订单退单数量计算
+        $return_count = Bill::where(['mallID'=>$mall_id, 'hang_up'=>0])
+                            ->whereIn('apply', [1, 2])
+                            ->where('split_type', '<>', 2)
+                            ->where(function($query){
+                                $query->where('pay_type', 1)
+                                    ->orWhere(function($q){
+                                        $q->where('pay_type', 2)
+                                            ->where('pay_status', 1);
+                                    });
+                            })->count();
+
+        $result_data = [
+            'new_count' => $new_order->count(),
+            'remind_count' => $remind_count,
+            'return_count' => $return_count,
+            'new_order_id' => isset($order_id_array) ? $order_id_array : []
+        ];
+
+        return response()->json(['code'=>200,'message'=>'ok','data'=>$result_data]);
+
+    }
+
+    /**
+     * 批量获取打印内容
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function  orderFetch(Request $request) {
+
+        $order_id = $request->input('order_id', '');
+        $mall_id = Redis::get('WDH_STEWARD_MALL_ID_' . session_id());
+        $client_id = Redis::get('WDH_CLIENT_ID_' . session_id());
+
+        if (!is_array($order_id)) {
+            $order_id = [$order_id];
+        }
+        $return_data = [];
+        $bill_type = [
+            5 => '百度外卖订单',
+            6 => '美团外卖订单',
+            7 => '饿了么订单',
+            8 => '京东到家订单'
+        ];
+
+        $website_name = ConfigureFunction::getConfigureField(43, 'website_name');
+        $domain_url = ConfigureFunction::getConfigureField(43, 'domain_url');
+
+        $mall_data = MallMaster::find($mall_id);
+        if (!$mall_data) {
+            return response()->json(['code'=>100003, 'message'=>'门店信息没有找到']);
+        }
+
+        $bill_data = Bill::where('mallID', $mall_id)->whereIn('bill_no', $order_id)->get();
+
+        if ($bill_data->count() > 0) {
+
+            foreach($bill_data as $bill) {
+
+                $goods_data = [];
+                $total_weight = 0;
+
+                $bill_goods = BillGoods::getGoods($bill->bill_no);
+                foreach ($bill_goods as $g) {
+                    $goods_data[] = [
+                        'sku_code' => app_to_string($g['product_code']), //商品编码
+                        'name' => app_to_string($g['goods_name']),  //商品名称
+                        'number' => app_to_int(round($g['goods_amount'], 2 )), //数量
+                        'spec' => !empty($g['goods_spec']) ? app_to_string($g['goods_spec']) : '',  //规格
+                        'price' => app_to_string($g['goods_purchasePrice']) //单价
+                    ];
+                    $total_weight += $g['goods_weight'];
+                }
+
+                $send_time = $bill->send_time;
+                if (empty($send_time) && (!empty($bill->pickup_start_time) && $bill->pickup_start_time != '0000-00-00 00:00:00')) {
+                    $send_time = date('m-d H:i', strtotime($bill->pickup_start_time));
+                    if (!empty($bill->pickup_end_time) && $bill->pickup_end_time != '0000-00-00 00:00:00') {
+                        $send_time .= ' ~ ' . date('m-d H:i', strtotime($bill->pickup_end_time));
+                    }
+                }
+
+                $bill_print_log = BillPrintLog::where('bill_no', $bill->bill_no)->where('device', $client_id)->where('device_site', 1)->first();
+                if (!$bill_print_log) {
+                    $bill_print_log = new BillPrintLog();
+                    $bill_print_log->uuid = Uuid::uuid();
+                    $bill_print_log->creator = 'system';
+                    $bill_print_log->createTime = date('Y-m-d h:i:s');
+                    $bill_print_log->bill_no = $bill->bill_no;
+                    $bill_print_log->device_site = 1;
+                    $bill_print_log->device = $client_id;
+                    $bill_print_log->save();
+                }
+
+                $barcode_data = ActivityCodePool::where('bill_no', $bill->bill_no)->first();
+                if (!$barcode_data) {
+                    $barcode_data = BillCodePool::where('bill_no', $bill->bill_no)->first();
+                }
+
+                $paid = $bill->pay_status == 1 ? $bill->bill_payable : 0;
+
+                $points_fee = $bill->bill_points_money;
+                $points_quantity = 0;
+
+                if ($bill->billType == 4) {
+                    $bill_pay = BillPay::where(['bill_no'=>$bill->bill_no, 'type'=>5])->first();
+                    if ($bill_pay) {
+                        $points_quantity = $bill_pay->deduct_amount;
+                    }
+                    $points_fee = 0;
+                }
+
+                $return_data[] = [
+                    'title' => $website_name, //订单标题
+                    'order_id' => app_to_string($bill->bill_no), //订单号
+                    'barcode' => $barcode_data ? app_to_string($barcode_data->barcode) : '', //提货券号
+                    'order_name' => isset($bill_type[$bill->billType]) ? $bill_type[$bill->billType] : '微电汇订单', //订单类型名
+                    'order_type' => isset($bill_type[$bill->billType]) ? 2 : 1, //订单类型：1、普通订单 2、外卖订单
+                    'shop_name' => app_to_string($mall_data->mallName), //店铺名称
+                    'shop_tel' => app_to_string($mall_data->phone), //店铺电话
+                    'shop_address' => app_to_string($mall_data->address),   //店铺地址
+                    'pay_name' => app_to_string($bill->payTypeName),    //支付方式名称
+                    'order_fee' => app_to_string($bill->bill_totalMoney), //订单总金额
+                    'total_fee' => app_to_string($bill->bill_totalPaid),  //商品总金额
+                    'user_paid_fee' => app_to_string($paid
+                        + $bill->bill_points_money
+                        + $bill->bill_balance_money
+                        + $bill->bill_coupon_money
+                    ),  //已付(合计)金额
+                    'paid_fee' => $paid, //主支付方式已支付
+                    'user_fee' => app_to_string($bill->bill_payable),   //应付(合计)金额
+                    'user_pay_fee' => app_to_string($bill->bill_payable - $paid),   //应收(合计)金额
+                    'points_fee' => app_to_string($points_fee),    //积分支付金额
+                    'points_quantity' => app_to_string(round($points_quantity ,2 )),    //积分支付数量(订单类型为积分兑换时有效)
+                    'balance_fee' => app_to_string($bill->bill_balance_money),    //优惠券抵扣金额
+                    'coupon_fee' => app_to_string($bill->bill_coupon_money),    //优惠券抵扣金额
+                    'discount_fee' => app_to_string($bill->bill_subtract_money),    //订单优惠金额
+                    'deliver_fee' => app_to_string($bill->deliver_feePaid), //运费
+                    'package_fee' => app_to_string($bill->additional_expenses), //餐盒费(只在外卖订单下显示)
+                    'total_weight' => app_to_string($total_weight), //订单商品总重量
+                    'create_time' => app_to_string(date('Y-m-d H:i', strtotime($bill->createTime))),  //下单时间
+                    'send_name' => app_to_string($bill->sendTypeName),  //配送方式名称
+                    'send_time' => app_to_string($send_time),   //配送或自提时间
+                    'deliver_name' => app_to_string($bill->deliver_name),   //收货人姓名
+                    'deliver_mobile' => app_to_string($bill->deliver_mobile),   //收货人联系方式
+                    'deliver_address' => app_to_string($bill->deliver_address), //收货人地址
+                    'code_url' => $domain_url,  //二维码地址
+                    'remark' => app_to_string($bill->remark),   //订单备注
+                    'print_time' => app_to_string(date('Y-m-d H:i')),    //打印时间
+                    'goods' => $goods_data  //订单商品数组
+                ];
+
+            }
+
+        }
+
+        return response()->json(['code'=>200, 'message'=>'ok', 'data'=>$return_data]);
+
+    }
+
+}

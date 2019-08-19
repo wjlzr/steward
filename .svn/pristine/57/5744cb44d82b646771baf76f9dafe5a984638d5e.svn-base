@@ -1,0 +1,45 @@
+<?php
+
+namespace App\Http\Controllers\Admin\Analyse;
+
+use Illuminate\Http\Request;
+use DB;
+use App\Http\Controllers\Controller;
+
+class goodsController extends Controller
+{
+
+    public function goodsList()
+    {
+
+        $view_array = [
+            0=>[
+                'num_1'=>1,
+                'num_2'=>'鸡翅根约500g/份',
+                'num_3'=>'80',
+                'num_4'=>'785.00',
+                'num_5'=>'58.00',
+            ],
+            1=>[
+                'num_1'=>2,
+                'num_2'=>'清爽啤酒500ml',
+                'num_3'=>'75',
+                'num_4'=>'750.00',
+                'num_5'=>'58.00',
+            ],
+            2=>[
+                'num_1'=>3,
+                'num_2'=>'可口可乐500ml',
+                'num_3'=>'72',
+                'num_4'=>'725.00',
+                'num_5'=>'58.00',
+            ],
+        ];
+
+
+
+        return response()->json(['code'=>200,'message'=>'ok','data'=>$view_array]);
+
+    }
+
+}

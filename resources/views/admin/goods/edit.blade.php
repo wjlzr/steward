@@ -1,0 +1,597 @@
+@extends('admin.layoutEdit')
+@section('css')
+    <link  rel="stylesheet" href="/css/admin/web/goods.css?v=2018011509">
+    <link href="/libs/iCheck/skins/square/blue.css" rel="stylesheet">
+    <link href="/libs/layui-v2.1.7/css/layui.css" rel="stylesheet">
+    <link rel="stylesheet" href="/libs/jquery-ui/jquery-ui.min.css" media="screen">
+    <style>
+        a {
+            color: #0066ff;
+        }
+
+        .pic-list ul {
+            padding-left: 0;
+        }
+        .pic-list ul li {
+            float: left;
+            margin: 0 15px 15px 0;
+            display: block;
+            width: 100px;
+            height: 100px;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            background-color: #fff;
+            position: relative;
+        }
+        .pic-list ul li img {
+            padding:5px;
+            width: 98px;
+            height: 98px;
+        }
+        .pic-list ul li a {
+            display: inline-block;
+            width: 100%;
+            height: 100%;
+            line-height: 100px;
+            text-align: center;
+            cursor: pointer;
+        }
+        .pic-list .glyphicon-remove {
+            right: 0px;
+            top: 0px;
+        }
+        .glyphicon-remove {
+            position: absolute;
+            right: 5px;
+            top: 20px;
+            cursor: pointer;
+            background: rgba(153,153,153,0.6);
+            border-radius: 15px;
+            padding: 5px;
+            color: #fff;
+        }
+
+        .question {
+            display : inline-block;
+            padding: 0;
+            margin-top: 0px;
+            width: 20px;
+            height: 20px;
+            background: #ff9709;
+            border-radius: 50%;
+            line-height: 20px;
+            text-align: center;
+            color: #fff;
+            cursor: pointer;
+        }
+
+    </style>
+@endsection
+
+@section('title')
+    @if( $id == 0 )
+        <li class="cur bill-detail"><span>添加商品</span></li>
+    @elseif( $id == 1)
+        <li class="cur bill-detail"><span>编辑商品</span></li>
+    @endif
+@endsection
+
+@section('go-back-btn')
+    <button class="btn btn-default layer-go-back" type="button" >返回</button>
+@endsection
+
+@section('content')
+    <div class="main">
+
+        <form action="#" id="goods-add" class="form-horizontal" role="form">
+            <!--基本信息-->
+            <div class="setting-box">
+                <p class="setting-title">基本信息</p>
+                <div class="setting-inner">
+                    <div class="col-md-12">
+                        <div class="col-sm-3">
+                            <label class="control-label"><strong><span class="red">*&nbsp;</span></strong>商品名称：</label>
+                        </div>
+                        <div class="form-group col-sm-5">
+                            <input type="text" class="form-control" name="name" placeholder="格式：伊利安慕希酸牛奶250克/瓶" value="{{ $goods['name'] or '' }}">
+                        </div>
+                        <div class="col-sm-1 question">?</div>
+                    </div>
+                    <div class="col-md-12">
+                        <div class="col-sm-3">
+                            <label class="control-label"><strong><span class="red">*&nbsp;</span></strong>商品分类：</label>
+                        </div>
+                        <div class="form-group col-sm-8" id="category">
+
+                        </div>
+                    </div>
+                    <div class="col-md-12">
+                        <div class="col-sm-3">
+                            <label class="control-label"><strong><span class="red">*&nbsp;</span></strong>商品单位：</label>
+                        </div>
+                        <div class="form-group col-sm-2">
+                            <input type="text" name="unit" class="form-control" placeholder="件" value="{{ $goods['unit'] or '' }}">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!--商品规格-->
+            <div class="setting-box">
+                <p class="setting-title">商品规格</p>
+
+                <div class="spec-list">
+                    @if( $id == 1 )
+
+                        <input type="hidden" value="{{ $goods['id']  or ''}}" name="goods_id">
+                        @foreach( $goods_sale  as $sale)
+
+                            <div class="spec" style="margin-top:20px;">
+                                <div class="form-group">
+                                    <div class="col-sm-2">
+
+                                    </div>
+                                    @if( $goods['spec_type'] == 1)
+                                        <div class="col-sm-2">
+                                            <span style="color:red">* </span><span >规格:</span>
+                                            <input type="text" value="{{ $sale['spec'] }}" name="spec[]" class="form-control goods_spec" style="width:130px;" placeholder="请输入商品规格">
+                                        </div>
+                                    @else
+                                        <div class="col-sm-2" style="display: none;">
+                                            <span style="color:red">* </span><span >规格:</span>
+                                            <input type="text" value="{{ $sale['spec'] }}" name="spec[]" class="form-control goods_spec" style="width:130px;" placeholder="请输入商品规格">
+                                        </div>
+                                    @endif
+                                    <input type="hidden" value="{{ $sale['id'] }}" name="goods_sale_id[]">
+                                    <div class="col-sm-2 ">
+                                        <span >商家编码:</span>
+                                        <input type="text" value="{{ $sale['sku'] }}" name="sku[]" class="form-control sku" style="width:130px;" placeholder="请输入商家编码">
+                                    </div>
+                                    <div class="col-sm-2 ">
+                                        <span >商品条码:</span>
+                                        <input type="text"  value="{{ $sale['upc'] }}" name="upc[]" class="form-control" style="width:130px;" placeholder="请输入商品条码">
+                                    </div>  <div class="col-sm-2 ">
+                                        <span style="color:red">* </span><span >销售价:</span>
+                                        <input type="text" value="{{ $sale['price'] }}" name="price[]" class="form-control price" style="width:130px;" placeholder="请输入销售价">
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <div class="col-sm-2">
+
+                                    </div>
+                                    <div class="col-sm-2 ">
+                                        <span >包装费:</span>
+                                        <input type="text" value="{{ $sale['package_price'] }}"  name="package_price[]" class="form-control" style="width:130px;" value="0">
+                                    </div>
+                                    <div class="col-sm-2">
+                                        <span >重量:</span>
+                                        <div class="input-group" style="width: 130px;">
+                                            <input type="text" value="{{ $sale['weight'] }}"  name="weight[]" class="form-control" style="width:91px;" value="0">
+                                            <span class="input-group-addon">克</span>
+                                        </div>
+                                    </div>  <div class="col-sm-2 ">
+                                        <span >库存转换系数: <div class="question" id="sku_spec_question">?</div></span>
+                                        <input type="text" value="{{ $sale['sku_spec'] }}"  name="sku_spec[]" class="form-control" style="width:160px;" placeholder="请输入库存转换系数">
+                                    </div>
+                                </div>
+                            </div>
+
+                        @endforeach
+                    @else
+                        <div class="spec" style="margin-top:20px;">
+                            <div class="form-group">
+                                <div class="col-sm-2">
+
+                                </div>
+                                <div class="col-sm-2" id="spec" style="display: none;">
+                                    <span >规格:</span>
+                                    <input type="text" name="spec[]" class="form-control goods_spec" style="width:130px;" placeholder="请输入商品规格">
+                                </div>
+                                <div class="col-sm-2 ">
+                                    <span style="color:red">* </span><span ><span >商家编码:</span></span>
+                                    <input type="text" name="sku[]" class="form-control" style="width:130px;" placeholder="请输入商家编码">
+                                </div>
+                                <div class="col-sm-2 ">
+                                    <span >商品条码:</span>
+                                    <input type="text" name="upc[]" class="form-control" style="width:130px;" placeholder="请输入商品条码">
+                                </div>  <div class="col-sm-2 ">
+                                    <span style="color:red">* </span><span >销售价:</span>
+                                    <input type="text" name="price[]" class="form-control price" style="width:130px;" placeholder="请输入销售价">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <div class="col-sm-2">
+
+                                </div>
+                                <div class="col-sm-2 ">
+                                    <span >包装费:</span>
+                                    <input type="text" name="package_price[]" class="form-control" style="width:130px;" value="0">
+                                </div>
+                                <div class="col-sm-2">
+                                    <span >重量:</span>
+                                    <div class="input-group" style="width: 130px;">
+                                        <input type="text" name="weight[]" class="form-control" style="width:91px;" value="0">
+                                        <span class="input-group-addon">克</span>
+                                    </div>
+                                </div>
+                                <div class="col-sm-2 ">
+                                    <span ><span >库存转换系数: <div class="question" id="sku_spec_question">?</div></span></span>
+                                    <input type="text" name="sku_spec[]" class="form-control sku_spec" style="width:160px;" placeholder="请输入库存转换系数">
+                                </div>
+                                <div class="col-sm-3" style="text-align: right">
+                                    <span class="spec-add"><img src="/images/admin/toggle-down.png" alt="">&nbsp; <a href="javascript:void(0)">添加</a></span>
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+                </div>
+            </div>
+
+            <!--商品图片-->
+            <div class="setting-box">
+            <p class="setting-title">商品图片</p>
+            <div class="setting-inner">
+                <div class="col-md-12">
+                    <div class="col-sm-3" style="line-height: 80px;">
+                        <label class="control-label"><strong><span class="red">*&nbsp;</span></strong>商品图片：</label>
+                    </div>
+                    <div class="col-sm-8 pic-list" id="js-pic-list">
+                        <ul>
+                            @if( $id == 1 && $goods['image_num'] != 0 )
+                                @foreach( $goods['image'] as $image )
+                                    <li class="sort">
+                                        <img src="{{ $image }}" data-target="{{ $image }}">
+                                        <span class="glyphicon glyphicon-remove" style="display: none;"></span>
+                                        <input type="hidden" name="image[]" value="{{ $image }}">
+                                    </li>
+                                @endforeach
+                                @if($goods['image_num'] < 5 )
+                                    <li class="no-sort">
+                                        <a href="javascript:void(0)" id="file-view">+添加图片</a>
+                                    </li>
+                                @endif
+                            @else
+                                <li class="no-sort">
+                                    <a href="javascript:void(0)" id="file-view">+添加图片</a>
+                                </li>
+                            @endif
+                        </ul>
+                        <span class="help-block" style="clear: both;">建议尺寸：不小于640×640px 像素，可以拖拽图片调整图片顺序，可点击图片放大</span>
+                    </div>
+                </div>
+                <div class="col-md-12">
+                    <div class="col-sm-3">
+                        <label class="control-label">商品描述：</label>
+                    </div>
+                    <div class="col-sm-7">
+                        <textarea name="describe" class="form-control" cols="30" rows="10">{{ $goods['describe'] or '' }}</textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+        </form>
+        <!--底部按钮-->
+        <div class="btn-box">
+            <button class="btn btn-blue save mr10">保存</button>
+            <button class="btn btn-blue mr10 save shelf">保存且上架</button>
+            <button class="btn btn-border-blue layer-go-back">取消</button>
+        </div>
+    </div>
+@endsection
+
+@section('js')
+    <script src="/libs/iCheck/icheck.js"></script>
+    <script src="/js/admin/photo.js"></script>
+    <script src="/libs/layui-v2.1.7/layui.js"></script>
+    <script src="/libs/jquery-ui/jquery-ui.min.js?v=20160927"></script>
+    <script>
+        //icheck插件
+        $('.square-radio').iCheck({
+            checkboxClass: 'icheckbox_square-blue',
+            radioClass: 'iradio_square-blue',
+            increaseArea: '20%' // optional
+        });
+
+        var category = $.parseJSON( '{!! $category !!}' );
+
+        var big_category_id = '{!! $goods['big_category_id'] or '' !!}';
+        var mid_category_id = '{!! $goods['mid_category_id'] or '' !!}';
+        var small_category_id = '{!! $goods['small_category_id'] or '' !!}';
+
+        //获取分类信息
+        var html_category = '';
+
+        html_category += '<select class="form-control form-inline bigCategoryID" name="bigCategoryID" style="width: auto;display: inline-block;">';
+        html_category += '<option value="0">请选择</option>';
+
+        if( category != '') {
+
+            if( big_category_id != ''){
+
+                var mid_category = '';
+
+                $.each(category, function (k, v) {
+
+                    if( big_category_id == v.id ){
+
+                        mid_category = v.children;
+
+                        html_category += '<option value="'+ v.id+'" selected>' + v.name + '</option>';
+
+                    }else{
+                        html_category += '<option value="'+ v.id+'">' + v.name + '</option>';
+                    }
+                });
+
+                html_category += '</select>&nbsp;&nbsp;';
+                html_category += '<select class="form-control form-inline midCategoryID"  style="width: auto;display: inline-block;" name="midCategoryID">';
+                html_category += '<option value="0">请选择</option>';
+
+                if(mid_category != ''){
+
+                    $.each(mid_category ,function( km ,vm ){
+
+                        if( mid_category_id == vm.id ){
+                            html_category += '<option value="'+ vm.id+'" selected>' + vm.name + '</option>';
+                        }else{
+                            html_category += '<option value="'+ vm.id+'" >' + vm.name + '</option>';
+                        }
+                    });
+                }
+
+            }else{
+
+                $.each(category, function (k, v) {
+
+                    html_category += '<option value="'+ v.id+'">' + v.name + '</option>';
+
+                });
+
+                html_category += '</select>&nbsp;&nbsp;';
+                html_category += '<select class="form-control form-inline midCategoryID"  style="width: auto;display: none;"    name="midCategoryID">';
+            }
+        }
+
+        html_category += '</select>&nbsp;&nbsp;';
+        html_category += '<select class="form-control form-inline smallCategoryID" style="width: auto;display: none;"   name="smallCategoryID"></select>&nbsp;&nbsp;';
+
+        $('#category').append(html_category);
+
+        $(function () {
+
+            var csrf = '{{ csrf_token() }}';
+
+            layui.use('upload', function(){
+                var upload = layui.upload;
+
+                //执行实例
+                var uploadInst = upload.render({
+                    elem: '#file-view' //绑定元素
+                    ,url: '/upload' //上传接口
+                    ,data : { action : 'goods/photo', _token : csrf }
+                    ,done: function(res){
+                        if( res.code == 200 ){
+
+                            var sort_html = '';
+                            sort_html += '<li class="sort">';
+                            sort_html += '<img src="'+ res.data.url+'" data-target="'+res.data.url+'">';
+                            sort_html += '<span class="glyphicon glyphicon-remove" style="display: none;"></span>';
+                            sort_html += '<input type="hidden" name="image[]" value="'+ res.data.url +'">';
+                            sort_html += '</li>';
+
+                            $('#js-pic-list').find('li.no-sort').before(sort_html);
+
+                            var len = $('#js-pic-list').find('li').length;
+
+                            if( len > 5 ){
+                                $('#js-pic-list').find('li.no-sort').hide();
+                            }
+
+                        }
+
+                    }
+                    ,error: function(){
+                        //请求异常回调
+                    }
+                });
+            });
+
+            var tip = 1 ;
+            //商品二级分类
+            $(document).on('change','.bigCategoryID',function(){
+
+                var _this = $(this);
+                //隐藏三级分类
+                _this.next().next().html('').hide();
+                //隐藏二级
+                _this.next().hide().html('');
+
+                var bigCategoryID = _this.val();
+
+                if( bigCategoryID != 0  ) {
+
+                    $.each(category  ,function ( k ,v ){
+                        if (v.id == bigCategoryID ){
+                            if(v.children != ''){
+
+                                var midHtml = '<option value="0">请选择</option>' ;
+                                $.each(v.children ,function ( km, vm ){
+                                    midHtml +='<option value="' + vm.id + '" >' + vm.name + '</option>' ;
+                                });
+
+                                _this.next().show().html(midHtml).css('display','inline-block');
+                            }else{
+                                //隐藏三级分类
+                                _this.next().next().html('').hide();
+                                //隐藏二级
+                                _this.next().hide().html('');
+                            }
+                        }
+                    })
+                }
+            }).on('click','.spec-add',function(){
+
+                $('#spec').show();
+
+                var html = '';
+
+                html += '<div class="spec">';
+                html += '<hr/>';
+                html += '<div class="form-group">';
+                html += '<div class="col-sm-2">';
+                html += '</div>';
+                html += '<div class="col-sm-2">';
+                html += '<span >规格:</span>';
+                html += '<input type="text" name="spec[]" class="form-control goods_spec" style="width:130px;" placeholder="请输入商品规格">';
+                html += '</div>';
+                html += '<div class="col-sm-2 ">';
+                html += '<span style="color:red">* </span><span >商家编码:</span>';
+                html += '<input type="text" name="sku[]" class="form-control sku" style="width:130px;" placeholder="请输入商家编码">';
+                html += '</div>';
+                html += '<div class="col-sm-2 ">';
+                html += '<span >商品条码:</span>';
+                html += '<input type="text" name="upc[]" class="form-control" style="width:130px;" placeholder="请输入商品条码">';
+                html += '</div>';
+                html += '<div class="col-sm-2 ">';
+                html += '<span style="color:red">* </span><span >销售价:</span>';
+                html += '<input type="text" name="price[]" class="form-control" style="width:130px;" placeholder="请输入销售价">';
+                html += '</div>';
+                html += '</div>';
+                html += '<div class="form-group">';
+                html += '<div class="col-sm-2">';
+                html += '</div>';
+                html += '<div class="col-sm-2 ">';
+                html += '<span >包装费:</span>';
+                html += '<input type="text" name="package_price[]" class="form-control" style="width:130px;" value="0">';
+                html += '</div>';
+                html += '<div class="col-sm-2">';
+                html += '<span >重量:</span>';
+                html += '<div class="input-group" style="width: 130px;">';
+                html += '<input type="text" name="weight[]" class="form-control" style="width:91px;" value="0">';
+                html += '<span class="input-group-addon">克</span>';
+                html += '</div>';
+                html += '</div>';
+                html += '<div class="col-sm-2 ">';
+                html += '<span >库存转换系数:</span>';
+                html += '<input type="text" name="sku_spec[]" class="form-control sku_spec" style="width:160px;" placeholder="请输入库存转换系数">';
+                html += '</div>';
+                html += '<div class="col-sm-3" style="text-align: right">';
+                html += '<span class="spec-del"><img src="/images/admin/toggle-up.png" alt="">&nbsp;<a href="javascript:void(0)">移除</a></span>';
+                html += '</div>';
+                html += '</div>';
+                html += '</div>';
+
+                $('.spec-list').append(html);
+
+            }).on('click','.spec-del',function(){
+
+                $(this).parents('.spec').remove();
+
+                var num = $('.spec-del').length;
+                if( !num){
+                    $('#spec').hide();
+                }
+            }).on('click','.save',function(){
+
+                var dt = E.getFormValues('goods-add');
+
+                var error_msg = '';
+
+                if( dt.name == ''){
+                    error_msg += '请输入商品名称<br/>';
+                }
+
+                if( dt.bigCategoryID == 0 ){
+                    error_msg += '请选择商品分类<br/>';
+                }
+
+                if( dt.unit == 0 ){
+                    error_msg += '请输入商品单位<br/>';
+                }
+
+//                $('.goods_spec').each(function(){
+//
+//                    var spec = $(this).val();
+//
+//                    if( spec == '' ){
+//                        error_msg += '请输入商品规格名称<br/>';
+//                        return false;
+//                    }
+//                });
+
+                $('.sku').each(function(){
+
+                    var sku = $(this).val();
+
+                    if( sku == ''){
+                        error_msg += '请输入商品编码<br/>';
+                        return false;
+                    }
+                });
+
+                $('.price').each(function(){
+
+                    var price = $(this).val();
+
+                    if( price == '' || !E.isMoney(price)){
+                        error_msg += '请输入正确的商品价格<br/>';
+                        return false;
+                    }
+                });
+
+                if( typeof (dt.image) == 'undefined' || dt.image == ''){
+                    error_msg += '请上传商品图片<br/>';
+                }
+
+
+                if( error_msg != ''){
+                    layer.msg( error_msg ,{icon :2 ,offset : '120px'});
+                    return false;
+                }
+
+                if( $(this).hasClass('shelf')){
+                    dt.status = 1 ;
+                }else{
+                    dt.status = 2 ;
+                }
+
+                E.ajax({
+                    type : 'get',
+                    url : '/admin/goods/submit',
+                    dataType : 'json',
+                    data : dt ,
+                    success : function (obj){
+
+                        if( obj.code == 200){
+                            layer.msg( obj.message,{icon : 1 ,time:1500,offset : '120px'},function(){
+                                var index = parent.layer.getFrameIndex(window.name);
+                                parent.layer.close(index);
+                                parent.layui_table_reload();
+                            });
+                        }else{
+                            layer.msg( obj.message,{icon :2 ,time :2000,offset : '120px'});
+                        }
+                    }
+                });
+            }).on('click','#sku_spec_question',function(){
+
+                if( tip == 1 ){
+
+                    layer.tips('例如:商品A的线下库存是10kg，在线上售卖1份是500g，商品A的库存系数就是0.5','#sku_spec_question',
+                            { tips:[ 1 ,'orange'] , time : 0 });
+                    tip = 0 ;
+                }else{
+                    tip = 1 ;
+                    layer.closeAll('tips');
+                }
+
+            });
+        });
+
+        //内容块拖动排序插件
+        $('#js-pic-list').find('ul').sortable({
+            revert: true,
+            items: 'li:not(.no-sort)'
+        });
+    </script>
+@endsection

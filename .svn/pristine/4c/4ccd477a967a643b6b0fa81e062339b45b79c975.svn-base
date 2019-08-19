@@ -1,0 +1,200 @@
+<?php
+
+namespace App\Services\Wm\MtFood;
+
+class Curl
+{
+
+    public $config;
+
+    public function call($data , $api_url, $method = 'get')
+    {
+
+        error_log('掉接口');
+
+        //系统参数
+        $http_param = [
+            'app_id' => $this->config['appKey'],
+            'timestamp' => time()
+        ];
+
+        $http_param = array_merge($http_param, $data);
+        $http_param['sig'] = $this->sig($http_param, $this->config['getWay'].$this->config['version'].'/'.$api_url);
+
+        if(is_array($data)){
+            foreach($data as $key => $val){
+                $http_param[$key] = $val ;
+            }
+        }else{
+            $http_param['order_id'] = $data;
+        }
+
+        if ($method == 'get') {
+            $result_data = $this->get($this->config['getWay'].$this->config['version'].'/'.$api_url . '?' . http_build_query($http_param));
+        } else {
+            $result_data = $this->post($this->config['getWay'].$this->config['version'].'/'.$api_url, $http_param);
+        }
+
+        if ($result_data['code'] != 200) {
+            return ['code'=>$result_data['code'], 'message'=>$result_data['message']];
+        }
+
+        return ['code'=>200, 'message'=>'ok', 'data'=>$result_data['data']];
+
+    }
+
+
+    /**
+     * PRC调用请求
+     * @param $url
+     * @param $data
+     * @return array
+     */
+    private function post($url, $data) {
+
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_POST, 1);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/x-www-form-urlencoded']);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data));
+        curl_setopt($ch, CURLOPT_USERAGENT, $this->config['userAgent']);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_ENCODING, 'gzip');
+        $request_response = curl_exec($ch);
+
+        $curl_http_status = curl_getinfo($ch,CURLINFO_HTTP_CODE);
+        $curl_http_info = curl_getinfo($ch);
+        if ($request_response == false || curl_errno($ch)) {
+            $error = curl_error($ch);
+            return array('code' => $curl_http_status, 'message' => $error,'http_info' => $curl_http_info);
+        }
+        $result = json_decode($request_response, true);
+        if (is_null($result)) {
+            $result = $request_response;
+        }
+
+        if (!empty($result['error'])) {
+            return ['code'=>$result['error']['code'], 'message'=>$result['error']['msg']];
+        }
+
+        return [
+            'code'=>200,
+            'message'=>'ok',
+            'data' =>$result['data'],
+            'http_info' => $curl_http_info
+        ];
+
+    }
+
+    /**
+     * PRC调用请求
+     * @param $url
+     * @param null $http_opts
+     * @param bool $is_transcoding
+     * @return array
+     */
+    public function get( $url, $http_opts = null, $is_transcoding = true ) {
+
+        if (!isset($url) || empty($url)) {
+            return array( 'code' => 400, 'message' => '缺少请求链接' );
+        }
+
+        $curl_handler = curl_init();
+
+        $options = array(
+            CURLOPT_URL             => $url,
+            CURLOPT_RETURNTRANSFER => 1,
+            CURLOPT_CONNECTTIMEOUT  => 15,
+            CURLOPT_HEADER			=> false,
+            CURLOPT_USERAGENT       => isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.114 Safari/537.36',
+        );
+
+        if (is_array($http_opts)) {
+            foreach ($http_opts as $key => $value){
+                $options[$key] = $value;
+            }
+        }
+
+        curl_setopt_array($curl_handler, $options);
+        $curl_result = curl_exec($curl_handler);
+        $curl_http_status = curl_getinfo($curl_handler,CURLINFO_HTTP_CODE);
+        $curl_http_info = curl_getinfo($curl_handler);
+        if ($curl_result === false) {
+            $error = curl_error($curl_handler);
+            curl_close($curl_handler);
+            return array('code' => $curl_http_status, 'message' => $error,'http_info' => $curl_http_info);
+
+        }
+        if ($is_transcoding) {
+            $encode = mb_detect_encoding($curl_result, array('ASCII', 'UTF-8','GB2312', 'GBK', 'BIG5'));
+            if ($encode != 'UTF-8') {
+                $curl_result = iconv($encode, 'UTF-8', $curl_result);
+            }
+        }
+
+        $result = json_decode($curl_result,true);
+        if (is_null($result) || empty($result)) {
+            $result = $curl_result;
+        }
+
+        curl_close($curl_handler);
+
+        return ['code' => $curl_http_status, 'data' => $result,'http_info' => $curl_http_info];
+    }
+
+    /**
+     * API接口签名验签
+     * @param $data
+     * @return string
+     */
+    private function sig($data, $api_url)
+    {
+
+        ksort($data);
+
+        $string = '';
+        foreach($data as $key=>$val) {
+            if($key != 'sig'){
+                $string .= $key.'='.$val.'&';
+            }
+        }
+
+        $string = trim($string,'&');
+
+        //按照请求url + ? + 排序后的参数 + consumer_secret的顺序进行连接
+        $sign_string = $api_url . '?' . $string . $this->config['appSecret'];
+
+        return md5($sign_string) ;
+    }
+
+    /**
+     * 验证签名
+     * @param $data
+     * @return string
+     */
+    public function verify_signature($data,$url){
+
+        if (is_array($data)) {
+            foreach ($data as $k=>$v) {
+                $data[$k] = urldecode($v);
+            }
+        }
+
+        $result = $this->sig($data,$url);
+
+        return $result;
+    }
+
+    /**
+     * 信息返回
+     * @param $message
+     * @param int $code
+     * @param array $data
+     * @return array
+     */
+    public function response($message, $code = 400, $data = [])
+    {
+        return ['code'=>$code, 'message'=>$message, 'data'=>$data];
+    }
+
+}

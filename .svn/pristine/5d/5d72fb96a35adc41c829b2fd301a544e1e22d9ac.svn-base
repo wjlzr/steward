@@ -1,0 +1,129 @@
+@extends('steward.layoutEdit')
+
+@section('css')
+    <link  rel="stylesheet" href="/static/css/steward/order/order.css?v=201713434456">
+    <style>
+        .col-extend-css {
+            width:100%;
+            text-align: left;
+            padding-left: 32px;
+        }
+        /*ie7、ie8兼容性*/
+        .form-inline button{
+            *vertical-align: top;
+            *margin-left:5px;
+        }
+        .form-inline .form-group{
+            display: inline;
+            zoom:1;
+        }
+        .form-inline .form-group label{
+            display: inline;
+            zoom:1;
+        }
+        .form-inline .form-group input{
+            width:auto;
+            display: inline;
+            zoom:1;
+            _line-height:35px;
+        }
+        .form-control{
+            *padding:0;
+        }
+        .layui-form-radio {display:block !important; }
+        .layui-form-radio i{
+            vertical-align: top !important;
+            padding-top:3px !important;
+            zoom:1;
+        }
+        .layui-form-radio span{
+            width:240px !important;
+        }
+        .pagination li {
+            _float: left;
+            _padding:10px 6px;
+            _border:1px solid #ccc;
+        }
+        .pagination li.active a{
+            _color:#fff;
+        }
+
+    </style>
+@endsection
+@section('title')
+    @if($id == 1)
+        <li class="bill-status-cls {{($type == '1' || $type == '') ? 'cur' : ''}}" data-type="1">
+            <span class="pointer">待接单</span>
+        </li>
+        <li class="bill-status-cls {{$type == '2' ? 'cur' :''}}" data-type="2"><span class="pointer">待发货</span></li>
+        <li class="bill-status-cls" data-type="3"><span class="pointer">配送中</span></li>
+        <li class="bill-status-cls {{$type == '4' ? 'cur' :''}}" data-type="4"><span class="pointer">异常单</span></li>
+        <li class="bill-status-cls {{$type == '5' ? 'cur' :''}}" data-type="5"><span class="pointer">催单</span></li>
+        <li class="bill-status-cls {{$type == '6' ? 'cur' :''}}" data-type="6"><span class="pointer">退单</span></li>
+        <li class="bill-status-cls" data-type="7"><span class="pointer">已完成</span></li>
+        <li class="bill-status-cls" data-type="8"><span class="pointer">已取消</span></li>
+    @else
+        <li class="cur"><span class="pointer">订单列表</span></li>
+    @endif
+@endsection
+
+@section('content')
+
+    <div class="row">
+        <div class="col-lg-12">
+            @if($id == 2)
+                <div class="row">
+                    <div class="col-md-9 col-extend-css">
+                        <form class="form-inline" id="search-form" onsubmit="return false;">
+                            <div class="form-group">
+                                <label for="billPlatform">渠&nbsp;&nbsp;&nbsp;&nbsp;道：</label>
+                                <select class="form-control" name="billPlatform" id="billPlatform" style="width:175px;display:inline-block;">
+                                    <option value="">全部渠道</option>
+                                    <option value="1">微电汇</option>
+                                    <option value="31">美团</option>
+                                    <option value="32">饿了么</option>
+                                    <option value="33">京东到家</option>
+                                </select>&nbsp;&nbsp;
+                            </div>
+                            <div class="form-group">
+                                <label for="bill_list">订单序号：</label>
+                                <input type="text" placeholder="请输入订单序号" class="form-control" name="" id="bill_list">&nbsp;&nbsp;
+                            </div>
+                            <div class="form-group">
+                                <label for="mobile">手机号：</label>
+                                <input type="text" placeholder="请输入手机号" class="form-control" name="mobile" id="mobile">&nbsp;&nbsp;
+                            </div>
+                            <div style="height:15px;"></div>
+                            <div class="form-group">
+                                <label for="bill_no">订单号：</label>
+                                <input type="text" placeholder="请输入订单号" class="form-control" name="bill_no" id="bill_no">&nbsp;&nbsp;
+                            </div>
+                            <button class="btn btn-info" id="search" type="button">查询</button>
+                            <button class="btn btn-default" id="re-set" type="button">重置</button>
+                        </form>
+                    </div>
+                </div><br/>
+            @endif
+
+            <div class="order-content">
+                <div class="top-jilu">共<span class="word-color" id="total"></span>条记录</div>
+                <ul class="order-list order-list-detail" id="order-list"></ul>
+                <div class="position-page"></div>
+            </div>
+
+        </div>
+    </div>
+@endsection
+
+@section('js')
+
+    <script src="/static/js/steward/bill.event.js?v=20171220"></script>
+    <script>
+
+        $(function () {
+            refresh();
+        });
+
+    </script>
+
+@endsection

@@ -1,0 +1,258 @@
+@extends('admin.layoutList')
+
+@section('title')
+    <li class="cur"><span>用户列表</span></li>
+@endsection
+
+@section('btn')
+    <button type="button" class="btn btn-blue" onclick="user.edit(0)">新建用户</button>
+@endsection
+
+@section('search')
+    <div class="form-group">
+        <input type="text" class="form-control" id="s_user_name" name="name" placeholder="请输入用户名">
+    </div>
+@endsection
+
+@section('js')
+
+    <script type="text/javascript">
+
+        var user_id = 0;
+
+        var bootstrap_table_ajax_url = '/ajax/user/search';
+        bootstrap_table({
+            sortName : 'id',
+            sortOrder : 'desc',
+            columns: [
+                { title: '操作', field: 'operation', align: 'center' },
+                { title: '用户名',  field: 'name', align: 'left' },
+                { title: '姓名', field: 'full_name', align: 'left' },
+                { title: '所属角色', field: 'type', align: 'center' },
+                { title: '所属门店', field: 'mall', align: 'left' },
+                { title: '创建时间', field: 'created_at', align: 'left' },
+                { title: '修改时间', field: 'updated_at', align: 'left' },
+                { title: '最后操作人', field: 'editor', align: 'left' },
+                { title: '状态', field: 'status', align: 'left' }
+            ]
+        });
+
+        var user = {
+
+            id:'',
+
+            status: function(id, status) {
+
+                var title = status == 1
+                        ? '您确定启用该用户吗？'
+                        : '您确定禁用该用户吗？';
+
+                layer.confirm(title, { icon: 3, offset: '50px' }, function (index) {
+
+                    layer.close(index);
+
+                    E.ajax({
+                        type: 'get',
+                        url: '/ajax/user/status',
+                        data: {
+                            id: id,
+                            status: status
+                        },
+                        success: function (o) {
+                            if (o.code == 200) {
+                                layer.msg('操作成功', {icon: 1, time: 1000});
+                                bootstrap_table_init();
+                            } else {
+                                layer.msg('操作失败', {icon: 2, time: 1000});
+                            }
+                        }
+                    });
+                })
+
+            },
+
+            edit: function(id) {
+
+                var html ='<form id="mall-edit" onsubmit="return false;" class="form-horizontal" role="form" style="margin-top: 10px">';
+                html +='<input  type="hidden" id="id" name="id" value="" />';
+                html +='<div class="form-group">';
+                html +='<label class="col-sm-3 control-label" for="name">';
+                html +='<span class="red pr5">*</span>用户名：';
+                html +='</label>';
+                html +='<div class="col-sm-5">';
+                if (id) {
+                    html +='<input class="form-control w300" disabled="disabled" type="text" id="name" name="name" value="" placeholder="请输入用户名"/>';
+                } else {
+                    html +='<input class="form-control w300" type="text" id="name" name="name" value="" placeholder="请输入用户名"/>';
+                }
+                html +='</div>';
+                html +='</div>';
+                html +='<div class="form-group">';
+                html +='<label class="col-sm-3 control-label" for="full_name">';
+                html +='<span class="red pr5">*</span>姓      名：';
+                html +='</label>';
+                html +='<div class="col-sm-5">';
+                html +='<input class="form-control w300" type="text" id="full_name" name="full_name" value=""  placeholder="请输入姓名" />';
+                html +='</div>';
+                html +='</div>';
+                html +='<div class="form-group"  >';
+                html +='<label class="col-sm-3 control-label" for="pwd">';
+                html +='<span class="red pr5">*</span>密      码：';
+                html +='</label>';
+                html +='<div class="col-sm-5">';
+                html +='<input class="form-control w300" type="password" id="pwd" name="pwd"  placeholder="请输入密码【修改时可为空】" />';
+                html +='</div>';
+                html +='</div>';
+                html +='<div class="form-group">';
+                html +='<label class="col-sm-3 control-label" for="type" >';
+                html +='<span style="color:red">* </span>角 色：';
+                html +='</label>';
+                html +='<div class="col-sm-5">';
+                html +='<input type="radio" class="square-radio" id="role_type1"  name="type" value="1" checked />&nbsp;总店运营&nbsp;&nbsp;';
+                html +='<input type="radio" class="square-radio" id="role_type2"  name="type" value="2"  />&nbsp;门店运营';
+                html +='</div>';
+                html +='</div>';
+                html +='</form>';
+
+                this.layer_index = layer.open({
+                    title: id == 0 ? '新增用户' : '编辑用户',
+                    type:1,
+                    area:'550px',
+                    content: html,
+                    btn: ['确定', '取消'],
+                    yes: function() {
+                        user.check();
+                    }
+                });
+
+                if (id != 0) {
+                    E.ajax({
+                        type: 'get',
+                        url: '/ajax/user/get/' + id,
+                        data: { },
+                        success: function (o) {
+                            if (o.code == 200) {
+                                $('#id').val(o.data.id);
+                                $('#name').val(o.data.name);
+                                $('#full_name').val(o.data.full_name);
+                                if( o.data.type == 1){
+                                    $('#role_type1').attr('checked',true);
+                                }else{
+                                    $('#role_type2').attr('checked',true);
+                                }
+                                $('#pwd').val(o.data.pwd);
+                            } else {
+                                layer.msg(o.message, { icon: 2, time: 1000 });
+                                return false;
+                            }
+                        }
+                    });
+                }
+
+            },
+
+            //校验数据
+            check: function (){
+
+                var dt = E.getFormValues("mall-edit");
+                var error_msg = "";
+
+                if( dt.name == ''){
+                    error_msg += '用户名不能为空！<br/>';
+                }else if(!E.isEmpty(dt.name) && !E.isMobile(dt.name)){
+                    error_msg += '请输入正确的用户名！<br/>';
+                }
+
+                if( E.isEmpty(dt.full_name) ){
+                    error_msg += '姓名不能为空！<br/>';
+                }
+
+                if( !dt.id && E.isEmpty(dt.pwd)){
+                    error_msg += '请设置密码!<br/>';
+                }else if(!dt.id && !E.isEmpty(dt.pwd) && !E.isPwd(dt.pwd)){
+                    error_msg += '密码必须是6-30位字符，可使用字母、数字或符号的组合!<br/>';
+                }
+
+                if(dt.id && !E.isEmpty(dt.pwd) && !E.isPwd(dt.pwd)){
+                    error_msg += '密码必须是6-30位字符，可使用字母、数字或符号的组合!<br/>';
+                }
+
+                if(dt.type == ''){
+                    error_msg += '请选择角色！<br/>';
+                }
+
+                if (error_msg != "") {
+                    layer.msg( error_msg ,{icon :2 ,offset : '120px'});
+                    return false;
+                }
+
+                E.ajax({
+                    type: 'get',
+                    url: "/ajax/user/edit",
+                    data: dt,
+                    success:function( o ) {
+                        if( o.code == 200 ) {
+                            layer.msg('保存成功', { icon: 1, time: 1000 });
+                            if(dt.id !=0){
+                                layer.close(user.layer_index);
+                            }else{
+                                $('#mall-edit').find('input').val('');
+                            }
+                            bootstrap_table_init();
+                        }else{
+                            layer.alert( o.message,{ icon:2} );
+                        }
+                    }
+                });
+
+            }
+
+        };
+
+        var plugin = {
+
+            mall_data: { },
+
+            mall_num: 0,
+
+            search_mall: function (id) {
+
+                user_id = id;
+                layer.open({
+                    title: '选择门店',
+                    type: 2,
+                    area: ['900px', '500px'],
+                    content: '/admin/plugin/mall'
+                });
+            },
+
+            //门店弹出层
+            mall: function (data) {
+
+                var id = 0;
+                $.each(data, function (k, v) {
+                    id = k;
+                });
+
+                E.ajax({
+                    type: 'get',
+                    url: '/ajax/user/binding',
+                    data: {
+                        mall_id : id,
+                        id: user_id
+                    },
+                    success: function (o) {
+                        if (o.code == 200) {
+                            layer.msg('绑定成功', {icon: 1, time: 1000});
+                            bootstrap_table_init();
+                        } else {
+                            layer.msg(o.message, {icon: 2, time: 1000});
+                        }
+                    }
+                });
+            }
+        }
+
+    </script>
+
+@endsection

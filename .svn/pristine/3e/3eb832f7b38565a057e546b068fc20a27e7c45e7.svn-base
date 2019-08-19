@@ -1,0 +1,754 @@
+
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <title>商管家</title>
+    <link href="http://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/libs/bootstrap-table-master/dist/bootstrap-table.min.css">
+    <link href="/libs/layui/css/layui.css" rel="stylesheet">
+    <style>
+
+        a,a:hover,a:focus,a:active {
+            text-decoration: none;
+            color: #0066ff;
+        }
+        .app-title {
+            height: 48px;
+            background: #fff;
+            /*overflow: hidden;*/
+            padding: 0 20px;
+        }
+        .app-title ul {
+            float: left;
+            -webkit-box-sizing: border-box;
+            -moz-box-sizing: border-box;
+            box-sizing: border-box;
+            /*overflow: hidden;*/
+        }
+        .app-title ul li {
+            float: left;
+            margin-right: 20px;
+            line-height: 48px;
+        }
+        .app-title ul li span {
+            padding-bottom: 10px;
+        }
+        .app-title ul li.cur span {
+            font-weight: 700;
+            color: #5f8af7;
+            border-bottom: 2px solid;
+        }
+        .app-title .right-btn {
+            float: right;
+            padding-top: 7px;
+        }
+
+        /*#search-form {*/
+        /*float: right;*/
+        /*}*/
+
+        .app-content {
+            margin: 10px;
+            padding: 15px;
+            background:#ffffff;
+            min-height: 500px;
+        }
+
+        .form-horizontal .form-group {
+            margin-right: 0;
+            margin-left: 0;
+        }
+        .red {
+            color: red;
+        }
+        .col-extend-css {
+            text-align: right;
+        }
+        /*ie7、ie8兼容性*/
+        .form-inline button{
+            *vertical-align: top;
+            *margin-left:5px;
+        }
+        .form-inline .form-group{
+            display: inline;
+            zoom:1;
+        }
+        .form-inline .form-group label{
+            display: inline;
+            zoom:1;
+        }
+        .form-inline .form-group input{
+            width:auto;
+            display: inline;
+            zoom:1;
+            _line-height: 35px;
+        }
+        .form-control{
+            *padding:0;
+        }
+        .pagination li {
+            _float: left;
+            _padding:10px 6px;
+            _border:1px solid #ccc;
+        }
+        .pagination li.active a{
+            _color:#fff;
+        }
+
+        .fixed-table-pagination{
+            zoom:1;
+            overflow: hidden;
+        }
+
+    </style>
+    <link href="http://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/css/admin/common.css?v=201709333334444">
+    <link href="/css/admin/list.css?v=20171213" rel="stylesheet">
+    <link href="/libs/iCheck/skins/square/blue.css" rel="stylesheet">
+    <style>
+        .col-extend-css {
+            text-align: left;
+        }
+        .app-title {
+            height: 0px;;
+        }
+    </style>
+
+</head>
+
+<body>
+<div class="app-title">
+    <ul>
+    </ul>
+    <div class="right-btn">
+    </div>
+</div>
+
+<div class="app-content">
+
+    <div class="row" id="search-box">
+        <div class="col-lg-12">
+            <div class="row">
+                <div class="col-md-3">
+                    <a class="btn btn-info goods-add " data-type="1" href="#" data-id="0" >创建商品</a>
+                    <a class="btn btn-info goods-upload" href="#" >批量导入</a>
+                    <a class="btn btn-default goods-export" href="#" style="border-color: #82b2dc;color: #5f8af7;">导出</a>
+                </div>
+                <div class="col-md-9 col-extend-css">
+
+                    <form class="form-inline" id="search-form" onsubmit="return false;">
+                        <div class="form-group">
+                            <label for="name">商品名称：</label>
+                            <input type="text" placeholder="请输入商品名称" style="width:130px;" class="form-control" name="name" id="name">&nbsp;&nbsp;
+                        </div>
+                        <div class="form-group">
+                            <label for="sku">商家编码：</label>
+                            <input type="text" placeholder="请输入商家编码" style="width:130px;" class="form-control" name="sku" id="sku">&nbsp;&nbsp;
+                        </div>
+                        <div class="form-group">
+                            <label for="upc">商品条码：</label>
+                            <input type="text" placeholder="请输入商品条码" style="width:130px;" class="form-control" name="upc" id="upc">
+                        </div>
+                        <button class="btn btn-info" id="search" type="button">查询</button>
+                        <button class="btn btn-default" id="re-set" type="button">重置</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div><br>
+
+    <div class="row">
+        <div>
+        </div>
+        <div class="col-lg-12">
+            <table id="table"></table>
+        </div>
+    </div>
+
+    <div class="list-content">
+        <div class="list-aside" >
+            <div class="aside-tit">
+                <div class="sorted-tit">分类列表</div>
+                <div class=" active-border category"><a href="/admin/category">管理分类</a></div>
+            </div>
+            <ul class="sort-list" id="accordion">
+
+            </ul>
+        </div>
+        <div class="list-body-right">
+            <div class="body-box">
+                <div class="nav-list">
+                    <span class="nav-item on" data-type="0">全部</span>
+                    <span class="nav-item" data-type="1">售卖中</span>
+                    <span class="nav-item" data-type="2">已下架</span>
+                    <div style="display: inline-block;width:330px;"></div>
+                    <input type="checkbox" class="square-radio no-image" style="display: inline-block;">&nbsp;&nbsp;无图片
+                    <input type="checkbox" class="square-radio no-weight" style="display: inline-block;">&nbsp;&nbsp;重量等于0
+                </div>
+                <div class="list-edit-body">
+                    <div class="checked-box">
+                        <div class="editBatch">
+                            <button class=" btn btn-default forsale all" style="border: rgba(28, 127, 227, 0.52) 1px solid" data-type="2">批量上架</button>&nbsp;&nbsp;&nbsp;
+                            <button class=" btn btn-default forsale all" style="border: rgba(28, 127, 227, 0.52) 1px solid" data-type="1">批量下架</button>
+                        </div>
+                    </div>
+                    <div class="tab-border">
+                        <table id="goods_table"></table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="htmlPrice" ></div>
+</div>
+
+</body>
+
+<script src="/libs/jquery/jquery-1.9.1.min.js"></script>
+<script src="http://cdn.bootcss.com/layer/3.0.1/layer.min.js"></script>
+<script src="/libs/layui-v2.1.7/layui.js"></script>
+<script src="/libs/bootstrap-table-master/dist/bootstrap-table.min.js?v=20161202"></script>
+<script src="/libs/bootstrap-table-master/dist/locale/bootstrap-table-zh-CN.js"></script>
+<script src="/js/admin/global.js"></script>
+<script src="/libs/iCheck/icheck.js"></script>
+<script>
+
+    $('.square-radio').iCheck({
+        checkboxClass: 'icheckbox_square-blue',
+        radioClass: 'iradio_square-blue',
+        increaseArea: '20%' // optional
+    });
+
+    function icheck_checked(){
+
+        if( $('.no-image').is(':checked')){
+
+            $('#search-form').append('<input type="hidden" name="image" value="1" >');
+        }else{
+            $('input[name="image"]').remove();
+        }
+
+        if( $('.no-weight').is(':checked')){
+
+            $('#search-form').append('<input type="hidden" name="weight" value="1" >');
+        }else{
+            $('input[name="weight"]').remove();
+        }
+    }
+
+    $(document).on('change', '#search-form select', function () {
+
+        icheck_checked();
+        $('#goods_table').bootstrapTable('refresh',{
+            url: bootstrap_table_ajax_url
+        });
+    }).on('click', '#search', function () {
+
+        icheck_checked();
+        $('#goods_table').bootstrapTable('refresh',{
+            url: bootstrap_table_ajax_url
+        });
+    }).on('click', '#re-set', function () {
+
+        icheck_checked();
+        $('#search-form')[0].reset();
+        $('#goods_table').bootstrapTable('refresh',{
+            url: bootstrap_table_ajax_url
+        });
+    }).on('click', '.layer-go-back', function () { //layer的iframe层关闭
+        E.layerClose();
+    });
+
+    $('.no-image,.no-weight').on('ifChanged',function(){
+
+        icheck_checked();
+        $('#goods_table').bootstrapTable('refresh',{ url : bootstrap_table_ajax_url });
+    });
+
+    function bootstrap_table_init() {
+        $('#goods_table').bootstrapTable('refresh');
+    }
+
+    function bootstrap_table(params) {
+
+        var table_height = $(window).height() - 48 - 25 - $('#search-box').height() - 20;
+
+        $('#goods_table').bootstrapTable({
+            classes: 'table table-hover', //bootstrap的表格样式
+            sidePagination: 'server', //获取数据方式【从服务器获取数据】
+            pagination: true, //分页
+            height: table_height, //表格高度
+            pageNumber: 1, //页码【第X页】
+            pageSize: 10, //每页显示多少条数据
+            queryParamsType: 'limit',
+            queryParams: function (params) {
+                var dt = E.getFormValues('search-form');
+                $.extend(params, dt);
+                return params;
+            },
+            url: bootstrap_table_ajax_url,//ajax链接
+            sortName: params.sortName, //排序字段
+            sortOrder: params.sortOrder,//排序方式
+            columns: params.columns
+        });
+
+    }
+
+    var bootstrap_table_ajax_url = '/admin/goods/search/0';
+
+    bootstrap_table({
+        sortName: 'st_goods.updated_at', //排序字段
+        sortOrder: 'desc',//排序方式
+        columns: [ //字段
+            { title: 'checkStatus',checkbox : true},
+            { title: '操作', field: 'operation', align: 'center',width : '90px'  },
+            { title: '商品信息', field: 'info', align: 'left'  },
+            { title: '商家编码/条码',  field: 'sku_upc', align: 'center' },
+            { title: '售价', field: 'price', align: 'left' },
+            { title: '所属分类', field: 'category', align: 'left' },
+            { title: '单位', field: 'unit', align: 'center' },
+            { title: '重量(g)', field: 'weight', align: 'center' },
+            { title: '售卖状态', field: 'status', align: 'center' }
+        ]
+    });
+
+    //分类列表
+
+    E.ajax({
+        type : 'get',
+        url : '/admin/category/search',
+        dataType : 'json' ,
+        data : {} ,
+        success : function (obj){
+
+            if( obj.code == 200 ){
+
+                var html_category = '';
+                html_category += '<li class="link active category_search current">';
+                html_category += '<div class="list-cont">';
+                html_category += '<i class="icon-toggle"></i>';
+                html_category += '<div class="icon-text">全部商品</div>';
+                html_category += '<div style="float: right;margin-right: 20px;">'+obj.total+'</div>';
+                html_category += '</div>';
+                html_category += '</li>';
+
+                $.each( obj.data ,function( k ,v ){
+
+                    html_category +=  '<li class="link category_search" data-id="'+ v.id +'">';
+                    html_category +=  '<div class="list-cont">';
+
+                    if(v.children == ''){
+                        html_category +=  '<i class="icon-toggle iconUp"></i>';
+                    }else{
+                        html_category +=  '<i class="icon-toggle iconDown"></i>';
+                    }
+
+                    html_category +=  '<div class="icon-text">'+ v.name +'</div>';
+                    html_category += '<div style="float: right;margin-right: 20px;">'+ v.goods_num+'</div>';
+                    html_category +=  '</div>';
+                    html_category +=  '<ul class="submenu">';
+
+                    if(v.children != ''){
+                        $.each(v.children ,function ( km ,vm ){
+                            html_category +=  '<li class="on category_search" data-id="'+ vm.id +'">';
+                            html_category +=  '<div class="publicSubmit">';
+
+                            if(vm.children == ''){
+                                html_category +=  '<i class="icon-toggle iconUp"></i>';
+                            }else{
+                                html_category +=  '<i class="icon-toggle iconDown"></i>';
+                            }
+
+                            html_category +=  '<div class="second-text">'+ vm.name+'</div>';
+                            html_category += '<div style="float: right;margin-right: 20px;">'+ vm.goods_num+'</div>';
+                            html_category +=  '</div>';
+                            html_category +=  '<ul class="third_menu">';
+                            if( vm.children != '' ){
+                                $.each(vm.children ,function( ks , vs ){
+
+                                    html_category +=  '<li class="category_search" data-id="'+ vs.id +'">';
+                                    html_category +=  '<div class="third_cont">';
+                                    html_category +=  '<div class="icon-text">'+ vs.name+'</div>';
+                                    html_category += '<div style="float: right;margin-right: 20px;">'+ vs.goods_num+'</div>';
+                                    html_category +=  '</div>';
+                                })
+                            }
+                            html_category +=  '</ul>';
+                            html_category +=  '</li>';
+                        })
+                    }
+                    html_category +=  '</ul>';
+                    html_category +=  '</li>';
+                });
+
+                $('#accordion').append(html_category);
+            }
+        }
+    });
+
+
+    $(function() {
+
+        $(document).on("click",".link", function(){
+
+            $(this).find('.list-cont').addClass('current').parent().siblings().removeClass('current');
+            $(this).find('.submenu').find('.current').removeClass('current');
+
+            $(this).find('.submenu').slideToggle().parent().siblings().find('.submenu').slideUp();
+
+            if ($(this).find('.icon-toggle').hasClass('iconDown')) {
+
+                $(this).find('.iconDown').removeClass('iconDown').addClass('iconUp').parents('.link').siblings().find('.iconUp').addClass('iconDown');
+
+            } else if ($(this).find('.icon-toggle').hasClass('iconUp')) {
+
+                $(this).find('.iconUp').addClass('iconDown').parents('.link').siblings().find('.iconDown').addClass('iconUp');
+
+            } else {
+                $(this).siblings().find('.submenu').slideUp().parent('.link').find('.iconUp').addClass('iconDown');
+            }
+        });
+
+        $(document).on("click", '.third_menu li', function() {
+
+            $(this).find('.third_cont').addClass('current').parent().siblings().find('.third_cont').removeClass('current');
+            $(this).parents('.submenu li').find('.publicSubmit').removeClass('current');
+        });
+
+        $(document).on("click",".publicSubmit", function() {
+
+//            $(this).next('.third_menu').slideToggle().parent().siblings().find('.third_menu').slideUp();
+            $(this).parents('.link').find('.list-cont').removeClass('current');
+            $(this).next().find('.current').removeClass('current');
+
+        });
+
+        $(document).on("click",".submenu li", function(e) {
+
+            e.stopPropagation();
+            $(this).addClass('on').siblings().removeClass('on');
+
+            $(this).find('.third_menu').slideToggle().siblings().find('.third_menu').slideUp();
+
+            $(this).find('.publicSubmit').addClass('current').parent().siblings().find('.publicSubmit').removeClass('current');
+
+        }).on('click', '.nav-list span',function(){
+
+            icheck_checked();
+
+            $(this).addClass('on').siblings().removeClass('on');
+            var type = $(this).attr('data-type');
+
+            var bootstrap_table_ajax_url = '/admin/goods/search/' + type;
+            $('#goods_table').bootstrapTable('refresh',{ url : bootstrap_table_ajax_url });
+
+        }).on('click','.forsale',function(){       //商品上下架操作
+
+            var type = $(this).attr('data-type');           //操作方式
+            var err_msg = '';                               //错误信息
+            var title = '';                                 //提示
+            var id_arr = [];                               //操作对象
+
+            if(type == 1){
+                title = '下架';
+            }else{
+                title = '上架';
+            }
+
+            if( $(this).hasClass('all') ){
+
+                //批量操作
+                var num_selected = 0;
+
+                $('.selected').each(function(){
+
+                    num_selected = 1;
+                    var id = $(this).find('.forsale').attr('data-id');
+                    id_arr.push(id);
+                });
+
+                if(!num_selected){
+                    layer.msg('请选择要操作的商品',{icon:2,shade: [0.15, 'black'],offset:'120px',time:2000});
+                    return false;
+                }
+                title = '您确定将所选商品'+ title + '吗？';
+            }else{
+
+                //单独操作
+                var id = $(this).attr('data-id');
+
+                title = '您确定将该商品'+title+'吗？';
+                id_arr.push(id);
+            }
+
+            if (err_msg) {
+                layer.msg( err_msg , {icon: 2,shade: [0.15, 'black'],offset:'120px',time:1000});
+                return false;
+            }
+
+            layer.confirm(title,{icon:3,offset:'50px'},function( index ){
+
+                layer.close(index);
+
+                E.ajax({
+                    type:'get',
+                    url:'/admin/goods/shelf',
+                    data: {
+                        type : type,
+                        id_arr :id_arr
+                    },
+                    success: function (o) {
+                        if(o.code == 200){
+                            layer.msg(o.message,{icon:1,time:1000});
+                            bootstrap_table_init();
+                        }else{
+                            layer.msg('操作失败',{icon:2,time:1000});
+                        }
+                    }
+                });
+            })
+        }).on('click','.price',function(){   //修改价格
+
+            var id = $(this).attr('data-id');
+
+            E.ajax({
+                type : 'get',
+                url : '/admin/goods/search_price/'+ id ,
+                dataType : 'json',
+                data : {},
+                success : function(obj){
+
+                    if(obj.code == 200 ){
+
+                        var htmlPrice = '';
+
+                        if( obj.data.total == 1){  //单规格
+
+                            htmlPrice += '<div id="pop" style="margin-top:10px;" style="width: 100%">';
+                            htmlPrice += '<div style="background: #ffffff">';
+                            htmlPrice += '<form id="pop_form" onsubmit="return false;" class="form-horizontal" role="form">';
+                            htmlPrice += '<input type="hidden" value="'+ id +'" name="goods_id">';
+                            htmlPrice += '<input type="hidden" value="'+ obj.data['goods'][0].spec_id +'" name="spec_id[]">';
+                            htmlPrice += '<div class="form-group" style="margin-right: 1px; margin-left: 28px;text-align: left">';
+                            htmlPrice += '<label class="col-sm-12 " for="price_edit" >';
+                            htmlPrice += '<span>'+ obj.data['goods'][0].goodsName +'</span></label>';
+                            htmlPrice += '</div>';
+                            htmlPrice += '<div class="form-group" style="margin-right: 1px; margin-left: 1px;">';
+                            htmlPrice += '<label class="col-sm-3 control-label" for="price_edit" >';
+                            htmlPrice += '价格：</label>';
+                            htmlPrice += '<div class="col-sm-8">';
+                            htmlPrice += '<input class="form-control"  style="width: 150px;" type="text" id="price_edit" name="price[]" maxlength="100" value="'+obj.data['goods'][0].salePrice+'" />';
+                            htmlPrice += '</div></div>';
+                            htmlPrice += '</form>';
+                            htmlPrice += '</div>';
+                            htmlPrice += '</div>';
+
+                        }else{              //多规格
+
+                            htmlPrice += '<div id="pop" style="margin-top:10px;" style="width: 100%">';
+                            htmlPrice += '<div style="background: #ffffff">';
+                            htmlPrice += '<form id="pop_form" onsubmit="return false;" class="form-horizontal" role="form">';
+                            htmlPrice += '<div class="form-group" style="margin-right: 1px; margin-left: 28px;text-align: left">';
+                            htmlPrice += '<label class="col-sm-12 " for="price_edit" >';
+                            htmlPrice += '<span>'+ obj.data['goods'][0].goodsName +'</span></label>';
+                            htmlPrice += '</div>';
+
+                            $.each(obj.data.goods,function( k , v ){
+
+                                htmlPrice += '<div class="form-group" style="margin-right: 1px; margin-left: 1px;">';
+                                htmlPrice += '<input type="hidden" value="'+ id +'" name="goods_id">';
+                                htmlPrice += '<input type="hidden" value="'+ v.spec_id +'" name="spec_id[]">';
+                                htmlPrice += '<label class="col-sm-3 control-label" for="price_edit" >'+ v.spec+'</label>';
+                                htmlPrice += '<label class="col-sm-3 control-label" for="price_edit" >销售价：</label>';
+                                htmlPrice += '<div class="col-sm-6">';
+                                htmlPrice += '<input class="form-control"  style="width: 120px;" type="text" id="price_edit" name="price[]" maxlength="100" value="'+v.salePrice+'" />';
+                                htmlPrice += '</div></div>';
+                            });
+
+                            htmlPrice += '</form>';
+                            htmlPrice += '</div>';
+                            htmlPrice += '</div>';
+
+                        }
+
+                        layer.open({
+                            title:'修改价格',
+                            type : 1,
+                            area : ['40%','auto'],
+                            move:false,
+                            btnAlign:'c',
+                            content : htmlPrice,
+                            btn : ['确认' ,'取消'],
+                            yes : function(index){
+
+                                layer.close(index);
+                                var dt = E.getFormValues('pop_form');
+                                var error = 0 ;
+                                $.each(dt.price ,function ( k ,v ){
+
+                                    if( v == ''){
+                                        error = 1 ;
+                                    }
+
+                                    if(!E.isMoney(v)){
+                                        error = 1 ;
+                                    }
+                                });
+                                if( error ){
+                                    layer.msg('请检查商品价格设置',{ icon : 2 ,shade: [0.15, 'black'], time : 2000 });
+                                    return false;
+                                }
+
+                                E.ajax({
+                                    type : 'get',
+                                    url : '/admin/goods/edit_price/',
+                                    dataType : 'json',
+                                    data : dt ,
+                                    success : function(obj){
+
+                                        if( obj.code == 200 ){
+                                            layer.msg('操作成功',{ icon : 1 ,shade: [0.15, 'black'], time : 2000 });
+                                            bootstrap_table_init();
+                                        }else{
+                                            layer.msg('操作失败',{ icon : 2 ,shade: [0.15, 'black'], time : 2000 });
+                                        }
+                                    }
+                                })
+                            }
+                        });
+
+                    }else{
+                        layer.msg( obj.message ,{ icon : 2 ,shade: [0.15, 'black'], time : 2000 });
+                    }
+                }
+            });
+        }).on('click','.category_search',function(){
+
+            icheck_checked();
+
+            if( $(this).hasClass('active')){
+
+                $('input[name="category_id"]').remove();
+                $('#goods_table').bootstrapTable('refresh',{ url : bootstrap_table_ajax_url });
+
+            }else {
+
+                var category_id = $(this).attr('data-id');
+
+                $('input[name="category_id"]').remove();
+                $('#search-form').append('<input type="hidden" name="category_id" value="'+ category_id +'">');
+                $('#goods_table').bootstrapTable('refresh');
+            }
+        }).on('click','.goods-add',function(){
+
+            var id = $(this).attr('data-id');
+
+            layer.open({
+                title:false,
+                type : 2,
+                closeBtn : 0 ,
+                area : ['100%','100%'],
+                content : '/admin/goods/edit/'+ id
+            });
+
+        }).on('click','.goods-upload',function(){
+
+            var html = '';
+            html += '<div style="height:35px;">';
+            html += '</div>';
+            html += '<div class="form-group">';
+            html += '<div class="col-sm-6 download">';
+            html += '<input type="text" id="file" class="form-control" style="height:38px;width: 140px;display: inline-block;">';
+            html += '<div class="layui-btn layui-btn-normal" id="file-view" style="margin-left:-5px;margin-top: -4px;">浏览</div>';
+            html += '</div>';
+            html += '<div class="col-sm-6">';
+            html += '<button class="layui-btn" id="re-sale" type="button">导入商品</button>';
+            html += '<button class="layui-btn" id="re-export" type="button" onclick="dw()">模板下载</button>';
+            html += '</div>';
+            html += '<div style="height:35px;">';
+            html += '</div>';
+            html += '</div>';
+
+
+            layer.open({
+                title: '导入商品' ,
+                type: 1 ,
+                closeBtn : 0 ,
+                move:false,
+                btnAlign:'c',
+                area: '600px',
+                skin: 'layui-layer-rim', //加上边框
+                content:  html ,
+                btn: ['关闭']
+            });
+
+            var csrf = '{{ csrf_token() }}';
+
+            layui.use('upload', function(){
+
+                var upload = layui.upload;
+
+                //执行实例
+                var uploadInst = upload.render({
+                    elem: '#file-view' //绑定元素
+                    ,url: '/upload' //上传接口
+                    ,accept: 'file'
+                    ,data : { action : 'goods/upload', _token : csrf }
+                    ,done: function(res){
+                        if( res.code == 200 ){
+
+                            layer.msg('文件已选择成功', {icon: 1, time: 1000});
+                            $('#file').val(res.data.name).attr('data-url', res.data.url);
+                        }else{
+                            layer.msg(res.message, {icon: 2, shade: [0.15, 'black'], offset: '120px', time: 1000});
+                        }
+
+                    }
+                    ,error: function(){
+                        //请求异常回调
+                    }
+                });
+
+                //批量上传
+                $(document).on('click','#re-sale', function () {
+                    if(!$('#file').val()){
+                        layer.msg('请先选择文件',{icon:2,time:1000});
+                        return false;
+                    }
+                    var file_url = $('#file').attr('data-url');
+                    $.ajax({
+                        type : 'get',
+                        url :'/admin/goods/batch_upload',
+                        dataType : 'json',
+                        data : {'file_url':file_url},
+                        success : function (o) {
+                            if(o.code == 200){
+                                layer.msg(o.message,{icon:1,time:1000});
+                                $('#file').val('');
+                            }else{
+                                layer.msg('上传失败',{icon:2,time:1000});
+                                $('#file').val('');
+                            }
+                        }
+                    });
+                })
+
+            });
+        }).on('click','.goods-export',function(){
+
+            window.location.href = '/admin/goods/export';
+        });
+
+    });
+
+    //下载模板
+    function dw () {
+        window.location.href = '/admin/goods/download';
+    }
+
+
+
+</script>
+
+</html>

@@ -1,0 +1,12 @@
+@extends('admin.layout')
+@section('css')
+@endsection
+
+
+@section('content')
+
+    mall page !
+
+@endsection
+@section('js')
+@endsection

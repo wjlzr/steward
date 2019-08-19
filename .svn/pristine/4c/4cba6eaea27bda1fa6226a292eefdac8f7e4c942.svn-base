@@ -1,0 +1,155 @@
+<?php
+
+namespace App\Http\Controllers\Admin\Analyse;
+
+use DB;
+
+use Illuminate\Http\Request;
+
+use App\Models\Goods\StStatGoodsAnalyse;
+
+use App\Models\Common\MultiDataExport;
+
+use App\Models\StApp;
+
+use App\Http\Controllers\Controller;
+
+class goodsController extends Controller
+{
+
+    public function goodsList( Request $request )
+    {
+
+        $startDate = $request->input('startDate');
+        $endDate = $request->input('endDate');
+        $app_id = $request->input('app_id');
+        $goods_name = $request->input('goods_name');
+
+        $where = [];
+
+        if ( !empty( $app_id ) ) {
+            $where[] = ['app_id' , '=' , $app_id] ;
+        }
+
+        if ( !empty( $startDate ) ) {
+            $where[] = ['cal_date','>=',$startDate];
+        }
+
+        if ( !empty( $endDate ) ) {
+            $where[] = ['cal_date','<=',$endDate];
+        }
+
+        if ( !empty( $goods_name ) ) {
+            $where[] = ['goods_name' , 'LIKE' , '%'.$goods_name.'%'] ;
+        }
+
+        $goods_data = StStatGoodsAnalyse::where($where)
+            ->orderBy($request->input('sort'), $request->input('order'))
+            ->groupBy('goods_id')
+            ->paginate($request->input('limit'))
+            ->toArray();
+
+        //返回数组
+        $return = [
+            'total' => $goods_data['total'],
+            'rows' => []
+        ];
+
+        if ( $goods_data['data'] ) {
+
+            foreach( $goods_data['data'] as $row ) {
+
+                if (  empty( $row['sku'] ) || empty( $row['upc'] ) ) {
+                    $sku = '';
+                } else {
+                    $sku = $row['sku'].'/'.$row['upc'];
+                }
+
+                $return['rows'][] = [
+                    'sku' => $sku,
+                    'goods_name' => $row['goods_name'],
+                    'total_num' => $row['total_num'],
+                    'total_bill_money' => $row['total_bill_money'],
+                    'bill_money' => round( $row['total_bill_money']/$row['total_num'] ,2)
+                ];
+
+            }
+        }
+
+
+        return response()->json($return);
+
+    }
+
+
+    /**
+     * 商管家商品分析导出
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function export( Request $request )
+    {
+
+        $startDate = $request->input('startDate');
+        $endDate = $request->input('endDate');
+        $app_id = $request->input('app_id');
+        $goods_name = $request->input('goods_name');
+        $exportIndex = $request->input('exportIndex','');
+
+        if ( empty( $exportIndex ) ) {
+            return response()->json(['code'=>10000,'message'=>'缺少导出索引']);
+        }
+
+        //实例大数据导出类
+        $multi_data_obj = new MultiDataExport();
+
+        //导出条件
+        $sql = '';
+        if ( !empty( $goods_name ) ) {
+            $sql .= ' AND goods_name LIKE "%'.trim($goods_name).'%"';
+        }
+        if ( !empty( $app_id ) ) {
+            $sql .= ' AND app_id = '.$app_id;
+        }
+        if ( !empty( $startDate ) ) {
+            $sql .= ' AND cal_date >= '."'$startDate'";
+        }
+        if ( !empty( $endDate ) ) {
+            $sql .= ' AND cal_date <= '."'$endDate'";
+        }
+
+        if( $sql ) {
+            $sql = ' WHERE '.substr($sql , 4 );
+        }
+
+        $search_sql = "SELECT  
+                        CONCAT(sku,'/',upc) AS \"商家编码/商品条形码\",
+                        goods_name AS 商品名,
+                        total_num AS 销量,
+                        total_bill_money AS 销售额(元),
+                        (IF( ROUND((total_bill_money/total_num),2)>0,ROUND((total_bill_money/total_num),2),0)) AS 均单价(元)
+                        FROM st_stat_goods_analyse ".$sql.' GROUP BY goods_id';
+
+
+        /**
+         * ==========================
+         * 组装参数，生成导出数据
+         * ==========================
+         */
+
+        $title = '商管家商品分析导出';
+
+        $args_array = array(
+            'creator' => 'system',
+            'title' => $title. date('YmdHis'),
+            'exportIndex' => $exportIndex,
+            'sql' => $search_sql
+        );
+
+        $export_data = $multi_data_obj->add( $args_array );
+
+        return response()->json($export_data);
+
+    }
+
+}

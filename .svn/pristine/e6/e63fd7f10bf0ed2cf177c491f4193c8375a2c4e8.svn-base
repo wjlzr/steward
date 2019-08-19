@@ -1,0 +1,128 @@
+/*公共*/
+a {
+    text-decoration: none;
+    color: #313131
+}
+* {
+    margin: 0;
+    padding: 0
+}
+body{
+    background:#fbfbfb;
+}
+.mr10 {
+    margin-right: 10px;
+}
+.orange {
+    color: #ff9709;
+}
+.blue {
+    color: #00a0e9;
+}
+.fl {
+    float: left;
+}
+.app-content {
+    border: 1px solid #eee;
+    border-radius: 4px;
+    overflow: hidden;
+    padding: 20px 15px;
+}
+.no-content {
+    text-align: center;
+    padding: 100px 0;
+}
+.no-content .img-box {
+    margin-bottom: 50px;
+}
+.img-box img {
+    margin-bottom: 10px;
+}
+.no-content .btn-box {
+    line-height: 34px;
+    width: 300px;
+    margin: 0 auto;
+    overflow: hidden;
+}
+.no-content .btn-box span,.no-content .btn-box button {
+    float: left;
+}
+.no-content .btn-box span {
+    margin: 0 5px;
+}
+
+
+.total-box {
+    padding-bottom: 20px;
+    border-bottom: 1px solid #eee;
+}
+.total-box .order-flex-4{
+    height: 110px;
+    clear: both;
+    margin-top: 20px;
+}
+.order-flex-4 li{
+    float: left;
+    width: 23.5%;
+    text-align: center;
+    background: #fff;
+    height: 100px;
+    margin-right: 2%;
+}
+.order-flex-4 li a {
+    display: block;
+    height: 100px;
+    border-radius: 4px;
+    overflow: hidden;
+    box-shadow: 5px 5px 20px 8px rgba(0,0,0,.025);
+    color: #313131;
+}
+.order-flex-4 li:last-child{
+    margin-right: 0
+}
+.flex-img {
+    float: left;
+    width: 20%;
+}
+.flex-img span {
+    display: block;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    overflow: hidden;
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-position: center center;
+    margin: 33px auto;
+}
+.order-flex-4 li .flex-num{
+    float: left;
+    width: 40%;
+}
+.order-flex-4 li p:first-child {
+    line-height: 20px;
+    margin: 18px 0 10px 0;
+}
+.order-flex-4 li p.num {
+    font-size: 30px;
+    color: #313131;
+}
+.control-label {
+    line-height: 34px;
+    font-weight: normal;
+    color: #313131;
+}
+.col-extend-css {
+    width: 100%;
+}
+.col-extend-css #search-form {
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+}
+.btn-list {
+    padding: 10px 0;
+    border-bottom: 1px solid #eee;
+}
+.btn-list button {
+    margin-right: 10px;
+}

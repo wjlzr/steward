@@ -1,0 +1,180 @@
+<?php
+
+namespace App\Http\Controllers\Admin\Analyse;
+
+use DB;
+
+use App\Models\StApp;
+
+use Illuminate\Http\Request;
+
+use App\Models\Goods\StStatGoodsCategoryAnalyse;
+
+use App\Http\Controllers\Controller;
+
+class OperatingIndexController extends Controller
+{
+    private $data = [];
+
+    //展示页面
+    public function index($op=1)
+    {
+
+        $data['op'] = $op;
+        $data['index'] = 'operating';
+
+        $data['url_data'] = array(
+            '1' => '营业分析',
+            '2' => '销售分析',
+            '3' => '商品分析',
+            '4' => '商品类别分析',
+            '5' => '门店分析',
+            '6' => '门店结算表',
+        );
+
+        $app = StApp::all();
+
+        if ( $app ) {
+            $app = $app->toArray();
+            foreach ( $app as $item ) {
+                $data['app_data'][] = [
+                    'id'=>$item['id'],
+                    'name'=>$item['name'],
+                    'alias'=>$item['alias']
+                ];
+            }
+        }
+
+        $this->data = $data;
+
+        switch ($op){
+            case 1:
+                $view_blade = $this->buisness(); //营业分析
+                break;
+            case 2:
+                $view_blade = $this->saleanalyse(); //销售分析
+                break;
+            case 3:
+                $view_blade = $this->goodsanalyse(); //商品分析
+                break;
+            case 4:
+                $view_blade = $this->goodscategory(); //商品类别分析
+                break;
+            case 5:
+                $view_blade = $this->mallanalyse(); //门店分析
+                break;
+            case 6:
+                $view_blade = $this->mallbalance(); //门店结算表
+                break;
+
+        }
+
+        return view($view_blade,$this->data);
+    }
+
+    /**
+     * 营业分析
+     * @return string
+     */
+    public function buisness()
+    {
+        return 'admin/analyse/buisnessanalyse';
+    }
+
+    /**
+     * 销售分析
+     * @return string
+     */
+    public function saleanalyse()
+    {
+        return 'admin/analyse/saleanalyse';
+    }
+
+    /**
+     * 商品分析
+     * @return string
+     */
+    public function goodsanalyse()
+    {
+        return 'admin/analyse/goodsanalyse';
+    }
+
+    /**
+     * 商品类别分析
+     * @return string
+     */
+    public function goodscategory()
+    {
+
+        //获取一级分类
+        $group_data = StStatGoodsCategoryAnalyse::where([['first_level_id','>',0]])->orderBy('total_bill_money', 'desc')->get()->toArray();
+        if ( !empty( $group_data ) ) {
+            foreach ( $group_data as $item ) {
+                $this->data['first_level'][$item['first_level_id']] = [
+                    'first_level_id' => $item['first_level_id'],
+                    'first_level_name' => $item['first_level_name']
+                ];
+            }
+        }
+
+        //获取二级分类
+        if ( !empty( $this->data['first_level'] ) ) {
+
+            foreach ( $this->data['first_level'] as $item ) {
+
+                $group_data = StStatGoodsCategoryAnalyse::where(['first_level_id'=>$item['first_level_id']])->orderBy('total_bill_money', 'desc')->get()->toArray();
+
+                if ( !empty( $group_data ) ) {
+                    foreach ( $group_data as $v ) {
+                        $this->data['second_level'][$item['first_level_id']] = [
+                            'second_level_id' => $v['second_level_id'],
+                            'second_level_name' => $v['second_level_name']
+                        ];
+                    }
+                }
+            }
+        }
+
+        //获取三级分类
+        if ( !empty( $this->data['second_level'] ) ) {
+
+            foreach ( $this->data['second_level'] as $v ) {
+
+                $group_data = StStatGoodsCategoryAnalyse::where('second_level_id',$v['second_level_id'])->orderBy('total_bill_money', 'desc')->get()->toArray();
+                if ( !empty( $group_data ) ) {
+                    foreach ( $group_data as $item ) {
+                        $this->data['third_level'][$v['second_level_id']] = [
+                            'third_level_id' => $item['third_level_id'],
+                            'third_level_name' => $item['third_level_name']
+                        ];
+                    }
+                }
+            }
+        }
+
+        $this->data['second_level'] = json_encode( $this->data['second_level'] );
+        $this->data['third_level'] = json_encode( $this->data['third_level'] );
+
+        return 'admin/analyse/goodscategory';
+    }
+
+    /**
+     * 门店分析
+     * @return string
+     */
+    public function mallanalyse()
+    {
+        return 'admin/analyse/mallanalyse';
+    }
+
+
+    /**
+     * 门店结算表
+     * @return string
+     */
+    public function mallbalance()
+    {
+        return 'admin/analyse/mallbalance';
+    }
+
+}

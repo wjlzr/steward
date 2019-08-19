@@ -1,0 +1,74 @@
+<?php
+
+namespace App\Services\User;
+
+use App\Models\User\StUser;
+use Illuminate\Support\Facades\DB;
+
+class SearchService
+{
+
+
+    /**
+     * 用户列表搜索
+     * @param $args
+     * @return mixed
+     */
+    public function search($args)
+    {
+
+        $page_size = isset($args['page_size'])
+            ? $args['page_size']
+            : 10;
+
+        $where = [];
+
+        if (isset($args['mobile']) && !empty($args['mobile'])) {
+            $where[] = ['mobile', $args['mobile']];
+        }
+
+        $user_array = StUser::where($where)
+            ->orderBy('id', 'desc')
+            ->paginate($page_size)
+            ->toArray();
+
+
+        return $user_array;
+
+    }
+
+    public function add($args)
+    {
+        $user_data = StUser::where('mobile', $args['user_name'])->first();
+
+        if ($args['user_id']) {
+            if(($args['pwd'])){
+                $return_data = StUser::where('id', $args['user_id'])->update([
+                    'mobile' => $args['user_name'],
+                    'creator' => $args['creator'],
+                    'pwd' => md5($args['pwd']),
+                    'type' => $args['type'],
+                ]);
+            }else{
+                $return_data = StUser::where('id', $args['user_id'])->update([
+                    'mobile' => $args['user_name'],
+                    'creator' => $args['creator'],
+                    'type' => $args['type'],
+                ]);
+            }
+
+        } elseif (!$args['user_id'] && !($user_data)) {
+            $user = new StUser();
+            $user->mobile = $args['user_name'];
+            $user->creator = $args['creator'];
+            $user->pwd = md5($args['pwd']);
+            $user->type = $args['type'];
+            $return_data = $user->save();
+        } else {
+            $return_data = '';
+        }
+
+        return $return_data;
+    }
+
+}

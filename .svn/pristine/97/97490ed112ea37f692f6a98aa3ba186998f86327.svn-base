@@ -1,0 +1,25 @@
+<?php
+
+namespace App\Http\Controllers\Api\Analyse;
+
+use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
+
+use App\Services\Analyse\SellService;
+
+
+class SellController extends Controller
+{
+
+    //销售分析接口
+    public function sell(Request $request)
+    {
+
+        $sell_service = new SellService();
+        $sell_result = $sell_service->sell($request->input());
+        return response()->json(['code'=>200, 'data'=>$sell_result]);
+
+    }
+
+
+}

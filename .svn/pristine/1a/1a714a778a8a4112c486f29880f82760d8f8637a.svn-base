@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>商管云</title>
+    <link href="http://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">
+    <link href="http://cdn.bootcss.com/bootstrap-select/1.12.2/css/bootstrap-select.min.css" rel="stylesheet">
+    <link href="/libs/layui/css/layui.css" rel="stylesheet">
+    <link rel="stylesheet" href="/css/steward/common/common.css?v=20171102">
+    <link rel="stylesheet" href="http://cdn.bootcss.com/bootstrap/3.3.5/css/bootstrap.min.css">
+    <style>
+        body {
+            background: #f2f2f2;
+        }
+        a,a:hover,a:focus,a:active {
+            text-decoration: none;
+            color: #0066ff;
+        }
+        .app-title {
+            height: 48px;
+            background: #fff;
+            overflow: hidden;
+            padding: 0 20px;
+        }
+        .app-title ul {
+            float: left;
+            -webkit-box-sizing: border-box;
+            -moz-box-sizing: border-box;
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+        .app-title ul li {
+            float: left;
+            margin-right: 20px;
+            line-height: 48px;
+        }
+        .app-title ul li span {
+            padding-bottom: 13px;
+
+        }
+        .app-title ul li.cur span {
+            font-weight: 700;
+            color: #5f8af7;
+            border-bottom: 2px solid;
+        }
+        .app-title .right-btn {
+            float: right;
+            padding-top: 7px;
+        }
+
+        .app-content {
+            margin: 10px;
+            padding: 15px;
+            background:#ffffff;
+            min-height: 500px;
+        }
+
+        .form-horizontal .form-group {
+            margin-right: 0;
+            margin-left: 0;
+        }
+        .red {
+            color: red;
+        }
+    </style>
+
+    @yield('css')
+</head>
+
+<body>
+<div class="app-title">
+    <ul>
+        @yield('title')
+    </ul>
+    <div class="right-btn">
+        @yield('go-back-btn')
+    </div>
+</div>
+
+<div class="app-content">
+    @yield('content')
+</div>
+
+</body>
+
+<script src="/libs/jquery/jquery-1.9.1.min.js"></script>
+<script src="http://cdn.bootcss.com/layer/3.0.1/layer.min.js"></script>
+<script src="http://cdn.bootcss.com/bootstrap-select/1.12.2/js/bootstrap-select.min.js"></script>
+<script src="http://cdn.bootcss.com/bootstrap-select/1.12.2/js/i18n/defaults-zh_CN.min.js"></script>
+<script src="/libs/layui/layui.js"></script>
+<script src="http://cdn.bootcss.com/jquery/1.11.3/jquery.min.js"></script>
+<script src="http://cdn.bootcss.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
+<script src="/js/steward/common/global.js"></script>
+
+<script>
+
+    $(document).on('click', '.layer-go-back', function () { //layer的iframe层关闭
+        E.layerClose();
+    });
+
+</script>
+
+@yield('js')
+
+</html>

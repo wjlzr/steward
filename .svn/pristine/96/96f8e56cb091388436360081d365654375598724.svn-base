@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>使用 layDate 独立版</title>
+    <link rel="stylesheet" href="/libs/css/layui.css">
+</head>
+<body>
+
+<input type="text" class="layui-input" id="test1">
+
+<script src="/libs/layui-v2.1.7/layui.js"></script>
+<script>
+    layui.use('laydate', function(){
+        var laydate = layui.laydate;
+
+        //执行一个laydate实例
+        laydate.render({
+            elem: '#test1' //指定元素
+        });
+    });
+</script>
+</body>
+</html>

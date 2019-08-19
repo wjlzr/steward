@@ -1,0 +1,221 @@
+<?php
+namespace App\Services\Wm;
+
+use App\Models\Order\StOrder;
+use App\Models\StApp;
+use App\Services\PushGoMqService;
+use App\Models\User\StUserDevices;
+use App\Models\User\StUserDevicesPush;
+use App\Models\Log\StAppLog;
+use Push;
+
+use Illuminate\Support\Facades\Redis as Redis;
+
+class WmService
+{
+
+    /**
+     * 接口请求入口
+     * @param string $api_name 接口路径 例如：100002.goods.get_shop_categories
+     * @param array $request 请求接口参数数组
+     * @return array
+     */
+    public function send( $api_name, $request = [] ) {
+
+        $start_time = microtime(true);
+
+        $api_arr = explode('.', $api_name);
+        if (!isset($api_arr[2])) {
+            $return = ['code'=>400, 'message'=>'接口名称错误，请检查！'];
+            StAppLog::add($request, response()->json($return), $api_name);
+            return $return;
+        }
+
+        $app_id = app_to_int($api_arr[0]);
+        $func_name = $api_arr[2];
+
+        $app = StApp::find($app_id);
+        if (!$app) {
+            $return = ['code'=>400, 'message'=>'无效请求，应用没有找到'];
+            StAppLog::add($request, response()->json($return), $api_name);
+            return $return;
+        }
+
+        $creator = 'api-'.strtolower($app->alias).'-request';
+        $class_name = sprintf(__NAMESPACE__ . '\%s\Request\%sRequest', $app->alias, $app->alias . ucfirst($api_arr[1]));
+
+        if (!class_exists($class_name)) {
+            $return = ['code'=>400, 'message'=>'接口无权访问，请检查接口文件是否存在！'];
+            StAppLog::add($request, response()->json($return), $api_name, $creator, $app->id);
+            return $return;
+        }
+
+        $instance = new $class_name(self::curl_client($app));
+        if (!method_exists($instance, $func_name)) {
+            $return = ['code'=>404, 'message'=>'接口'.$func_name.'不存在，请检查！'];
+            StAppLog::add($request, response()->json($return), $api_name, $creator, $app->id);
+            return $return;
+        }
+
+        $return_result = empty($request) ? $instance->$func_name() : $instance->$func_name($request);
+        StAppLog::add($request, response()->json($return_result), $api_name, $creator, $app->id, $start_time);
+
+        return $return_result;
+
+    }
+
+
+    /**
+     * 接口请求资源建立
+     * @param $app
+     * @return mixed
+     */
+    public function curl_client($app) {
+
+        $c_class_name = sprintf(__NAMESPACE__ . '\%s\Config', $app->alias);
+
+        $c_instance = new $c_class_name();
+
+        $c_class_val = get_class_vars(get_class($c_instance));
+        if (method_exists($c_instance, '_cover_attribute')) {
+            $c_class_val = array_replace($c_class_val, $c_instance->_cover_attribute());
+        }
+
+        $c_class_val['appKey'] = $app->app_key;
+        $c_class_val['appSecret'] = $app->app_secret;
+        $c_class_val['token'] = $app->access_token;
+
+        $curl_class_name = sprintf(__NAMESPACE__ . '\%s\Curl', $app->alias);
+        $curl_instance = new $curl_class_name();
+
+        $curl_instance->config = $c_class_val;
+
+        return $curl_instance;
+
+    }
+
+    /**
+     * 创建外卖订单
+     * @param $order_data = [
+     *      'app_id' => int 外卖平台id
+     *      'order_id' => bigint 外部订单号
+     *      'day_sequence' => string 店铺当日订单流水
+     *      'operator' => string 操作者
+     *      'user_fee' => string 应付金额
+     *      'order_fee' => string 订单总金额(优惠前)
+     *      'mall_fee' => string 门店实收金额
+     *      'service_fee' => string 服务费
+     *      'mall_act_fee' => string 门店承担总金额
+     *      'app_act_fee' => string 平台承担总金额
+     *      'discount_fee' => string 优惠总金额(门店承担+平台承担)
+     *      'card_fee' => string 【选填】红包抵扣金额
+     *      'package_fee' => string 包装总费用
+     *      'freight_fee' => string 运费总金额
+     *      'mall_code' => string 商家门店编号
+     *      'send_time' => string 配送时间
+     *      'deliver_lng' => string 收货地址经纬度
+     *      'deliver_lat' => string 收货地址经纬度
+     *      'deliver_name' => string 收货人姓名
+     *      'deliver_mobile' => string 收货人手机号
+     *      'deliver_address' => string 收货人地址
+     *      'invoice' => int 【选填】是否需要发票：0、不开发票 1、开发票
+     *      'invoice_title' => int 【选填】发票抬头
+     *      'taxer_id' => string 【选填】纳税人识别号
+     *      'remark' => string 订单备注，没有传空字符串
+     *      'goods' => [
+     *          [
+     *              'goods_name' => string 商品名称
+     *              'goods_number' => int 商品数量
+     *              'goods_from' => int 商品来源：1、正常商品 2、赠品
+     *              'sku' => string 商家商品编码
+     *              'price' => string 商品价格
+     *          ]
+     *      ]，
+     *      'app_order_json' => string 平台推送的原消息串
+     *
+     * ]
+     * @return array
+     */
+    public function create_order( $order_data) {
+
+        $app = StApp::find($order_data['app_id']);
+        if (!$app) {
+            return ['code'=>404, 'message'=>'应用平台没有找到'];
+        }
+
+        $order = StOrder::where(['app_id'=>$app->id, 'app_order_id'=>$order_data['order_id']])->first();
+        if ($order) {
+            return ['code'=>400, 'message'=>'订单：'.$order_data['order_id'].'已经存在'];
+        }
+
+        $order_index = 'order_' . $app->id . '_' . $order_data['order_id'];
+        Redis::setex($order_index, 86400, json_encode($order_data));
+
+        $push_array = [
+            'call_url' => 'http://' . $_SERVER['HTTP_HOST'] . '/ajax/order/add',
+            'order_index' => "$order_index"
+        ];
+
+        $push_result = PushGoMqService::async($push_array);
+        return $push_result;
+
+    }
+
+    /**
+     * 推送极光消息给指定用户设备
+     * @param array $user_array 操作用户数组，包含用户对应的设备
+     * @param string $message 推送消息串
+     * @param int $type 消息类型：1、新订单 2、催单 3、退单
+     * @return bool
+     */
+    public function push_message($user_array, $message, $type) {
+
+        $push_device = [];
+        $ios_source = [
+            1 => 'new_bill.caf',
+            2 => 'remind_bill.caf',
+            3 => 'back_bill.caf'
+        ];
+
+        foreach ($user_array as $user) {
+
+            $st_user_devices = StUserDevices::where('user_id', $user->user_id)->get();
+            if ($st_user_devices->count() <= 0) {
+                continue;
+            }
+
+            foreach($st_user_devices as $device) {
+
+                if (empty($device->device) || in_array($device->device, $push_device) || $device->work_state == 0) {
+                    continue;
+                }
+
+                $st_user_devices_push_first = StUserDevicesPush::where([
+                                                        'device'=>$device->device,
+                                                        'type' => $type
+                                                    ])->first();
+                if ($st_user_devices_push_first && (time() - strtotime($st_user_devices_push_first->updated_at)) <= 10) {
+                    continue;
+                }
+
+                StUserDevicesPush::insert([
+                    'creator' => '',
+                    'device' => $device->device,
+                    'type' => $type,
+                    'user_id' => $device->user_id,
+                    'content' => $message
+                ]);
+
+            }
+
+        }
+
+        Push::send($message, $push_device, [
+                'android_source'=>$type,
+                'ios_source'=>$ios_source[$type]
+        ]);
+        return true;
+
+    }
+
+}

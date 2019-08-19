@@ -1,0 +1,17 @@
+<?php
+
+namespace App\Http\Controllers\Ajax\Goods;
+
+use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
+
+
+class RepertoryController extends Controller
+{
+
+
+
+
+
+}
+

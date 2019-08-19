@@ -1,0 +1,218 @@
+/*公共*/
+a {
+    text-decoration: none;
+    color: #000
+}
+* {
+    margin: 0;
+    padding: 0
+}
+body{
+    background:#fbfbfb;
+}
+/*首页*/
+.main {
+    width: 90%;
+    margin: 20px  auto;
+    height: auto;
+}
+.main-notice {
+    height: 40px;
+    padding: 0 18px;
+    line-height: 40px;
+    border: 1px solid #ffbb58;
+    -webkit-box-shadow: 0 0 10px rgba(0,0,0,0.15);
+    -moz-box-shadow: 0 0 10px rgba(0,0,0,0.15);
+    box-shadow: 0 0 10px rgba(0,0,0,0.15);
+    position: relative;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    background: #fff;
+}
+.main-notice a span{
+    color: #fb8426;
+}
+.main-notice .icon-cancel{
+    position: absolute;
+    right: 18px;
+    top: 0;
+    cursor: pointer;
+    _top:16px;
+}
+.main-info-box{
+    position: relative;
+    margin:20px 0;
+    padding:15px 0 0;
+    background: #fff;
+    clear: both;
+}
+.main-show{
+    padding: 10px 10px 0 30px;
+    height:80px;
+    clear: both;
+}
+.main-info-box .main-show .shop-logo{
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    -webkit-border-radius: 50%;
+    -moz-border-radius: 50%;
+    float: left;
+}
+.main-info-box  .main-show .shop-logo img {
+    width: 100%;
+}
+.shop-info-list{
+    margin-left:40%;
+}
+.shop-info-list li {
+    text-align: center;
+    float: left;
+    border-left: 1px solid #eee;
+    width: 33%;
+}
+.shop-info-list li  a .title-info {
+    font-weight: bold;
+    font-size: 14px;
+    margin-bottom:10px;
+}
+.shop-info-list li  a .today-number {
+    font-size: 24px;
+    color: #fb8426;
+}
+.shop-info-list li  a .tom-number {
+    font-size: 14px;
+    color: #999;
+}
+.order-flex-5{
+    height: 150px;
+    clear: both;
+    margin-top:20px;
+}
+.order-flex-5 li{
+    float: left;
+    width: 19.5%;
+    text-align: center;
+    background: #fff;
+    transition:  all 0.5s;
+    -webkit-transition:  all 0.5s;
+    -moz-transition:  all 0.5s;
+    padding-top: 35px;
+    height:115px;
+    margin-right: 0.5%;
+}
+.order-flex-5 li:last-child{
+    margin-right: 0
+}
+.order-flex-5 li:hover {
+    -webkit-box-shadow: 0 0 5px rgba(0,0,0,0.15);
+    -moz-box-shadow: 0 0 5px rgba(0,0,0,0.15);
+    box-shadow: 0 0 5px rgba(0,0,0,0.15);
+}
+.order-flex-5 li p img{
+    margin-bottom: 10px;
+}
+.order-flex-5 li p {
+    line-height: 20px;
+}
+.chart-z-list{
+    /*width:100%;*/
+    overflow: auto;
+    margin-top: 40px;
+}
+.chart-z-list .chart-z{
+    float: left;
+    width:49%;
+    margin-bottom:10px;
+    margin-right:1%;
+    overflow: hidden;
+}
+.chart-z-list .chart-z:first-child{
+    margin-right: 1%;
+}
+.chart-z-list .chart-second{
+    margin-left: 1%;
+    margin-right:0
+}
+.chart-z {
+    position: relative;
+}
+.chart-z .chart-title{
+    font-weight: bold;
+}
+.chart-z .chart-title .sel-day-btn{
+    position: absolute;
+    right: 0;
+    top: 0;
+}
+.more{
+    font-weight: normal;
+}
+.curn{
+    border-bottom: 2px solid #5f8af7;
+    color: #5f8af7;
+}
+.chart-box{
+    background: #fff !important;
+    margin-top: 2px;
+    padding: 5%;
+    border:1px solid #fff;
+    -webkit-background: #fff;
+    -moz-background:#fff;
+}
+.chart-box img{
+    width: 100%;
+}
+@media only screen and (max-width: 900px){
+    .chart-z-list .chart-z{
+        width:100%;
+        float: none;
+    }
+    .chart-z-list .chart-z:nth-child(1){
+        margin-right: 0;
+    }
+    .chart-z-list .chart-z:nth-child(2){
+        margin-left: 0;
+    }
+}
+.news-list{
+
+}
+.news-list li {
+    height: 30px;
+    position: relative;
+}
+
+.news-list li  a{
+    width: 60%;
+    display: inline-block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: left;
+    line-height: 30px;
+    height:30px;
+    background: url("/static/images/steward/news-before.png") no-repeat center left;
+    -webkit-background-size: 4px;
+    background-size: 4px;
+    padding-left:10px;
+}
+.news-list li span{
+    position: absolute;
+    top: 0;
+    right: 0px;
+    line-height: 30px;
+    float: right;
+    display: inline-block;
+}
+.chart-zx{
+    background: #fff;
+    margin: 55px 0;
+}
+.chart-zx-box{
+    padding:10px;
+}
+.chart-zx-box img{
+    width:100%;
+}

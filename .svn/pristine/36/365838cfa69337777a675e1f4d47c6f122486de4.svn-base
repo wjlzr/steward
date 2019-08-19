@@ -1,0 +1,230 @@
+em{
+    font-style: normal;
+}
+.list-content{
+    overflow: hidden;
+    background:#fff;
+}
+.list-aside{
+    width:21%;
+    float: left;
+    margin-top:10px;
+}
+.aside-tit{
+    border-bottom:1px solid #eee;
+    overflow: hidden;
+    line-height:30px;
+    margin:0 20px 0 0;
+    padding:6px 0;
+}
+.aside-tit .sorted-tit{
+    float: left;
+    font-weight: 600;
+}
+.aside-tit .active-border a{
+    float: right;
+}
+/*分类列表*/
+.icon-toggle{
+    width: 20px;
+    position: absolute;
+    height:40px;
+}
+.toggle{
+    width: 20px;
+    position: absolute;
+    height:40px;
+}
+.iconUp{
+    background:url('/images/admin/toggle-up.png') no-repeat center left;
+    background-size:18px;
+}
+.iconDown{
+    background:url('/images/admin/toggle-down.png') no-repeat center left;
+    background-size:18px;
+}
+.icon-text{
+    position: absolute;
+    top:0;
+    left:25px;
+    width: 61%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.icon-number{
+    float: right;
+    padding-right: 20px
+}
+.submenu{
+    display:none;
+}
+.submenu li .publicSubmit{
+    overflow: hidden;
+    line-height:40px;
+    padding-left:20px;
+}
+.submenu li.on .publicSubmit{
+    color:#5f8af7;
+}
+.current{
+    background: url('/images/admin/active-icon.jpg') no-repeat center right;
+    -webkit-background-size: 6px;
+    background-size: 6px;
+    z-index: 99;
+}
+.publicSubmit .second-text{
+    float: left;
+    margin-left:25px;
+}
+.publicSubmit .second-number{
+    float: right;
+    padding-right:20px
+}
+.sort-list{
+    margin:15px 0;
+}
+.sort-list li{
+    cursor: pointer;
+}
+.sort-list li .list-cont{
+    position:relative;
+    overflow: hidden;
+    line-height:40px;
+    height: 40px;
+}
+.sort-list li.active .list-cont{
+    color:#00a0e9;
+}
+.list-body-right{
+    float: left;
+    border-left:1px solid #eee;
+    width:78%;
+    position: relative;
+    left:-6px;
+    min-height:600px;
+}
+.body-box{
+    margin:0 0 10px 20px;
+}
+.nav-list{
+    border-bottom:1px solid #eee;
+    padding:0 20px;
+}
+.nav-list .nav-item {
+    display: inline-block;
+    *display: inline;
+    zoom:1;
+    margin:0 40px 0 0;
+    line-height: 30px;
+    padding: 5px 0;
+    cursor: pointer;
+}
+.nav-list .nav-item.on {
+    border-bottom:2px solid #00a0e9;
+    color:#00a0e9;
+}
+/* 复选按钮  单选按钮样式*/
+.icheck{width:22px; height:22px; position: relative; display: inline-block; cursor: pointer;}
+.icheck label{ width:100%; height:100%; border-radius:30px; border:1px solid #ddd; box-sizing: border-box; float: left; background: #fff; cursor: pointer}
+.icheck-square label{border-radius:3px;}
+.icheck input[type=checkbox]{visibility: hidden;position: absolute; z-index:9999;}
+.icheck input[type=radio]{visibility: hidden;position: absolute; z-index:9999;}
+.icheck label:after{
+    content: '';
+    display:inline-block;
+    background:url("/static/images/m/common/icheck.png") no-repeat center center ;
+    background-size:60% auto;
+    width:100%;
+    height:100%;
+    position:absolute;
+    top:0;
+    left:0;
+}
+.icheck input:checked + label{ border: none;}
+.icheck.checked label{  border: none;}
+
+.icheck.checked label{
+    background:#5f8af7
+}
+.whole{
+    position:relative;
+    top:-6px;
+}
+.checked-box{
+    margin-top: 15px;
+    overflow: hidden;
+}
+.checked-box-nav{
+    float: left;
+}
+.editBatch{
+    float: left;
+    margin-left:0px;
+}
+.editBatch span{
+    margin-right: 37px;
+}
+.tab-thred{
+    background:#fbfbfb;
+    height: 40px;
+    line-height:40px;
+    padding:0 20px;
+    overflow: hidden;
+}
+.tab-thred div{
+    float: left;
+}
+.tab-checkbox{
+    width:16%;
+}
+.tab-typeNo{
+    width:16%;
+}
+.checkSquare{
+    position: relative;
+    top:5px;
+}
+.edit-word{
+    margin-left:8px;
+}
+.spec-type-tab{
+    width:100%;
+}
+.spec-type-tab tr th{
+    text-align: center;
+    padding:10px 20px;
+    background: #fbfbfb;
+}
+.tab-left-flex{
+    text-align: left;
+}
+.spec-type-tab tr td{
+    padding:20px 20px;
+    text-align: center;
+}
+.spec-type-tab tr{
+    border-bottom:1px solid #eee;
+}
+.spec-type-tab tr:nth-child(1){
+    border-bottom:none;
+}
+.word-color{
+    color:#6598f1 !important;
+    cursor: pointer;
+}
+.edit-icon{
+    cursor: pointer;
+}
+.third_menu{
+    display: none;
+}
+.publicSubmit .icon-toggle{
+    margin-right:5px;
+}
+.third_cont{
+    position: relative;
+    height: 40px;
+    line-height: 40px;
+    margin-left: 35px;
+}

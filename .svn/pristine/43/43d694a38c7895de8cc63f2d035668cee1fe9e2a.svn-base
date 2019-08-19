@@ -1,0 +1,81 @@
+<?php
+
+namespace App\Http\Controllers\Admin\Plugin;
+
+use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
+
+use App\Models\Export\ExportManage;
+
+
+class ExportController extends Controller
+{
+
+
+    //加载导出任务列表页面
+    public function index($id)
+    {
+
+        return view('admin/plugin/export', ['export_index'=>$id]);
+
+    }
+
+
+    //查询导出任务列表数据
+    public function search(Request $request)
+    {
+
+        $where = [];
+
+        if ( $request->input('export_index') ) {
+            $where[] = ['export_index', $request->input('export_index')];
+        }
+
+        if ( $request->input('title') ) {
+            $where[] = ['name','like','%'.$request->input('title').'%'];
+        }
+
+        $export_data = ExportManage::where($where)
+            ->paginate($request->input('limit'))
+            ->toArray();
+
+        $export_result = [
+            'code' => 0,
+            'count' => $export_data['total'],
+            'data' => []
+        ];
+
+        foreach ( $export_data['data'] as $export ) {
+
+            $operation = '';
+            if ($export['status'] == 2) {
+                $operation = '<a href="javascript:void(0)下载</a>">';
+            }
+
+            $status_name = '执行中';
+            if ($export['status'] == 2) {
+                $status_name = '已完成';
+            } else if ($export['status'] == 3) {
+                $status_name = !empty($export['error_msg'])
+                    ? $export['error_msg']
+                    : '导出失败';;
+            }
+
+            $return_result['data'][] = [
+                'operation' => $operation,
+                'export_id' => app_to_int($export['export_id']),
+                'export_index' => app_to_int($export['export_index']),
+                'title' => app_to_string($export['title']),
+                'status' => app_to_int($export['status']),
+                'status_name' => $status_name,
+                'error_msg' => app_to_string($export['error_msg'])
+            ];
+
+        }
+
+        return $export_result;
+
+    }
+
+
+}

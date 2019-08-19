@@ -1,0 +1,67 @@
+<?php
+
+namespace App\Services\User;
+
+use App\Models\User\StUser;
+
+
+class UserSearchService
+{
+
+
+    /**
+     * 用户列表搜索
+     * @param $args
+     * @return mixed
+     */
+    public function search($args)
+    {
+
+        $page_size = isset($args['page_size'])
+            ? $args['page_size']
+            : 10;
+
+        $where = [];
+
+        if (isset($args['mobile']) && !empty($args['mobile'])) {
+            $where[] = ['mobile', $args['mobile']];
+        }
+
+        $user_array = StUser::where($where)
+            ->orderBy('id', 'desc')
+            ->paginate($page_size)
+            ->toArray();
+
+
+        return $user_array;
+
+    }
+
+
+    /**
+     * 获取用户详细信息
+     * @param $user_id
+     * @return array
+     */
+    public function get($user_id)
+    {
+
+        $user = StUser::find($user_id);
+        if (!$user) {
+            return ['code'=>404, 'message'=>'用户信息没有找到'];
+        }
+
+        $user_result = [
+            'user_name' => app_to_string($user->user_name),
+            'full_name' => app_to_string($user->full_name),
+            'mobile' => app_to_string($user->mobile),
+            'type' => app_to_int($user->type),
+            'status' => app_to_int($user->status)
+        ];
+
+        return ['code'=>200, 'message'=>'ok', 'data'=>$user_result];
+
+    }
+
+
+}

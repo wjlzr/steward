@@ -1,0 +1,56 @@
+<?php
+
+namespace App\Http\Controllers\Admin\Goods;
+
+use App\Models\Goods\StCategory;
+use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
+
+
+class CategoryController extends Controller
+{
+
+
+    public function index() {
+
+
+        return view('/admin/goods/category/index');
+    }
+
+    public function search( Request $request) {
+
+        $st_category = StCategory::all();
+
+        if( !$st_category -> isEmpty()){
+            $st_category = $this -> getTree( $st_category->toArray() , 0 );
+        }
+
+        return response()->json(['code' => 200 ,'data' => $st_category]);
+    }
+
+
+    public function edit() {
+
+
+    }
+
+    public function status() {
+
+
+    }
+
+    private function getTree($data, $pId)
+    {
+        $tree = '';
+
+        foreach ($data as $k => $v){
+            if($v['p_id'] == $pId)
+            {
+                $v['children'] = $this->getTree($data, $v['id']);
+                $tree[] = $v;
+            }
+        }
+        return $tree;
+    }
+
+}

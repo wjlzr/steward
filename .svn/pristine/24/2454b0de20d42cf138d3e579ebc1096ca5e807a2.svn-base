@@ -1,0 +1,376 @@
+<?php
+
+namespace App\Http\Controllers\Receive;
+
+use Wm;
+use App;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
+use App\Models\Order\StOrder;
+use App\Models\Order\StOrderTrace;
+use App\Http\Controllers\Controller;
+use App\Services\Order\OrderEditService;
+
+class MtFoodController extends Controller
+{
+
+    private $create_type = 0;
+
+    /**
+     * 消息推送统一入口
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function index(Request $request, $type)
+    {
+
+        $content = $request->input();
+        $app = $content['_app'];
+
+        if (!isset($content['order_id']) || empty($content['order_id'])) {
+            return response()->json(['data' => 'ok']);
+        }
+
+        if ($type != 'create') {
+            $order = StOrder::where('app_order_id', $content['order_id'])
+                ->first();
+            if (!$order) {
+                return response()->json(['code'=>404, 'message'=>'订单信息没有找到']);
+            }
+            $content['order_id'] = $order->id;
+        }
+
+        error_log('----------- mt订单推送 enter ----------');
+        error_log($type);
+        error_log(var_export($content, true));
+
+        switch (true) {
+
+            //结算信息
+            case $type == 'settlement':
+                $res = $this->settlement($content);
+                break;
+
+            //订单生效
+            case $type == 'create':
+                $this->create_type = 1;
+                $res = $this->create($content,$app);
+                break;
+
+            //美团或者客户取消订单
+            case $type == 'cancel':
+                $res = $this->cancel($content);
+                break;
+
+            //美团用户或客服退款流程操作
+            case $type == 'refund':
+                $res = $this->refund($content);
+                break;
+
+            //已确认订单
+            case $type == 'cfmd_order':
+                $res = $this->confirmOrderPush($content);
+                break;
+
+            //已完成订单
+            case $type == 'finish_order':
+                $res = $this->finishOrderPush($content);
+                break;
+
+            //订单配送状态回调
+            case $type == 'send_status':
+                $res = $this->distributionStatePush($content);
+                break;
+
+            default:
+                return response()->json(['data' => 'ok']);
+                break;
+
+        }
+
+        if ($res['code'] != 200) {
+
+            error_log('======//返回的错误信息');
+
+            error_log($res['code'].':'.$res['message']);
+            return $res;
+
+        }else{
+
+            return response()->json(['data' => 'ok']);
+        }
+
+    }
+
+    /**
+     * 推送结算信息
+     */
+    public function settlement($data) {
+
+        if ($this->create_type == 0) {
+            return ['code' => 400, 'message' => 'error'];
+        }else{
+            StOrder::where('id',$data['order_id'])->update(['service_fee'=>$data['commisionAmount']]);
+            $this->create_type = 0;
+        }
+
+        return ['code' => 200, 'message' => 'ok'];
+    }
+
+    /**
+     * 推送已支付订单
+     */
+    public function create($data,$app) {
+
+        //费用信息
+        $fee_data = json_decode(urldecode($data['extras']),true);
+
+        //优惠金额
+        $reduce_fee = 0 ;
+        //门店承担总金额
+        $mall_act_fee = 0;
+        //平台承担总金额
+        $app_act_fee = 0;
+        //餐盒总价
+        $lunch_box_fee = 0;
+        foreach($fee_data as $kk=>$vv){
+            $reduce_fee += $vv['reduce_fee'];
+            $mall_act_fee += $vv['poi_charge'];
+            $app_act_fee += $vv['mt_charge'];
+        }
+
+        //商品详情信息
+        $detail_data = json_decode(urldecode($data['detail']),true);
+
+        //门店实收金额
+        $poi_receive_detail = json_decode(urldecode($data['poi_receive_detail']),true);
+
+        //商品信息
+        $goods_data = [];
+        foreach($detail_data as $kk=>$vv){
+            $goods_data[] = [
+                "goods_name" => $vv['food_name'] ,   //商品名称
+                "goods_number" => $vv['quantity'] ,  //商品份数
+                'goods_from' => 1,
+                "price" =>  $vv['price'] ,  //商品实售价
+                "sku" =>  $vv['sku_id']   //商品编号
+            ];
+            $lunch_box_fee += $vv['box_price'];
+        }
+
+        $sendTime = $data['delivery_time'] == 0 ? '立即送达' : date('Y-m-d H:i:s',$data['delivery_time']);
+
+        $taken_data = [
+            'app_id' => $app->id,
+            'order_id' => $data['order_id'],
+            'day_sequence' => $data['day_seq'],
+            'operator' => 'mt-api',
+            'user_fee' => $data['total'],
+            'order_fee' => $data['original_price'],
+            'mall_fee' => round($poi_receive_detail['onlinePayment']/100,2),
+            'mall_act_fee' => $mall_act_fee,
+            'service_fee' => '0.00',
+            'app_act_fee' => $app_act_fee,
+            'mall_code' => $data['app_poi_code'],
+            'send_time' => $sendTime,
+            //'deliver_lng' => $data['latitude'],
+            //'deliver_lat' => $data['latitude'],
+            'deliver_lng' => '121.347512',
+            'deliver_lat' => '31.152363',
+            'deliver_name' => urldecode($data['recipient_name']),
+            'deliver_address' => urldecode($data['recipient_address']),
+            'deliver_mobile' => $data['recipient_phone'],
+            'freight_fee' => $data['shipping_fee'],
+            'package_fee' => $lunch_box_fee,
+            'discount_fee' => $reduce_fee,
+            'invoice' => $data['has_invoiced'],
+            'invoice_title' => $data['invoice_title'],
+            'taxer_id' => $data['taxpayer_id'],
+            'remark' => $data['caution'],
+            'goods' => $goods_data,
+            'app_order_json' => json_encode($data)
+        ];
+
+        error_log('======//请求参数');
+        error_log(var_export($taken_data,true));
+
+        $result = Wm::create_order($taken_data);
+
+        return ['code' => $result['code'], 'message' => $result['message']];
+    }
+
+    /**
+     * 已确认订单回调
+     */
+    public function confirmOrderPush($data)
+    {
+
+        $order_edit = new OrderEditService();
+        $order_result = $order_edit->receive($data['order_id'], 'mt-push', 0);
+        return $order_result;
+    }
+
+    /**
+     * 订单完成回调
+     * @param $args
+     * @return array
+     */
+    public function finishOrderPush($args)
+    {
+        $order = StOrder::find($args['order_id']);
+
+        if (!in_array($order->status, [2, 3])) {
+            StOrder::where('id', $order->id)->update(['status'=>2]);
+        }
+        $order_edit = new OrderEditService();
+        $order_result = $order_edit->complete($args['order_id'], 'mt-push', 0);
+        return $order_result;
+
+    }
+
+    /**
+     * 订单配送状态回调
+     */
+    public function distributionStatePush($data)
+    {
+
+        $content_map = [
+            0 => [2, '配送单发往配送'],
+            10 => [3, '配送单已确认'],
+            20 => [4, '骑手已取餐'],
+            40 => [5, '骑手已送达'],
+            100 => [6, '配送单已取消', 'hang_up']
+        ];
+
+        if ($data['logistics_status'] == 20) {
+            $order_edit = new OrderEditService();
+            $order_result = $order_edit->delivery($data['order_id'], 'mt-push', 0);
+            return $order_result;
+
+        }else{
+
+            //记录订单轨迹并更新物流状态
+            $StOrderTrace = new StOrderTrace();
+            $StOrderTrace->updated_at = Carbon::now();
+            $StOrderTrace->creator = 'mt-push';
+            $StOrderTrace->created_at = Carbon::now();
+            $StOrderTrace->order_id = $data['order_id'];
+            $StOrderTrace->order_status = $content_map[$data['logistics_status']][0];
+            $StOrderTrace->content = $content_map[$data['logistics_status']][1];
+            $StOrderTrace->save();
+
+            return ['code' => 200, 'message' => 'ok'];
+        }
+
+    }
+
+    /**
+     * 美团用户或客服取消
+     */
+    public function cancel($data) {
+
+        $order_edit = new OrderEditService();
+        $order_result = $order_edit->cancel($data['order_id'], 'push', $data['reason'], 'mt-push', 0);
+        return $order_result;
+
+    }
+
+    /**
+     * 退单消息[下行]
+     */
+    public function refund($data) {
+
+        error_log('=====//退单');
+        error_log(var_export($data,true));
+
+        if (!isset($data['order_id']) || empty($data['order_id'])) {
+            return ['code' => 404, 'message' => '参数错误：order_id'];
+        }
+
+        if (!isset($data['reason']) || empty($data['reason'])) {
+            $args_data['reason'] = '';
+        }
+
+        switch($data['notify_type']) {
+
+            //用户申请退单
+            case 'apply':
+                $res = $this->apply_refund($data);
+                break;
+
+            //确认退款
+            case 'agree':
+                $res = $this->agree_refund($data);
+                break;
+
+            //驳回退款
+            case 'reject':
+                $res = $this->dis_agree_refund($data);
+                break;
+
+            //用户取消退单
+            case 'cancelRefund':
+                $res = $this->cancel_apply_refund($data);
+                break;
+
+        }
+
+        return ['code' => $res['code'], 'message' => $res['message']];
+    }
+
+    /**
+     * 用户申请退单
+     * @param $args_data
+     * @return array
+     */
+    private function apply_refund($args_data)
+    {
+
+        $order_edit = new OrderEditService();
+        $order_result = $order_edit->applyRefund($args_data['order_id'], 'mt-push', $args_data['reason'], 2);
+        return $order_result;
+
+    }
+
+    /**
+     * 商户同意退单
+     * @param $args
+     * @return array
+     */
+    private function agree_refund($args)
+    {
+
+        $order_edit = new OrderEditService();
+        $order_result = $order_edit->agreeRefund($args['order_id'], 'mt-push', 0);
+        return $order_result;
+    }
+
+    /**
+     * 商户拒绝退单
+     * @param $args
+     * @return array
+     */
+    private function dis_agree_refund($args)
+    {
+
+        $order_edit = new OrderEditService();
+        $order_result = $order_edit->disagreeRefund($args['order_id'], '平台推送拒绝退单', 'mt-push', 0);
+        return $order_result;
+
+    }
+
+    /**
+     * 用户取消退单申请
+     * @param $args_data
+     * @return array
+     */
+    private function cancel_apply_refund($args_data)
+    {
+
+        $order_edit = new OrderEditService();
+        $order_result = $order_edit->cancelApplyRefund($args_data['order_id'], 'ele-push', 2);
+        return $order_result;
+
+    }
+
+}

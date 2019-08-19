@@ -1,0 +1,148 @@
+@extends('admin.layoutList')
+
+@section('css')
+    <link  rel="stylesheet" href="/css/admin/order/order.css?v=20180108002">
+@endsection
+
+@section('title')
+    <li class="cur"><span>用户列表</span></li>
+@endsection
+
+@section('btn')
+    <button type="button" class="btn btn-info user-add">新建用户</button>
+@endsection
+
+@section('search')
+    <div class="form-group">
+        <label for="mobile">用户名</label>
+        <input type="text" class="form-control" id="mobile" name="mobile" placeholder="请输入用户名">
+    </div>
+@endsection
+
+@section('js')
+    <script type="text/javascript">
+
+        var bootstrap_table_ajax_url = '/admin/user/search';
+        bootstrap_table({
+            sortName : 'id',
+            sortOrder : 'desc',
+            columns: [ //字段
+                { title: '操作', field: 'operation', align: 'center' },
+                { title: '用户名',  field: 'mobile', align: 'left' },
+                { title: '姓名', field: 'name', align: 'left' },
+                { title: '所属角色', field: 'type', align: 'center' },
+                { title: '所属门店', field: 'mall', align: 'left' },
+                { title: '创建时间', field: 'created_at', align: 'left' },
+                { title: '修改时间', field: 'updated_at', align: 'left' },
+                { title: '最后操作人', field: 'editor', align: 'left' },
+                { title: '状态', field: 'status', align: 'left' }
+            ]
+        });
+
+        //启用&&禁用
+        $(document).on('click', '.status_type', function () {
+            var del_str = '';
+            var notice = '';
+            var err_msg = '';
+            var del_arr = [];
+
+            var user_id = $(this).attr('data_id');
+            var status = $(this).attr('data_type');
+            if (E.isInt(user_id) && user_id > 0) {
+                if (status == 1) {
+                    notice = '您确定将该门店禁用吗？';
+                }else{
+                    notice = '您确定将该门店启用吗？';
+                }
+            } else {
+                err_msg = '参数错误，请刷新页面';
+            }
+
+            if (err_msg) {
+                layer.msg(err_msg, {icon: 2, shade: [0.15, 'black'], offset: '120px', time: 1000});
+                return false;
+            }
+
+            layer.confirm(notice, {icon: 3, offset: '50px'}, function (index) {
+
+                layer.close(index);
+
+                E.ajax({
+                    type: 'get',
+                    url: '/admin/user/status',
+                    data: {
+                        'data': user_id+','+status
+                    },
+                    success: function (o) {
+                        if (o.code == 200) {
+                            layer.msg(o.message, {icon: 1, time: 1000});
+                            bootstrap_table_init();
+                        } else {
+                            layer.msg('操作失败', {icon: 2, time: 1000});
+                        }
+                    }
+                });
+            })
+        });
+
+        //修改
+        $(document).on('click', '.edit', function () {
+            var notice = '';
+            var err_msg = '';
+
+            var id = $(this).attr('data_id');
+
+            if (E.isInt(id) && id > 0) {
+                    notice = '您确定将绑定门店吗？';
+            } else {
+                err_msg = '参数错误，请刷新页面';
+            }
+
+            if (err_msg) {
+                layer.msg(err_msg, {icon: 2, shade: [0.15, 'black'], offset: '120px', time: 1000});
+                return false;
+            }
+
+            layer.confirm(notice, {icon: 3, offset: '50px'}, function (index) {
+
+                layer.close(index);
+
+                E.ajax({
+                    type: 'get',
+                    url: '/admin/user/edit/{id}',
+                    data: {
+                        'id': id
+                    },
+                    success: function (o) {
+                        if (o.code == 200) {
+                            layer.msg(o.message, {icon: 1, time: 1000});
+                            bootstrap_table_init();
+                        } else {
+                            layer.msg('操作失败', {icon: 2, time: 1000});
+                        }
+                    }
+                });
+            })
+        })
+
+        //新建用户
+        $(document).on('click', '.user-add', function () {
+            layer.open({
+                title:false,
+                type : 2,
+                closeBtn : 0 ,
+                area : ['60%','75%'],
+                content : '/admin/user/add'
+            })
+
+
+
+
+        })
+
+
+
+    </script>
+
+@endsection
+

@@ -1,0 +1,107 @@
+<?php
+
+/*
+|--------------------------------------------------------------------------
+| Web Routes
+|--------------------------------------------------------------------------
+|
+| Here is where you can register web routes for your application. These
+| routes are loaded by the RouteServiceProvider within a group which
+| contains the "web" middleware group. Now create something great!
+|
+*/
+
+Route::get('/', function () {
+    return view('welcome');
+});
+
+Route::get('kit/captcha', 'Common\KitController@captcha');
+
+Route::get('admin/login', 'Admin\LoginController@index');
+Route::get('admin/login/do', 'Admin\LoginController@login');
+Route::get('admin/logout', 'Admin\LoginController@logout');
+
+Route::post('upload', 'Common\UploadController@upload');
+
+Route::middleware(['admin.service'])->group(function () {
+
+    //首页
+    Route::get('admin', 'Admin\IndexController@main');
+    Route::get('admin/index', 'Admin\IndexController@index');
+    Route::get('admin/index/mall', 'Admin\IndexController@mall');
+
+    //订单
+    Route::get('admin/order', 'Admin\OrderController@index');
+    Route::get('admin/order/search', 'Admin\OrderController@search');
+    Route::get('admin/order/detail/{id}', 'Admin\OrderController@detail');
+
+    //商品分类
+    Route::get('admin/category', 'Admin\Goods\CategoryController@index');
+    Route::get('admin/category/search', 'Admin\Goods\CategoryController@search');
+    Route::get('admin/category/edit', 'Admin\Goods\CategoryController@edit');
+    Route::get('admin/category/add', 'Admin\Goods\CategoryController@add');
+    Route::get('admin/category/status', 'Admin\Goods\CategoryController@status');
+    Route::get('admin/category/sync', 'Admin\Goods\CategoryController@sync');
+
+    //商品管理
+    Route::get('admin/goods', 'Admin\Goods\GoodsController@index');
+    Route::get('admin/goods/search/{type}', 'Admin\Goods\GoodsController@search');
+    Route::get('admin/goods/shelf', 'Admin\Goods\GoodsController@shelf');
+    Route::get('admin/goods/edit', 'Admin\Goods\GoodsController@edit');
+    Route::get('admin/goods/search_price/{id}', 'Admin\Goods\GoodsController@searchPrice');
+    Route::get('admin/goods/edit_price', 'Admin\Goods\GoodsController@editPrice');
+
+    //商品同步
+    Route::get('admin/goods/synch', 'Admin\Goods\GoodsSynchController@index');
+    Route::get('admin/goods/synch/search', 'Admin\Goods\GoodsSynchController@search');
+    Route::get('admin/goods/synch/edit', 'Admin\Goods\GoodsSynchController@edit');
+
+    //商品列表插件
+    Route::get('admin/plugin', 'Admin\Plugin\GoodsPluginController@index');
+    Route::get('admin/plugin/search', 'Admin\Plugin\GoodsPluginController@search');
+    Route::get('admin/plugin/goods', 'Admin\Plugin\GoodsPluginController@goods');
+
+    //经营分析
+    Route::get('admin/business/analyse/{op?}', 'Admin\Analyse\OperatingIndexController@index');
+    Route::post('admin/business/analyse/1/report', 'Admin\Analyse\BillSaleController@report');
+    Route::post('admin/business/analyse/1/list', 'Admin\Analyse\BillSaleController@saleList');
+
+    //商品分析
+    Route::get('admin/goods/analyse/list', 'Admin\Analyse\goodsController@goodsList');
+
+    //商品类别分析
+    Route::get('admin/goods/category/list', 'Admin\Analyse\categoryController@goodsList');
+
+    //系统设置
+    Route::get('admin/mall', 'Admin\Mall\MallController@index');
+    Route::get('admin/mall/search', 'Admin\Mall\MallController@search');
+    Route::get('admin/mall/status', 'Admin\Mall\MallController@status');
+    Route::get('admin/mall/update', 'Admin\Mall\MallController@stock_update');
+    Route::get('admin/mall/edit', 'Admin\Mall\MallController@edit');
+
+    //任务管理
+    Route::get('admin/task', 'Admin\Task\TaskManageController@index');
+    Route::get('admin/task/search', 'Admin\Task\TaskManageController@search'); // 查询任务管理
+    Route::get('admin/task/get', 'Admin\Task\TaskManageController@get'); // 获取任务单条信息
+    Route::post('admin/task/edit', 'Admin\Task\TaskManageController@edit'); // 编辑or添加任务
+    Route::get('admin/task/status', 'Admin\Task\TaskManageController@status'); // 暂停或运行任务
+    Route::get('admin/task/del', 'Admin\Task\TaskManageController@del'); // 删除任务
+    Route::get('admin/task/log', 'Admin\Task\TaskManageController@log'); // 查询日志
+
+    //用户管理
+    Route::get('admin/user', 'Admin\User\UserController@index');
+    Route::get('admin/user/search', 'Admin\User\UserController@search');
+    Route::get('admin/user/add', 'Admin\User\UserController@add');
+    Route::get('admin/user/edit/{id}', 'Admin\User\UserController@edit');
+    Route::get('admin/user/submit', 'Admin\User\UserController@submit');
+    Route::get('admin/user/status', 'Admin\User\UserController@status');
+
+});
+
+Route::middleware(['api.service'])->prefix('/open-api/')->group(function () {
+    Route::get('order/index', 'Api\Order\OrderController@index');
+    Route::get('order/search', 'Api\Order\OrderController@search');
+    Route::get('order/detail/{id}', 'Api\Order\OrderController@detail');
+    Route::get('user/search', 'Api\User\UserController@search');
+    Route::get('user/edit', 'Api\User\UserController@edit');
+});

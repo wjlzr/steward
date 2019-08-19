@@ -1,0 +1,61 @@
+<?php
+
+namespace App\Http\Controllers\Admin\Goods;
+
+
+use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
+
+
+class GoodsSynchController extends Controller
+{
+
+
+    //商品同步首页
+    public function index(Request $request)
+    {
+
+        return view('admin/goods/synch/index', []);
+
+    }
+
+    //列表页数据
+    public function search (Request $request)
+    {
+        //返回数组
+        $return_data = [
+            'total' => 1,
+            'rows' => []
+        ];
+
+        $return_data['rows'][] = array(
+            'operation' => '详情',
+            'sid' => '同步商品至线上分店',
+            'sDesc' => '2018-01-03 20 : 45',
+            'releaseTime' => '李建兵',
+            'status' => '已完成',
+            'testStatus' => '35 个商品上架成功'
+        );
+
+        return response()->json($return_data);
+    }
+
+    //商品同步上线/下线页
+    public function edit(Request $request)
+    {
+
+        return view('admin/goods/synch/edit', []);
+
+    }
+
+
+    //商品同步上线/下线提交
+    public function submit(Request $request)
+    {
+
+        return response()->json(['code'=>200, 'message'=>'ok', 'data'=>[]]);
+
+    }
+
+
+}

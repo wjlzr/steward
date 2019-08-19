@@ -1,0 +1,548 @@
+@extends('admin.layoutList')
+@section('css')
+
+    <link href="/libs/iCheck/skins/square/blue.css" rel="stylesheet">
+    <style>
+        .col-extend-css {
+            width: 100%;
+            text-align: left;
+        }
+        .laytable-cell-1-operation a {
+            padding : 6px;
+        }
+        .laytable-cell-1-platForm img {
+            padding:2px;
+        }
+        #pop label {
+            font-weight: 500;
+        }
+        .layui-table-body .laytable-cell-1-operation {
+            height : 50px;
+        }
+    </style>
+@endsection
+@section('title')
+    <li class="cur">
+        <a href="#"><span>门店商品</span></a>
+    </li>
+@endsection
+@section('search')
+    <div class="form-group">
+        <label for="goods_name">商品名称：</label>
+        <input type="text" placeholder="请输入商品名称" style="width: 130px;" class="form-control" name="name" id="name">&nbsp;
+    </div>
+    <div class="form-group">
+        <label for="product_code">商品编码：</label>
+        <input type="text" placeholder="请输入商品编码" style="width: 130px;"  class="form-control" name="sku" id="sku">&nbsp;
+    </div>
+    <div class="form-group">
+        <label for="goods_name">商品条码：</label>
+        <input type="text" placeholder="请输入商品条码" style="width: 130px;"  class="form-control" name="upc" id="upc">&nbsp;
+    </div>
+    <div class="form-group category-list">
+        <label >商品分类：</label>
+
+    </div>
+
+@endsection
+@section('button')
+    <div class="" style="margin-top: 14px;padding:10px;background-color: #eee;">
+        <button class="btn btn-border-blue pull-erp-stock batch btn-batch" disabled >批量拉取ERP库存</button>
+        <button class="btn btn-border-blue pull-erp-price batch btn-batch" disabled="disabled">批量拉取ERP价格</button>
+        <button class="btn btn-border-blue sync-app batch btn-batch" disabled="disabled">同步上线平台</button>
+        <button class="btn btn-border-blue inventory batch btn-batch" disabled="disabled">批量修改库存</button>
+    </div>
+@endsection
+@section('js')
+
+    <script src="/libs/iCheck/icheck.js"></script>
+    <script>
+        var layui_table_ajax_url = '/admin/mallgoods/search';
+
+        layui_table({
+            sort_name : 'product_code',
+            sort_order : 'desc',
+            cols: [ [//字段
+                { type: 'checkbox',event : 'checkbox'},
+                { title: '操作', field: 'operation', align: 'center' ,width : 230  },
+                { title: '商品编码/条码', field: 'product_code', align: 'center' , width:'' },
+                { title: '商品信息',  field: 'goods_info', align: 'left',width : '' },
+                { title: '所属分类', field: 'category', align: 'left', width:'' },
+                { title: '售价', field: 'price', align: 'left', width:'' },
+                { title: '库存', field: 'enable_number', align: 'left', width:'' },
+                { title: '上线平台', field: 'platForm', align: 'left' }
+            ]]
+        });
+
+        var category = $.parseJSON( '{!! $category !!}' );
+        var category_html = '';
+        category_html += '<select class="form-control bigCategoryID" name="bigCategoryID" id="bigCategoryID"  data-wm="0">';
+        category_html += '<option value="0">请选择</option>';
+        if( category != ''){
+
+            $.each(category , function( k ,v ){
+
+                category_html += '<option value="'+ v.id +'">'+ v.name+'</option>';
+            });
+        }
+        category_html += '</select>&nbsp;';
+        category_html += '<select class="form-control midCategoryID" name="midCategoryID" id="midCategoryID" data-wm="0" style="display: none" >';
+        category_html += '</select>&nbsp;';
+        category_html += '<select class="form-control smallCategoryID" name="smallCategoryID" id="smallCategoryID" data-wm="0" style="display: none;">';
+        category_html += '</select>&nbsp;';
+
+        $('.category-list').append(category_html);
+
+        $(function(){
+
+            $(document).on('change','.bigCategoryID',function(){
+
+                var _this = $(this);
+                //隐藏三级分类
+                _this.next().next().html('').hide();
+                //隐藏二级
+                _this.next().hide().html('');
+
+                var bigCategoryID = _this.val();
+
+                if( bigCategoryID != 0  ) {
+
+                    $.each(category  ,function ( k ,v ){
+
+                        if (v.id == bigCategoryID ){
+                            if(v.children != ''){
+
+                                var midHtml = '<option value="0">请选择</option>' ;
+                                $.each(v.children ,function ( km, vm ){
+                                    midHtml +='<option value="' + vm.id + '" >' + vm.name + '</option>' ;
+                                });
+
+                                _this.next().show().html(midHtml).css('display','inline-block');
+                            }else{
+                                //隐藏三级分类
+                                _this.next().next().html('').hide();
+                                //隐藏二级
+                                _this.next().hide().html('');
+                            }
+                        }
+                    })
+                }
+            }).on('click','.price',function(){   //修改价格
+
+                var id = $(this).attr('data-id');
+
+                var price = $(this).prev().text();
+                var goods_name = $(this).attr('data-name');
+
+                var htmlPrice = '';
+
+                htmlPrice += '<div id="pop" style="margin-top:10px;" style="width: 100%">';
+                htmlPrice += '<div style="background: #ffffff">';
+                htmlPrice += '<form id="pop_form" onsubmit="return false;" class="form-horizontal" role="form">';
+                htmlPrice += '<input type="hidden" value="'+ id +'" name="spec_id">';
+                htmlPrice += '<div class="form-group" style="margin-right: 1px; margin-left: 28px;text-align: left">';
+                htmlPrice += '<label class="col-sm-12 " for="price_edit" >';
+                htmlPrice += '<span>'+ goods_name +'</span></label>';
+                htmlPrice += '</div>';
+                htmlPrice += '<div class="form-group" style="margin-right: 1px; margin-left: 1px;">';
+                htmlPrice += '<label class="col-sm-3 control-label" for="price_edit">';
+                htmlPrice += '价格：</label>';
+                htmlPrice += '<div class="col-sm-8">';
+                htmlPrice += '<input class="form-control"  style="width: 150px;" type="text" id="price_edit" name="price" maxlength="100" value="'+price+'" />';
+                htmlPrice += '</div></div>';
+                htmlPrice += '</form>';
+                htmlPrice += '</div>';
+                htmlPrice += '</div>';
+
+                layer.open({
+                    title:'修改价格',
+                    type : 1,
+                    area : ['40%','auto'],
+                    move:false,
+                    btnAlign:'c',
+                    content : htmlPrice,
+                    btn : ['确认' ,'取消'],
+                    yes : function(index){
+
+                        var dt = E.getFormValues('pop_form');
+                        var error = '' ;
+
+                        if( dt.price == ''){
+                            error = '请输入商品价格' ;
+                        }
+
+                        if(!E.isMoney(dt.price)){
+                            error = '请设置正确的商品价格' ;
+                        }
+
+                        if( error != '' ){
+                            layer.msg( error ,{ icon : 2 ,shade: [0.15, 'black'], time : 2000 });
+                            return false;
+                        }
+
+                        layer.close(index);
+
+                        E.ajax({
+                            type : 'get',
+                            url : '/admin/mallgoods/edit_price',
+                            dataType : 'json',
+                            data : dt ,
+                            success : function(obj){
+
+                                if( obj.code == 200 ){
+                                    layer.msg('操作成功',{ icon : 1 ,shade: [0.15, 'black'], time : 2000 });
+                                    layui_table_reload();
+                                }else{
+                                    layer.msg('操作失败',{ icon : 2 ,shade: [0.15, 'black'], time : 2000 });
+                                }
+                            }
+                        })
+                    }
+                });
+            }).on('click','.inventory',function(){   //修改库存
+
+                var id = $(this).attr('data-id');
+
+                if($(this).hasClass('batch')){
+
+                    var spec_num = 0;
+                    var sku_ids = [];
+
+                    $('.layui-table-body').find('.layui-form-checked').each(function(){
+                        spec_num ++ ;
+                    });
+
+                    if( !spec_num ){
+                        layer.msg( '请至少选择一个商品' ,{ icon : 2 ,shade: [0.15, 'black'], time : 2000 });
+                        return false;
+                    }
+
+                    $('.layui-table-body').find('.layui-form-checked').each(function(){
+
+                        var sku = $(this).parents('tr').find('.inventory').attr('data-id');
+
+                        sku_ids.push(sku);
+                    });
+
+                    var html = '';
+                    html += '<div id="pop" style="margin-top:10px;" style="width: 100%">';
+                    html += '<div style="background: #ffffff">';
+                    html += '<form id="enable_number_form" onsubmit="return false;" class="form-horizontal" role="form">';
+                    html += '<div class="form-group" style="">';
+                    html += '<div class="col-sm-3">';
+                    html += '</div>';
+                    html += '<label class="col-sm-8 " for="price_edit" >';
+                    html += '<span>共选择了<span style="color: red;"> '+ spec_num +'</span>件商品</span></label>';
+                    html += '</div>';
+                    html += '<div class="form-group" style="margin-right: 1px; margin-left: 1px;">';
+                    html += '<div class="col-sm-3">';
+                    html += '</div>';
+                    html += '<div class="col-sm-8">';
+                    html += '<input type="radio" class="square-radio infinite" checked name="set_enable_number" value="999999">无限</br></br>';
+                    html += '<input type="radio" class="square-radio noinfinite" id="set_enable_number" name="set_enable_number" value="1">具体库存数';
+                    html += '</div>';
+                    html += '</div></div>';
+                    html += '</form>';
+                    html += '</div>';
+
+                    layer.open({
+                        title:'修改库存',
+                        type : 1,
+                        area : ['40%','240px'],
+                        move:false,
+                        btnAlign:'c',
+                        content : html,
+                        btn : ['确认' ,'取消'],
+                        yes : function(index){
+
+                            var dt = E.getFormValues('enable_number_form');
+                            var error = '' ;
+
+                            if( dt.set_enable_number == 1){
+
+                                if(dt.enable_number == ''){
+                                    error = '请输入商品库存' ;
+                                }
+                                if(!E.isInt(dt.enable_number)){
+                                    error = '请设置正确的商品库存' ;
+                                }
+                            }else{
+                                dt.enable_number = 9999;
+                            }
+
+                            dt.sku_ids = sku_ids;
+
+                            if( error != '' ){
+                                layer.msg( error ,{ icon : 2 ,shade: [0.15, 'black'], time : 2000 });
+                                return false;
+                            }
+
+                            layer.close(index);
+
+                            console.log(dt);
+                            E.ajax({
+                                type : 'get',
+                                url : '/admin/mallgoods/edit_inventory',
+                                dataType : 'json',
+                                data : dt ,
+                                success : function(obj){
+
+                                    if( obj.code == 200 ){
+                                        layer.msg('操作成功',{ icon : 1 ,shade: [0.15, 'black'], time : 2000 });
+                                        layui_table_reload();
+                                    }else{
+                                        layer.msg('操作失败',{ icon : 2 ,shade: [0.15, 'black'], time : 2000 });
+                                    }
+                                }
+                            })
+                        }
+                    });
+
+                    addcheck();
+
+                    if($('.noinfinite').is(':checked')){
+
+                        $(this).after('<input type="text" class="form-control" value="" name="enable_number" style="margin-top: -7px;width:80px;margin-left: 102px;">');
+                    }else{
+                        $(this).after('');
+                    }
+
+                    $('.infinite ,.noinfinite').on('ifClicked',function(){
+
+                        var val = $(this).val();
+                        if( val == 1){
+                            $('input[name="enable_number"]').remove();
+                            $('#set_enable_number').after('<input type="text" class="form-control" value="" name="enable_number" style="margin-top: -7px;width:80px;margin-left: 102px;">')
+                        }else{
+                            $('input[name="enable_number"]').remove();
+                        }
+                    });
+
+                }else{
+
+                    var id = $(this).attr('data-id');
+
+                    var enable_number = $(this).prev().text();
+                    var goods_name = $(this).attr('data-name');
+
+                    var html = '';
+
+                    html += '<div id="pop" style="margin-top:10px;" style="width: 100%">';
+                    html += '<div style="background: #ffffff">';
+                    html += '<form id="pop_form" onsubmit="return false;" class="form-horizontal" role="form">';
+                    html += '<input type="hidden" value="'+ id +'" name="sku_ids[]">';
+                    html += '<div class="form-group" style="margin-right: 1px; margin-left: 28px;text-align: left">';
+                    html += '<label class="col-sm-12 " for="price_edit" >';
+                    html += '<span>'+ goods_name +'</span></label>';
+                    html += '</div>';
+                    html += '<div class="form-group" style="margin-right: 1px; margin-left: 1px;">';
+                    html += '<label class="col-sm-3 control-label" for="price_edit">';
+                    html += '库存：</label>';
+                    html += '<div class="col-sm-8">';
+                    html += '<input class="form-control"  style="width: 150px;display: inline-block;" type="text" id="price_edit" name="enable_number" maxlength="100" value="'+enable_number+'" />';
+                    html += '<a href="javescript:void(0)" class="reset">    沽清 | </a>';
+                    html += '<a href="javescript:void(0)" class="infinite">无限</a>';
+                    html += '</div></div>';
+                    html += '</form>';
+                    html += '</div>';
+                    html += '</div>';
+
+                    layer.open({
+                        title:'修改库存',
+                        type : 1,
+                        area : ['40%','auto'],
+                        move:false,
+                        btnAlign:'c',
+                        content : html,
+                        btn : ['确认' ,'取消'],
+                        yes : function(index){
+
+                            var dt = E.getFormValues('pop_form');
+                            var error = '' ;
+
+                            if( dt.enable_number == ''){
+                                error = '请输入商品库存' ;
+                            }
+
+                            if(!E.isInt(dt.enable_number)){
+                                error = '请设置正确的商品库存' ;
+                            }
+
+                            if( error != '' ){
+                                layer.msg( error ,{ icon : 2 ,shade: [0.15, 'black'], time : 2000 });
+                                return false;
+                            }
+
+                            layer.close(index);
+
+                            E.ajax({
+                                type : 'get',
+                                url : '/admin/mallgoods/edit_inventory',
+                                dataType : 'json',
+                                data : dt ,
+                                success : function(obj){
+
+                                    if( obj.code == 200 ){
+                                        layer.msg('操作成功',{ icon : 1 ,shade: [0.15, 'black'], time : 2000 });
+                                        layui_table_reload();
+                                    }else{
+                                        layer.msg('操作失败',{ icon : 2 ,shade: [0.15, 'black'], time : 2000 });
+                                    }
+                                }
+                            })
+                        }
+                    });
+                }
+            }).on('click','.reset',function(){
+
+                $(this).prev().val(0);
+            }).on('click','.infinite',function(){
+
+                $(this).prev().prev().val(9999);
+            }).on('click', '.online', function () {
+
+                var spec_id = $(this).attr('data-id');
+
+                layer.open({
+                    title:false,
+                    type : 2,
+                    closeBtn : 0 ,
+                    area : ['100%','100%'],
+                    content : '/admin/mallgoods/online_list/'+ spec_id
+                });
+
+            }).on('click','.sync-app',function(){   //同步
+
+                var  dt = { spec_ids : [] };
+
+                if( $(this).hasClass('batch')){
+
+                    var spec_num = 0;
+
+                    $('.layui-table-body').find('.layui-form-checked').each(function(){
+
+                        spec_num = 1 ;
+                        var spec_id = $(this).parents('tr').find('.online').attr('data-id');
+                        dt.spec_ids.push( spec_id );
+                    });
+
+                    if( !spec_num ){
+                        layer.msg('请至少选择一个商品',{ icon : 2 , time : 2000 ,shade: [0.15, 'black'] });
+                        return false;
+                    }
+                }else{
+
+                    var spec_id = $(this).prev().attr('data-id');
+                    dt.spec_ids.push(spec_id);
+                }
+
+                E.ajax({
+                    type : 'get',
+                    url :'/admin/mallgoods/sync',
+                    dataType : 'json',
+                    data : {},
+                    success :function ( obj ){
+
+                        if( obj.code == 200 ){
+                            layer.msg('同步成功',{ icon : 1 ,shade: [0.15, 'black'], time : 2000 });
+                        }else{
+                            layer.msg( obj.message ,{ icon : 2 ,shade: [0.15, 'black'], time : 2000 });
+                        }
+                    }
+                })
+            });
+
+        }).on('click','.pull-erp-price',function(){  //拉取erp价格
+
+            var  dt = { spec_ids : [] };
+
+            if( $(this).hasClass('batch')){
+
+                var spec_num = 0;
+
+                $('.layui-table-body').find('.layui-form-checked').each(function(){
+
+                    spec_num = 1;
+                    var spec_id = $(this).parents('tr').find('.online').attr('data-id');
+                    dt.spec_ids.push( spec_id );
+                });
+
+                if( !spec_num ){
+                    layer.msg('请至少选择一个商品',{ icon : 2 , time : 2000 ,shade: [0.15, 'black'] });
+                    return false;
+                }
+            }else{
+
+                var spec_id = $(this).parent().find('.online').attr('data-id');
+                dt.spec_ids.push(spec_id);
+            }
+
+            console.log(dt);
+            E.ajax({
+                type : 'get',
+                url :'/admin/mallgoods/pull_erp_price',
+                dataType : 'json',
+                data : {},
+                success :function ( obj ){
+
+                    if( obj.code == 200 ){
+                        layer.msg('拉取成功',{ icon : 1 ,shade: [0.15, 'black'], time : 2000 });
+                    }else{
+                        layer.msg( obj.message ,{ icon : 2 ,shade: [0.15, 'black'], time : 2000 });
+                    }
+                }
+            })
+
+        }).on('click','.pull-erp-stock',function(){  //批量拉取库存
+
+            var  dt = { spec_ids : [] };
+
+            if( $(this).hasClass('batch')){
+
+                var spec_num = 0;
+
+                $('.layui-table-body').find('.layui-form-checked').each(function(){
+
+                    spec_num = 1 ;
+                    var spec_id = $(this).parents('tr').find('.online').attr('data-id');
+                    dt.spec_ids.push( spec_id );
+                });
+
+                if( !spec_num ){
+                    layer.msg('请至少选择一个商品',{ icon : 2 , time : 2000 ,shade: [0.15, 'black'] });
+                    return false;
+                }
+            }else{
+
+                var spec_id = $(this).prev().prev().prev().attr('data-id');
+                dt.spec_ids.push(spec_id);
+            }
+
+            console.log(dt);
+            E.ajax({
+                type : 'get',
+                url :'/admin/mallgoods/pull_erp_stock',
+                dataType : 'json',
+                data : {},
+                success :function ( obj ){
+
+                    if( obj.code == 200 ){
+                        layer.msg('拉取成功',{ icon : 1 ,shade: [0.15, 'black'], time : 2000 });
+                    }else{
+                        layer.msg( obj.message ,{ icon : 2 ,shade: [0.15, 'black'], time : 2000 });
+                    }
+                }
+            })
+        });
+
+        function addcheck(){
+
+            $('.square-radio').iCheck({
+                checkboxClass: 'icheckbox_square-blue',
+                radioClass: 'iradio_square-blue',
+                increaseArea: '20%' // optional
+            });
+        }
+
+    </script>
+@endsection

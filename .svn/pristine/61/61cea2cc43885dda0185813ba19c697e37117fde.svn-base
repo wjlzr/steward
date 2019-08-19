@@ -1,0 +1,106 @@
+@extends('admin.layoutEdit')
+
+@section('css')
+    <link href="http://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.bootcss.com/bootstrap-table/1.11.1/bootstrap-table.min.css">
+    <style>
+        .items{
+            width:512px;
+            height: 100px;
+            display: inline-block;
+            background-color: rgba(242, 242, 242, 1);
+            border-radius: 5px;
+            margin-bottom:15px;
+            padding: 10px 30px;
+        }
+        .items2{
+            position: relative;
+            right:-37px;
+            vertical-align: top;
+        }
+        .itemsCont,.itemsRight{
+            display: inline-block;
+        }
+        .itemsRight{
+            width: 226px;
+            margin-left:95px;
+            vertical-align: middle;
+        }
+        .synch{
+            width: 40px;
+            height: 40px;
+            margin-left: 40px;
+        }
+        .offline{
+            width: 40px;
+            height: 40px;
+            margin-left: 40px;
+        }
+    </style>
+@endsection
+
+@section('content')
+    <div class="items">
+        <div class="itemsCont">
+            <img class="synch" src="/images/admin/app/u4948.png"/>
+            <p>同步商品至线上平台</p>
+        </div>
+        <p class="itemsRight">新增或更新部分商品至线上平台，其他商品均不变</p>
+    </div>
+    <div class="items items2">
+        <div class="itemsCont">
+            <img class="offline" src="/images/admin/app/u4950.png"/>
+            <p>下架线上平台商品</p>
+        </div>
+        <p class="itemsRight">下架线上平台部分商品，其他商品均不变</p>
+    </div>
+    <div class="row">
+        <div class="col-lg-12">
+            <div style="background-color: rgba(242, 242, 242, 1);width: 100%;height: 35px;">
+                <span style="line-height: 35px;margin-left:20px;">操作记录</span>
+                <a style="margin-left: 893px;" href="javascript: void(0);" onclick="ApiGroup.del();">刷新操作记录</a>
+            </div>
+            <table id="table"></table>
+        </div>
+    </div>
+@endsection
+
+@section('js')
+<script src="https://cdn.bootcss.com/bootstrap-table/1.9.1/bootstrap-table.min.js"></script>
+    <script>
+
+
+        var bootstrap_table_ajax_url = '/admin/goods/synch/search';
+        $('#table').bootstrapTable({
+            classes: 'table table-hover', //bootstrap的表格样式
+            sidePagination: 'server', //获取数据方式【从服务器获取数据】
+            pagination: true, //分页
+            height: $(window).height() - 200, //表格高度
+            pageNumber: 1, //页码【第X页】
+            pageSize: 10, //每页显示多少条数据
+            queryParamsType: 'limit',
+            queryParams: function (params) {
+                var dt = E.getFormValues('search-form');
+                $.extend(params, dt);
+                return params;
+            },
+            url: bootstrap_table_ajax_url ,//ajax链接
+            sortName: 'sDesc', //排序字段
+            sortOrder: 'DESC',//排序方式
+            columns: [ //字段
+                { title: '操作', field: 'operation', align: 'center' },
+                { title: '内容', field: 'sid', align: 'center' },
+                { title: '时间', field: 'sDesc', align: 'center' },
+                { title: '操作人', field: 'releaseTime', align: 'center'},
+                { title: '状态',  field: 'status', align: 'center' },
+                { title: '结果',  field: 'testStatus', align: 'center' }
+            ]
+        });
+
+        //搜索条件的判断
+        var goods = {
+
+        };
+
+    </script>
+@endsection

@@ -1,0 +1,812 @@
+<?php
+
+namespace App\Services\Order;
+
+use App\Models\Order\StOrder;
+use App\Models\Order\StOrderApply;
+use App\Models\Order\StOrderTrace;
+use App\Models\StApp;
+
+use DB;
+use Wm;
+
+class OrderEditService
+{
+
+
+    /**
+     * 订单接单
+     * @param int $order_id 订单号
+     * @param string $operator 操作者
+     * @param int $app_release 是否发布至应用
+     * @return array
+     */
+    public function receive($order_id, $operator, $app_release = 1) {
+
+        $order = StOrder::find($order_id);
+        if (!$order) {
+            return ['code'=>404, 'message'=>'订单信息没有找到'];
+        }
+
+        $app = StApp::find($order->app_id);
+        if (!$app) {
+            return ['code'=>404, 'message'=>'应用信息没有找到'];
+        }
+
+        if ($order->status == 1) {
+            return ['code'=>400, 'message'=>'订单已接单'];
+        } else if (in_array($order->status, [2, 3])) {
+            return ['code'=>400, 'message'=>'订单已发货'];
+        } else if (in_array($order->status, [7, 8])) {
+            return ['code'=>400, 'message'=>'订单已配货'];
+        } else if ($order->status == 4) {
+            return ['code'=>400, 'message'=>'订单已完成'];
+        } else if ($order->status == 5) {
+            return ['code'=>400, 'message'=>'订单已取消'];
+        }
+
+        try {
+
+            DB::beginTransaction();
+
+            StOrder::where('id', $order->id)->update(['status' => 1]);
+
+            $st_order_trace = new StOrderTrace();
+            $st_order_trace->creator = $operator;
+            $st_order_trace->order_id = $order->id;
+            $st_order_trace->order_status = 1;
+            $st_order_trace->content = '您的订单已接单';
+            $st_order_trace->save();
+
+            if ($app_release) {
+                $send_result = Wm::send($app->alias.'.order.accept_order', [
+                    'order_id'=>$order->o_order_id
+                ]);
+                if ($send_result['code'] != 200) {
+                    throw new Exception($send_result['message'], 400);
+                }
+            }
+
+            DB::commit();
+            return ['code'=>200, 'message'=>'订单接单成功'];
+
+        } catch (Exception $e) {
+            DB::rollBack();
+            return ['code'=>$e->getCode(), 'message'=>$e->getMessage()];
+        }
+
+    }
+
+
+    /**
+     * 取消订单
+     * @param $order_id
+     * @param int $reason_id
+     * @param string $reason_content
+     * @param $operator
+     * @param int $app_release
+     * @return array
+     */
+    public function cancel($order_id, $reason_id = 0, $reason_content = '', $operator, $app_release = 1)
+    {
+
+        if (empty($reason)) {
+            return ['code'=>400, 'message'=>'取消原因不能为空'];
+        }
+
+        if (empty($reason_id)) {
+            return ['code'=>400, 'message'=>'取消原因ID不能为空'];
+        }
+
+        $order = StOrder::find($order_id);
+        if (!$order) {
+            return ['code'=>404, 'message'=>'订单信息没有找到'];
+        } else if ($order->status == 2) {
+            return ['code'=>400, 'message'=>'订单已取消，不能再取消'];
+        }
+
+        $app = StApp::find($order->app_id);
+        if (!$app) {
+            return ['code'=>404, 'message'=>'应用信息没有找到'];
+        }
+
+        try {
+
+            DB::beginTransaction();
+
+            StOrder::where('id', $order->id)->update(['status' => 5]);
+
+            $st_order_trace = new StOrderTrace();
+            $st_order_trace->creator = $operator;
+            $st_order_trace->order_id = $order->id;
+            $st_order_trace->order_status = 5;
+            $st_order_trace->content = '您的订单已取消';
+            $st_order_trace->save();
+
+            if ($app_release) {
+                $send_result = Wm::send($app->alias.'.order.cancel_order', [
+                    'order_id' => $order->o_order_id,
+                    'type' => $reason_id,
+                    'remark' => $reason_content
+                ]);
+                if ($send_result['code'] != 200) {
+                    throw new Exception($send_result['message'], 400);
+                }
+            }
+
+            DB::commit();
+            return ['code'=>200, 'message'=>'订单取消成功'];
+
+        } catch (Exception $e) {
+            DB::rollBack();
+            return ['code'=>$e->getCode(), 'message'=>$e->getMessage()];
+        }
+
+    }
+
+
+    /**
+     * 挂起订单
+     * @param int $order_id 订单号
+     * @param string $operator 操作者
+     * @return array
+     */
+    public function hangUp($order_id, $operator) {
+
+        $order = StOrder::find($order_id);
+        if (!$order) {
+            return ['code'=>404, 'message'=>'订单信息没有找到'];
+        }
+
+        $app = StApp::find($order->app_id);
+        if (!$app) {
+            return ['code'=>404, 'message'=>'应用信息没有找到'];
+        }
+
+        try {
+
+            DB::beginTransaction();
+
+            StOrder::where('id', $order->id)->update(['hang_up' => 1]);
+
+            $st_order_trace = new StOrderTrace();
+            $st_order_trace->creator = $operator;
+            $st_order_trace->order_id = $order->id;
+            $st_order_trace->order_status = $order->status;
+            $st_order_trace->content = '您的订单已挂起';
+            $st_order_trace->save();
+
+            DB::commit();
+            return ['code'=>200, 'message'=>'订单挂起成功'];
+
+        } catch (Exception $e) {
+            DB::rollBack();
+            return ['code'=>$e->getCode(), 'message'=>$e->getMessage()];
+        }
+
+    }
+
+
+    /**
+     * 取消挂起订单
+     * @param int $order_id 订单号
+     * @param string $operator 操作者
+     * @return array
+     */
+    public function cancelHangUp($order_id, $operator) {
+
+        $order = StOrder::find($order_id);
+        if (!$order) {
+            return ['code'=>404, 'message'=>'订单信息没有找到'];
+        }
+
+        $app = StApp::find($order->app_id);
+        if (!$app) {
+            return ['code'=>404, 'message'=>'应用信息没有找到'];
+        }
+
+        try {
+
+            DB::beginTransaction();
+
+            StOrder::where('id', $order->id)->update(['hang_up' => 0]);
+
+            $st_order_trace = new StOrderTrace();
+            $st_order_trace->creator = $operator;
+            $st_order_trace->order_id = $order->id;
+            $st_order_trace->order_status = $order->status;
+            $st_order_trace->content = '您的订单已取消挂起';
+            $st_order_trace->save();
+
+            DB::commit();
+            return ['code'=>200, 'message'=>'订单取消挂起成功'];
+
+        } catch (Exception $e) {
+            DB::rollBack();
+            return ['code'=>$e->getCode(), 'message'=>$e->getMessage()];
+        }
+
+    }
+
+
+    /**
+     * 订单配货
+     * @param $order_id
+     * @param $operator
+     * @return array
+     */
+    public function packs($order_id, $operator) {
+
+        $order = StOrder::find($order_id);
+        if (!$order) {
+            return ['code'=>404, 'message'=>'订单信息没有找到'];
+        } else if ($order->status == 0) {
+            return ['code'=>400, 'message'=>'订单未接单'];
+        } else if ($order->status == 2) {
+            return ['code'=>400, 'message'=>'订单已发货'];
+        } else if ($order->status == 7) {
+            return ['code'=>400, 'message'=>'订单已配货'];
+        } else if ($order->status == 8) {
+            return ['code'=>400, 'message'=>'订单已配货完成'];
+        } else if ($order->status == 4) {
+            return ['code'=>400, 'message'=>'订单已完成'];
+        } else if ($order->status == 5) {
+            return ['code'=>400, 'message'=>'订单已取消'];
+        }
+
+        try {
+
+            DB::beginTransaction();
+
+            StOrder::where('id', $order->id)->update(['status' => 7]);
+
+            $st_order_trace = new StOrderTrace();
+            $st_order_trace->creator = $operator;
+            $st_order_trace->order_id = $order->id;
+            $st_order_trace->order_status = 7;
+            $st_order_trace->content = '您的订单配货中';
+            $st_order_trace->save();
+
+            DB::commit();
+            return ['code'=>200, 'message'=>'订单配货成功'];
+
+        } catch (Exception $e) {
+            DB::rollBack();
+            return ['code'=>$e->getCode(), 'message'=>$e->getMessage()];
+        }
+
+    }
+
+
+    /**
+     * 完成配货
+     * @param $order_id
+     * @param $operator
+     * @return array
+     */
+    public function completePacks($order_id, $operator) {
+
+        $order = StOrder::find($order_id);
+        if (!$order) {
+            return ['code'=>404, 'message'=>'订单信息没有找到'];
+        } else if ($order->status == 0) {
+            return ['code'=>400, 'message'=>'订单未接单'];
+        }else if ($order->status == 1) {
+            return ['code'=>400, 'message'=>'订单未配货'];
+        } else if ($order->status == 2) {
+            return ['code'=>400, 'message'=>'订单已发货'];
+        } else if ($order->status == 8) {
+            return ['code'=>400, 'message'=>'订单已配货完成'];
+        } else if ($order->status == 4) {
+            return ['code'=>400, 'message'=>'订单已完成'];
+        } else if ($order->status == 5) {
+            return ['code'=>400, 'message'=>'订单已取消'];
+        }
+
+        try {
+
+            DB::beginTransaction();
+
+            StOrder::where('id', $order->id)->update(['status' => 8]);
+
+            $st_order_trace = new StOrderTrace();
+            $st_order_trace->creator = $operator;
+            $st_order_trace->order_id = $order->id;
+            $st_order_trace->order_status = 8;
+            $st_order_trace->content = '您的订单已完成配货';
+            $st_order_trace->save();
+
+            DB::commit();
+            return ['code'=>200, 'message'=>'订单完成配货成功'];
+
+        } catch (Exception $e) {
+            DB::rollBack();
+            return ['code'=>$e->getCode(), 'message'=>$e->getMessage()];
+        }
+
+    }
+
+
+    /**
+     * 订单发货
+     * @param $order_id
+     * @param $operator
+     * @param int $app_release
+     * @return array
+     */
+    public function delivery($order_id, $operator, $app_release = 1)
+    {
+
+        $order = StOrder::find($order_id);
+        if (!$order) {
+            return ['code'=>404, 'message'=>'订单信息没有找到'];
+        } else if ($order->status == 0) {
+            return ['code'=>400, 'message'=>'订单未接单'];
+        } else if ($order->status == 2) {
+            return ['code'=>400, 'message'=>'订单已发货'];
+        } else if ($order->status == 3) {
+            return ['code'=>400, 'message'=>'订单配送中'];
+        } else if ($order->status == 7) {
+            return ['code'=>400, 'message'=>'订单未完成配货'];
+        } else if ($order->status == 4) {
+            return ['code'=>400, 'message'=>'订单已完成'];
+        } else if ($order->status == 5) {
+            return ['code'=>400, 'message'=>'订单已取消'];
+        }
+
+        $app = StApp::find($order->app_id);
+        if (!$app) {
+            return ['code'=>404, 'message'=>'应用信息没有找到'];
+        }
+
+        try {
+
+            DB::beginTransaction();
+
+            StOrder::where('id', $order->id)->update(['status' => 2]);
+
+            $st_order_trace = new StOrderTrace();
+            $st_order_trace->creator = $operator;
+            $st_order_trace->order_id = $order->id;
+            $st_order_trace->order_status = 2;
+            $st_order_trace->content = '您的订单已发货';
+            $st_order_trace->save();
+
+            if ($app_release) {
+                $send_result = Wm::send($app->alias.'.order.send_out_order', [
+                                    'order_id' => $order->o_order_id
+                                ]);
+                if ($send_result['code'] != 200) {
+                    throw new Exception($send_result['message'], 400);
+                }
+            }
+
+            DB::commit();
+            return ['code'=>200, 'message'=>'订单发货成功'];
+
+        } catch (Exception $e) {
+            DB::rollBack();
+            return ['code'=>$e->getCode(), 'message'=>$e->getMessage()];
+        }
+
+    }
+
+
+    /**
+     * 订单完成
+     * @param $order_id
+     * @param $operator
+     * @param int $app_release
+     * @return array
+     */
+    public function complete($order_id, $operator, $app_release = 1)
+    {
+
+        $order = StOrder::find($order_id);
+        if (!$order) {
+            return ['code'=>404, 'message'=>'订单信息没有找到'];
+        } else if (in_array($order->status, [0, 1, 7, 8])) {
+            return ['code'=>400, 'message'=>'订单未发货'];
+        } else if ($order->status == 4) {
+            return ['code'=>400, 'message'=>'订单已完成'];
+        } else if ($order->status == 5) {
+            return ['code'=>400, 'message'=>'订单已取消'];
+        }
+
+        $app = StApp::find($order->app_id);
+        if (!$app) {
+            return ['code'=>404, 'message'=>'应用信息没有找到'];
+        }
+
+        try {
+
+            DB::beginTransaction();
+
+            StOrder::where('id', $order->id)->update(['status' => 4]);
+
+            $st_order_trace = new StOrderTrace();
+            $st_order_trace->creator = $operator;
+            $st_order_trace->order_id = $order->id;
+            $st_order_trace->order_status = 4;
+            $st_order_trace->content = '您的订单已完成';
+            $st_order_trace->save();
+
+            if ($app_release) {
+                $send_result = Wm::send($app->alias.'.order.delivered_order', [
+                    'order_id' => $order->o_order_id
+                ]);
+                if ($send_result['code'] != 200) {
+                    throw new Exception($send_result['message'], 400);
+                }
+            }
+
+            DB::commit();
+            return ['code'=>200, 'message'=>'订单完成成功'];
+
+        } catch (Exception $e) {
+            DB::rollBack();
+            return ['code'=>$e->getCode(), 'message'=>$e->getMessage()];
+        }
+
+    }
+
+
+    /**
+     * 用户申请退单/取消单
+     * @param $order_id
+     * @param string $operator
+     * @param string $apply_reason
+     * @param int $apply_type：1、取消单 2、退单 3、催单
+     * @return array
+     */
+    public function applyRefund($order_id, $operator, $apply_reason = '', $apply_type = 1)
+    {
+
+        $order = StOrder::find($order_id);
+        if (!$order) {
+            return ['code'=>404, 'message'=>'订单信息没有找到'];
+        } else if ($order->status == 5) {
+            return ['code'=>404, 'message'=>'订单已取消'];
+        }
+
+        $apply_content = $apply_type == 1
+                ? '您的订单用户申请取消了，理由是：' . $apply_reason
+                : '您的订单用户申请退单了，理由是：' . $apply_reason;
+
+        try {
+
+            DB::beginTransaction();
+
+            $order_apply = new StOrderApply();
+            $order_apply->creator = $operator;
+            $order_apply->order_id = $order->id;
+            $order_apply->type = $apply_type;
+            $order_apply->rason = $apply_content;
+            $order_apply->save();
+
+            $order_trace = new StOrderTrace();
+            $order_trace->creator = $operator;
+            $order_trace->order_id = $order->id;
+            $order_trace->order_status = $order->status;
+            $order_trace->content = $apply_content;
+            $order_trace->save();
+
+            StOrder::where('id', $order->id)->update([
+                'apply' => $apply_type,
+                'apply_id' => $order_apply->id
+            ]);
+
+            DB::commit();
+            return ['code' => 200, 'message' => 'ok'];
+
+        } catch(Exception $e) {
+            DB::rollBack();
+            return ['code'=>$e->getCode(), 'message'=>$e->getMessage()];
+        }
+
+    }
+
+
+    /**
+     * 用户取消退单/取消单申请
+     * @param $order_id
+     * @param $operator
+     * @param int $type
+     * @return array
+     */
+    public function cancelApplyRefund($order_id, $operator, $type = 1)
+    {
+
+        $order = StOrder::find($order_id);
+        if (!$order) {
+            return ['code'=>404, 'message'=>'订单信息没有找到'];
+        } else if ($order->status == 5) {
+            return ['code'=>404, 'message'=>'订单已取消'];
+        }
+
+        $message = $type == 1 ? '用户取消取消单申请' : '用户取消退单申请';
+
+        try {
+
+            DB::beginTransaction();
+
+            $order_trace = new StOrderTrace();
+            $order_trace->creator = $operator;
+            $order_trace->order_id = $order->id;
+            $order_trace->order_status = $order->status;
+            $order_trace->content = $message;
+            $order_trace->save();
+
+            StOrder::where('id', $order->id)->update([
+                'apply' => 0,
+                'apply_id' => 0
+            ]);
+
+            DB::commit();
+            return ['code' => 200, 'message' => 'ok'];
+
+        } catch(Exception $e) {
+            DB::rollback();
+            return ['code' => $e->getCode(), 'message' => $e->getMessage()];
+        }
+
+    }
+
+
+    /**
+     * 同意退单/取消单
+     * @param $order_id
+     * @param $operator
+     * @param int $app_release
+     * @return array
+     */
+    public function agreeRefund($order_id, $operator, $app_release = 1)
+    {
+
+        $order = StOrder::find($order_id);
+        if (!$order) {
+            return ['code'=>404, 'message'=>'订单信息没有找到'];
+        } else if ($order->status == 5) {
+            return ['code'=>404, 'message'=>'订单已取消'];
+        }
+
+        $app = StApp::find($order->app_id);
+        if (!$app) {
+            return ['code'=>404, 'message'=>'应用平台没有找到'];
+        }
+
+        $reply_content = $order->apply == 2 ? '商家已同意退单' : '商家已同意取消单';
+
+        try {
+
+            DB::beginTransaction();
+
+            StOrderApply::where('order_id', $order->apply_id)->update([
+                'reply' => 1,
+                'reply_message' => $reply_content
+            ]);
+
+            StOrder::where('id', $order->id)->update([
+                'status' => 5,
+                'apply' => 0,
+                'apply_id' => 0
+            ]);
+
+            $order_trace = new StOrderTrace();
+            $order_trace->creator = $operator;
+            $order_trace->order_id = $order->id;
+            $order_trace->order_status = 5;
+            $order_trace->content = '您的订单['. $reply_content .']';
+            $order_trace->save();
+
+            if ( $app_release ) {
+                $send_array = Wm::send( $app->alias. '.order.audit_cancel_order', [
+                    'order_id' => $order->id
+                ]);
+                if ($send_array['code'] != 200) {
+                    throw new Exception($send_array['message'], 400);
+                }
+            }
+
+            DB::commit();
+            return ['code' => 200, 'message' => '回复成功'];
+
+        } catch(Exception $e) {
+            DB::rollBack();
+            return ['code'=>$e->getCode(), 'message'=>$e->getMessage()];
+        }
+
+    }
+
+
+    /**
+     * 拒绝退单/取消单申请
+     * @param $order_id
+     * @param $disagree_reason
+     * @param $operator
+     * @param int $app_release
+     * @return array
+     */
+    public function disagreeRefund($order_id, $disagree_reason, $operator, $app_release = 1)
+    {
+
+        if (empty($disagree_reason)) {
+            return ['code'=>400, 'message'=>'请填写拒绝理由'];
+        }
+
+        $order = StOrder::find($order_id);
+        if (!$order) {
+            return ['code'=>404, 'message'=>'订单信息没有找到'];
+        } else if ($order->status == 5) {
+            return ['code'=>404, 'message'=>'订单已取消'];
+        }
+
+        $app = StApp::find($order->app_id);
+        if (!$app) {
+            return ['code'=>404, 'message'=>'应用平台没有找到'];
+        }
+
+        try {
+
+            DB::beginTransaction();
+
+            StOrderApply::where('order_id', $order->apply_id)->update([
+                'reply' => 1,
+                'reply_message' => $disagree_reason
+            ]);
+
+            StOrder::where('id', $order->id)->update([
+                'apply' => 0,
+                'apply_id' => 0
+            ]);
+
+            $order_trace = new StOrderTrace();
+            $order_trace->creator = $operator;
+            $order_trace->order_id = $order->id;
+            $order_trace->order_status = $order->status;
+            $order_trace->content = '您的申请被拒绝，理由是：'. $disagree_reason;
+            $order_trace->save();
+
+            if ( $app_release ) {
+                $send_array = Wm::send( $app->alias. '.order.audit_cancel_order', [
+                    'order_id' => $order->id,
+                    'is_agree' => false,
+                    'remark' => $disagree_reason
+                ]);
+                if ($send_array['code'] != 200) {
+                    throw new Exception($send_array['message'], 400);
+                }
+            }
+
+            DB::commit();
+            return ['code' => 200, 'message' => '回复成功'];
+
+        } catch(Exception $e) {
+            DB::rollBack();
+            return ['code'=>$e->getCode(), 'message'=>$e->getMessage()];
+        }
+
+    }
+
+
+    /**
+     * 用户申请催单
+     * @param $order_id
+     * @param $remind_id
+     * @param $operator
+     * @return array
+     */
+    public function applyRemind( $order_id, $remind_id, $operator )
+    {
+
+        $order = StOrder::find($order_id);
+        if (!$order) {
+            return ['code'=>404, 'message'=>'订单信息没有找到'];
+        } else if ($order->status == 5) {
+            return ['code'=>404, 'message'=>'订单已取消'];
+        }
+
+        try {
+
+            DB::beginTransaction();
+
+            $order_apply = new StOrderApply();
+            $order_apply->creator = $operator;
+            $order_apply->order_id = $order->id;
+            $order_apply->type = 3;
+            $order_apply->save();
+
+            $order_trace = new StOrderTrace();
+            $order_trace->creator = $operator;
+            $order_trace->order_id = $order->id;
+            $order_trace->order_status = $order->status;
+            $order_trace->content = '有用户发起催单啦';
+            $order_trace->save();
+
+            StOrder::where('id', $order->id)->update([
+                'apply' => 3,
+                'apply_id' => $order_apply->id,
+                'remind_id' => $remind_id
+            ]);
+
+            DB::commit();
+            return ['code' => 200, 'message' => 'ok'];
+
+        } catch(Exception $e) {
+            DB::rollBack();
+            return ['code'=>$e->getCode(), 'message'=>$e->getMessage()];
+        }
+
+    }
+
+
+    /**
+     * 回复催单
+     * @param $order_id
+     * @param $reply_content
+     * @param $operator
+     * @param int $app_release
+     * @return array
+     */
+    public function replyRemind($order_id, $reply_content, $operator, $app_release = 1)
+    {
+
+        if (empty($reply_content)) {
+            return ['code'=>400, 'message'=>'回复催单内容不能为空'];
+        }
+
+        $order = StOrder::find($order_id);
+        if (!$order) {
+            return ['code'=>404, 'message'=>'订单信息没有找到'];
+        } else if ($order->status == 5) {
+            return ['code'=>404, 'message'=>'订单已取消'];
+        }
+
+        $app = StApp::find($order->app_id);
+        if (!$app) {
+            return ['code'=>404, 'message'=>'应用信息没有找到'];
+        }
+
+        try {
+
+            DB::beginTransaction();
+
+            StOrderApply::where('order_id', $order->apply_id)->update([
+                'reply' => 1,
+                'reply_message' => $reply_content
+            ]);
+
+            $order_trace = new StOrderTrace();
+            $order_trace->creator = $operator;
+            $order_trace->order_id = $order->id;
+            $order_trace->order_status = $order->status;
+            $order_trace->content = '催单已回复['. $reply_content .']';
+            $order_trace->save();
+
+            StOrder::where('id', $order->id)->update([
+                'apply' => 0,
+                'apply_id' => 0
+            ]);
+
+            if ( $app_release ) {
+                $result_array = Wm::send( $app->alias. '.order.reply_remind', [
+                    'remind_id' => $order->remind_id,
+                    'reply_content' => $reply_content
+                ]);
+                if ($result_array['code'] != 200) {
+                    throw new Exception($result_array['message'], 400);
+                }
+            }
+
+            DB::commit();
+            return ['code' => 200, 'message' => '回复成功'];
+
+        } catch(Exception $e) {
+            DB::rollBack();
+            return ['code'=>$e->getCode(), 'message'=>$e->getMessage()];
+        }
+
+    }
+
+
+}

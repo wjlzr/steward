@@ -1,0 +1,86 @@
+@extends('admin.layoutEdit')
+
+@section('css')
+    <link href="/css/admin/order/order.css?v=20180109002" rel="stylesheet">
+    <style>
+        .col-extend-css {
+            width:100%;
+            text-align: left;
+            padding-left: 32px;
+        }
+        /*ie7、ie8兼容性*/
+        .form-inline button{
+            *vertical-align: top;
+            *margin-left:5px;
+        }
+        .form-inline .form-group{
+            display: inline;
+            zoom:1;
+        }
+        .form-inline .form-group label{
+            display: inline;
+            zoom:1;
+        }
+        .form-inline .form-group input{
+            width:auto;
+            display: inline;
+            zoom:1;
+            _line-height:35px;
+        }
+        .form-control{
+            *padding:0;
+        }
+        .layui-form-radio {display:block !important; }
+        .layui-form-radio i{
+            vertical-align: top !important;
+            padding-top:3px !important;
+            zoom:1;
+        }
+        .layui-form-radio span{
+            width:240px !important;
+        }
+        .pagination li {
+            _float: left;
+            _padding:10px 6px;
+            _border:1px solid #ccc;
+        }
+        .pagination li.active a{
+            _color:#fff;
+        }
+
+    </style>
+@endsection
+@section('title')
+    <li class="bill-status-cls {{$type == '1' ? 'cur':''}}" data-type="1"><span class="pointer">待接单</span></li>
+    <li class="bill-status-cls {{$type == '2' ? 'cur':''}}" data-type="2"><span class="pointer">待发货</span></li>
+    <li class="bill-status-cls" data-type="3"><span class="pointer">配送中</span></li>
+    <li class="bill-status-cls {{$type == '5' ? 'cur':''}}" data-type="5"><span class="pointer">异常单</span></li>
+    <li class="bill-status-cls {{$type == '6' ? 'cur':''}}" data-type="6"><span class="pointer">催单</span></li>
+    <li class="bill-status-cls {{$type == '7' ? 'cur':''}}" data-type="7"><span class="pointer">退单</span></li>
+    <li class="bill-status-cls" data-type="8"><span class="pointer">已完成</span></li>
+    <li class="bill-status-cls" data-type="9"><span class="pointer">已取消</span></li>
+@endsection
+
+@section('content')
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="order-content">
+                <div class="top-jilu">共<span class="word-color" id="total"></span>条记录</div>
+                <ul class="order-list order-list-detail" id="order-list"></ul>
+                <div class="position-page"></div>
+            </div>
+        </div>
+    </div>
+@endsection
+
+@section('js')
+    <script src="/js/admin/order.event.js?v=201801202000"></script>
+    <script>
+
+        $(function () {
+            refresh();
+        });
+
+    </script>
+
+@endsection
